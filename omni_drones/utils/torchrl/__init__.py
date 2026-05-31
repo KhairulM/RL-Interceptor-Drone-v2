@@ -22,4 +22,4 @@
 
 
 from .env import AgentSpec, RenderCallback, EpisodeStats
-from .collector import SyncDataCollector
+from .collector import Collector

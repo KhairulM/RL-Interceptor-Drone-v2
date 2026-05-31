@@ -23,14 +23,16 @@
 
 import torch
 import time
-from torchrl.collectors import SyncDataCollector as _SyncDataCollector
+# from torchrl.collectors import SyncDataCollector as _SyncDataCollector
+from torchrl.collectors import Collector as _Collector
 from torchrl.collectors.utils import split_trajectories
 from torchrl.envs.utils import _replace_last, step_mdp
 from tensordict.tensordict import TensorDictBase
 
 from typing import Iterator
 
-class SyncDataCollector(_SyncDataCollector):
+
+class Collector(_Collector):
 
     def rollout(self) -> TensorDictBase:
         start = time.perf_counter()
@@ -86,4 +88,3 @@ class SyncDataCollector(_SyncDataCollector):
 
             if self._frames >= self.total_frames:
                 break
-

@@ -14,7 +14,7 @@ from omegaconf import OmegaConf
 from omni_drones import init_simulation_app
 from torchrl.data import CompositeSpec, TensorSpec
 from torchrl.envs.utils import set_exploration_type, ExplorationType
-from omni_drones.utils.torchrl import SyncDataCollector
+from omni_drones.utils.torchrl import Collector
 from omni_drones.utils.torchrl.transforms import (
     FromMultiDiscreteAction,
     FromDiscreteAction,
@@ -251,10 +251,10 @@ def main(cfg):
 
     stats_keys = [
         k for k in base_env.observation_spec.keys(True, True)
-        if isinstance(k, tuple) and k[0]=="stats"
+        if isinstance(k, tuple) and k[0] == "stats"
     ]
     episode_stats = EpisodeStats(stats_keys)
-    collector = SyncDataCollector(
+    collector = Collector(
         env,
         policy=policy,
         frames_per_batch=frames_per_batch,
@@ -265,8 +265,8 @@ def main(cfg):
 
     @torch.no_grad()
     def evaluate(
-        seed: int=0,
-        exploration_type: ExplorationType=ExplorationType.MODE
+        seed: int = 0,
+        exploration_type: ExplorationType = ExplorationType.MODE
     ):
 
         base_env.enable_render(True)

@@ -20,27 +20,4 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-
-from .mappo import MAPPOPolicy
-from .mappo_new import MAPPO
-from .ppo import *
-from .happo import HAPPOPolicy
-from .qmix import QMIXPolicy
-
-from .dqn import DQNPolicy
-from .sac import SACPolicy
-from .td3 import TD3Policy
-from .matd3 import MATD3Policy
-from .tdmpc import TDMPCPolicy
-
-ALGOS = {
-    "mappo_old": MAPPOPolicy,
-    "mappo": MAPPO,
-    "happo": HAPPOPolicy,
-    "ppo": PPOPolicy,
-    "ppo_rnn": PPORNNPolicy,
-    "ppo_adapt": PPOAdaptivePolicy,
-    "sac": SACPolicy,
-    "td3": TD3Policy,
-    "matd3": MATD3Policy,
-}
+from .intercept_competitive import InterceptCompetitive

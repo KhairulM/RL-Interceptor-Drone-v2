@@ -11,7 +11,7 @@ from omegaconf import OmegaConf
 from omni_drones import init_simulation_app
 from torchrl.data import CompositeSpec
 from torchrl.envs.utils import set_exploration_type, ExplorationType
-from omni_drones.utils.torchrl import SyncDataCollector
+from omni_drones.utils.torchrl import Collector
 from omni_drones.utils.torchrl.transforms import (
     FromMultiDiscreteAction,
     FromDiscreteAction,
@@ -104,6 +104,25 @@ def main(cfg):
     except KeyError:
         raise NotImplementedError(f"Unknown algorithm: {cfg.algo.name}")
 
+    # Optionally load a trained checkpoint produced by train.py.
+    ckpt_path = cfg.get("checkpoint", None)
+    if ckpt_path:
+        ckpt_path = os.path.expanduser(str(ckpt_path))
+        try:
+            state = torch.load(ckpt_path, map_location=base_env.device)
+            policy.load_state_dict(state)
+            logging.info(f"Loaded checkpoint from {ckpt_path}")
+        except AttributeError:
+            logging.warning(
+                f"Policy {policy} does not implement `.load_state_dict()`; "
+                f"ignoring checkpoint {ckpt_path}"
+            )
+    else:
+        logging.info(
+            "No checkpoint specified; running with randomly initialized policy. "
+            "Pass `checkpoint=/path/to/checkpoint.pt` to load trained weights."
+        )
+
     frames_per_batch = env.num_envs * 32
 
     stats_keys = [
@@ -111,33 +130,36 @@ def main(cfg):
         if isinstance(k, tuple) and k[0] == "stats"
     ]
     episode_stats = EpisodeStats(stats_keys)
-    collector = SyncDataCollector(
+    collector = Collector(
         env,
         policy=policy,
         frames_per_batch=frames_per_batch,
         total_frames=cfg.total_frames,
         device=cfg.sim.device,
         return_same_td=True,
+        trust_policy=True,
     )
 
     pbar = tqdm(collector)
-    env.train()
-    for i, data in enumerate(pbar):
-        info = {"env_frames": collector._frames, "rollout_fps": collector._fps}
-        episode_stats.add(data.to_tensordict())
+    base_env.eval()
+    env.eval()
+    with set_exploration_type(ExplorationType.MODE):
+        for i, data in enumerate(pbar):
+            info = {"env_frames": collector._frames, "rollout_fps": collector._fps}
+            episode_stats.add(data.to_tensordict())
 
-        if len(episode_stats) >= base_env.num_envs:
-            stats = {
-                "train/" + (".".join(k) if isinstance(k, tuple) else k): torch.mean(v.float()).item()
-                for k, v in episode_stats.pop().items(True, True)
-            }
-            info.update(stats)
+            if len(episode_stats) >= base_env.num_envs:
+                stats = {
+                    "train/" + (".".join(k) if isinstance(k, tuple) else k): torch.mean(v.float()).item()
+                    for k, v in episode_stats.pop().items(True, True)
+                }
+                info.update(stats)
 
-        print(OmegaConf.to_yaml(
-            {k: v for k, v in info.items() if isinstance(v, float)}))
+            print(OmegaConf.to_yaml(
+                {k: v for k, v in info.items() if isinstance(v, float)}))
 
-        pbar.set_postfix({"rollout_fps": collector._fps,
-                         "frames": collector._frames})
+            pbar.set_postfix({"rollout_fps": collector._fps,
+                             "frames": collector._frames})
 
     simulation_app.close()
 

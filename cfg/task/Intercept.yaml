@@ -19,6 +19,11 @@ time_encoding_dim: 4
 reset_thres: 15.0
 success_radius: 0.5
 reward_distance_scale: 0.8
+reward_approach_velocity_weight: 1.0
+reward_action_smoothness_weight: 1.0
+reward_heading_alignment_weight: 1.0
+reward_delta_distance_weight: 1.0
+
 action_transform: rate
 
 pursuer:
@@ -37,25 +42,32 @@ pursuer:
 evader:
   model: Hummingbird
   controller: LeePositionController
-  trajectory:
+  # speed: 5.0
+  # trajectory:
     # type: circular
     # radius: 5.0
     # ang_vel: 1.0
     # type: hover
-    type: linear
-    speed: 5.0
-  trajectories:
-    - type: hover
-    - type: circular
-      radius: 1.0
-      ang_vel: 1.0
-    - type: linear
-      speed: 5.0
-  speed_range: [0.8, 1.5]
+    # type: linear
+    # speed: 5.0
+  # trajectories:
+  #   - type: hover
+  #   - type: circular
+  #     radius: 1.0
+  #     ang_vel: 1.0
+  #   - type: linear
+  #     speed: 5.0
+  speed_range: [2.0, 15.0]
   spawn_distance_range: [4.0, 7.0]
-  boundary_mode: bounce
-  bounds:
-    min: [-6.0, -6.0, 1.0]
-    max: [6.0, 6.0, 4.0]
+  # Each env samples uniformly from this list of enabled trajectory types
+  # on every reset. Supported: "linear", "zigzag".
+  trajectory_types: [linear, zigzag]
+  zigzag:
+    amplitude_range: [1.0, 3.0]
+    frequency_range: [0.3, 1.0]
+  # boundary_mode: bounce
+  # bounds:
+  #   min: [-6.0, -6.0, 1.0]
+  #   max: [6.0, 6.0, 4.0]
   use_relative_velocity: false
 

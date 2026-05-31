@@ -1,0 +1,40 @@
+name: matd3
+
+# Replay buffer / data collection
+buffer_size: 500_000
+train_every: 64
+batch_size: 1024
+gamma: 0.99
+tau: 0.005
+max_grad_norm: 5.0
+
+# Optimisation
+gradient_steps: 64
+actor_delay: 2
+target_update_interval: 2
+critic_loss: smooth_l1
+
+# TD3 noise schedule
+target_noise: 0.2
+policy_noise: 0.1
+noise_clip: 0.5
+
+# Competitive InterceptCompetitive has TWO heterogeneous agents
+# (pursuer vs evader) — each must learn its own policy.
+share_actor: false
+
+# Train both pursuer and evader policies.
+# 0 = pursuer, 1 = evader.
+train_agent_indices: [0, 1]
+
+actor:
+  hidden_units: [256, 256, 128]
+  lr: 3.0e-4
+  layer_norm: true
+  attn_encoder: PartialAttentionEncoder
+
+critic:
+  hidden_units: [256, 256, 128]
+  lr: 3.0e-4
+  layer_norm: true
+  attn_encoder: PartialAttentionEncoder

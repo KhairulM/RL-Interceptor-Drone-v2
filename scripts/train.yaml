@@ -15,6 +15,10 @@ eval_interval: -1
 save_interval: -1
 seed: 0
 
+# Optional path to a checkpoint (state_dict) to load before rollout in play.py.
+# Override on the CLI with `checkpoint=/path/to/checkpoint_final.pt`.
+checkpoint: null
+
 viewer:
   resolution: [960, 720]
   eye: [8, 0., 6.]

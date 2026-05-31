@@ -42,7 +42,7 @@ from tensordict.nn import (
 from torchrl.modules import ProbabilisticActor
 from torchrl.data import TensorSpec, Composite
 from torchrl.envs.transforms import CatTensors
-from einops.layers.torch import Reduce
+from einops.layers.torch import Rearrange, Reduce
 
 from .ppo.common import GAE, make_mlp
 from .modules.distributions import IndependentNormal
@@ -131,8 +131,8 @@ class MAPPO:
         self,
         cfg,
         observation_spec: Composite,
-        action_spec: Composite,
-        reward_spec: Composite,
+        action_spec: TensorSpec,
+        reward_spec: TensorSpec,
         device
     ):
         super().__init__()
@@ -143,10 +143,10 @@ class MAPPO:
         self.critic_loss_fn = nn.HuberLoss(delta=10)
         self.gae = GAE(0.99, 0.95)
 
-        if not action_spec[("agents", "action")].ndim > 2:
+        if not action_spec.ndim > 2:
             raise ValueError("Please use PPOPolicy for single-agent environments.")
 
-        self.num_agents, self.action_dim = action_spec[("agents", "action")].shape[-2:]
+        self.num_agents, self.action_dim = action_spec.shape[-2:]
         fake_input = observation_spec.zero()
 
         actor_module = TensorDictModule(
@@ -168,14 +168,14 @@ class MAPPO:
             in_keys=["loc", "scale"],
             out_keys=[("agents", "action")],
             distribution_class=IndependentNormal,
-            return_log_prob=True,
-            log_prob_key="sample_log_prob"
+            return_log_prob=True
         ).to(self.device)
 
         self.critic = TensorDictModule(
             nn.Sequential(
                 make_mlp([512, 256], nn.Mish),
-                nn.LazyLinear(1),
+                nn.LazyLinear(self.num_agents),
+                Rearrange("... -> ... 1")
             ),
             [("agents", "observation_central")], ["state_value"]
         ).to(self.device)
@@ -192,24 +192,13 @@ class MAPPO:
         return tensordict
 
     def train_op(self, tensordict: TensorDict):
-        # SyncDataCollector typically returns [T, N, ...], while our GAE
-        # implementation expects [N, T, ...]. Normalize once here.
-        def _ensure_env_time_layout(x: torch.Tensor) -> torch.Tensor:
-            if x.ndim < 2:
-                return x
-            train_every = int(getattr(self.cfg, "train_every", 0))
-            if train_every > 0 and x.shape[0] == train_every and x.shape[1] != train_every:
-                return x.transpose(0, 1).contiguous()
-            return x
-
         next_tensordict = tensordict["next"]
         with torch.no_grad():
             next_values = self.critic(next_tensordict)["state_value"]
-        rewards = _ensure_env_time_layout(tensordict[("next", "agents", "reward")])
-        dones = _ensure_env_time_layout(tensordict[("next", "terminated")])
-        dones = einops.repeat(dones, "n t 1 -> n t a 1", a=self.num_agents)
-        values = _ensure_env_time_layout(tensordict["state_value"])
-        next_values = _ensure_env_time_layout(next_values)
+        rewards = tensordict[("next", "agents", "reward")]
+        dones = tensordict[("next", "terminated")]
+        dones = einops.repeat(dones, "t n 1 -> t n a 1", a=self.num_agents)
+        values = tensordict["state_value"]
         values = self.value_norm.denormalize(values)
         next_values = self.value_norm.denormalize(next_values)
 
@@ -239,10 +228,8 @@ class MAPPO:
         log_probs = dist.log_prob(tensordict[("agents", "action")])
         entropy = dist.entropy().mean()
 
-        old_log_probs = tensordict["sample_log_prob"]
-
         adv = tensordict["adv"]
-        ratio = torch.exp(log_probs - old_log_probs).unsqueeze(-1)
+        ratio = torch.exp(log_probs - tensordict["sample_log_prob"]).unsqueeze(-1)
         surr1 = adv * ratio
         surr2 = adv * ratio.clamp(1.-self.clip_param, 1.+self.clip_param)
         policy_loss = - torch.mean(torch.min(surr1, surr2)) * self.action_dim

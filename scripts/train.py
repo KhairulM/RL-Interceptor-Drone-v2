@@ -15,7 +15,7 @@ from omegaconf import OmegaConf
 from omni_drones import init_simulation_app
 # from torchrl.data import CompositeSpec
 from torchrl.envs.utils import set_exploration_type, ExplorationType
-from omni_drones.utils.torchrl import SyncDataCollector
+from omni_drones.utils.torchrl.collector import Collector
 from omni_drones.utils.torchrl.transforms import (
     FromMultiDiscreteAction,
     FromDiscreteAction,
@@ -29,7 +29,7 @@ from omni_drones.utils.torchrl import RenderCallback, EpisodeStats
 from omni_drones.learning import ALGOS
 
 from setproctitle import setproctitle
-from torchrl.envs.transforms import TransformedEnv, InitTracker, Compose
+from torchrl.envs.transforms import TransformedEnv, Compose, InitTracker, VecNormV2
 
 try:
     import wandb
@@ -76,7 +76,9 @@ def main(cfg):
     env_class = IsaacEnv.REGISTRY[cfg.task.name]
     base_env = env_class(cfg, headless=cfg.headless)
 
-    transforms: list = [InitTracker()]
+    observation_keys = list(base_env.observation_spec.keys(True, True))
+    reward_keys = list(base_env.reward_spec.keys(True, True))
+    transforms: list = [InitTracker(), VecNormV2(in_keys=observation_keys + reward_keys)]
 
     # a CompositeSpec is by default processed by a entity-based encoder
     # ravel it to use a MLP encoder instead
@@ -158,13 +160,14 @@ def main(cfg):
         if isinstance(k, tuple) and k[0] == "stats"
     ]
     episode_stats = EpisodeStats(stats_keys)
-    collector = SyncDataCollector(
+    collector = Collector(
         env,
         policy=policy,
         frames_per_batch=frames_per_batch,
         total_frames=total_frames,
         device=cfg.sim.device,
         return_same_td=True,
+        trust_policy=True,
     )
 
     @torch.no_grad()
@@ -192,10 +195,15 @@ def main(cfg):
                     return_contiguous=False,
                 )
             except RuntimeError as err:
-                if "requires Replicator" not in str(err):
+                err_msg = str(err)
+                if (
+                    "requires Replicator" not in err_msg
+                    and "Cannot render 'rgb_array'" not in err_msg
+                ):
                     raise
                 logging.warning(
-                    "Replicator is disabled; skipping eval video recording.")
+                    "RGB rendering is unavailable; skipping eval video recording."
+                )
                 record_video = False
                 trajs = env.rollout(
                     max_steps=base_env.max_episode_length,

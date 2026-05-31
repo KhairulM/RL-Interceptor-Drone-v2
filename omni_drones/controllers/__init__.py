@@ -25,5 +25,7 @@ from .controller import ControllerBase
 from .lee_position_controller import (
     LeePositionController,
     AttitudeController,
-    RateController
+    RateController,
+    PIDRateController,
+    PID_controller_flightmare,
 )

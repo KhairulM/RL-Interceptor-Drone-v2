@@ -21,12 +21,13 @@
 # SOFTWARE.
 
 
+from .modules.networks import MLP, ENCODERS_MAP
+from .common import make_encoder
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.func import vmap
-from tensordict.nn import TensorDictModule, make_functional
-from tensordict import TensorDict
+from tensordict.nn import TensorDictModule
+from tensordict import TensorDict, TensorDictBase
 
 from torchrl.data import (
     TensorSpec,
@@ -41,18 +42,27 @@ from torchrl.objectives.utils import hold_out_net
 
 import copy
 from tqdm import tqdm
-from omni_drones.utils.torchrl import AgentSpec
 from .common import soft_update
 
+
 class MATD3Policy(object):
+    """MADDPG / MATD3 trainer for the modern nested-key env layout.
+
+    Expects the env to expose:
+        observation_spec[("agents", "observation")]          -> [n, obs_dim]
+        observation_spec[("agents", "observation_central")]  -> [n, state_dim]
+        action_spec      [("agents", "action")]              -> [n, act_dim]
+        reward_spec      [("agents", "reward")]              -> [n, 1]
+    """
 
     def __init__(self,
-        cfg,
-        agent_spec: AgentSpec,
-        device: str="cuda",
-    ) -> None:
+                 cfg,
+                 observation_spec: Composite,
+                 action_spec: TensorSpec,
+                 reward_spec: TensorSpec,
+                 device: str = "cuda",
+                 ) -> None:
         self.cfg = cfg
-        self.agent_spec = agent_spec
         self.device = device
 
         self.gradient_steps = int(cfg.gradient_steps)
@@ -63,15 +73,36 @@ class MATD3Policy(object):
         self.policy_noise = self.cfg.policy_noise
         self.noise_clip = self.cfg.noise_clip
 
-        self.obs_name = f"{self.agent_spec.name}.obs"
-        self.act_name = ("action", f"{self.agent_spec.name}.action")
-        if agent_spec.state_spec is not None:
-            self.state_name = f"{self.agent_spec.name}.state"
-        else:
-            self.state_name = f"{self.agent_spec.name}.obs"
-        self.reward_name = f"{self.agent_spec.name}.reward"
+        # Modern nested keys used by MAPPO and the multi-agent envs.
+        self.obs_name = ("agents", "observation")
+        self.act_name = ("agents", "action")
+        self.state_name = ("agents", "observation_central")
+        self.reward_name = ("agents", "reward")
 
-        self.action_dim = self.agent_spec.action_spec.shape[-1]
+        # Per-agent specs (shape [n, dim]).
+        self._obs_spec = observation_spec[self.obs_name]
+        self._action_spec = action_spec[self.act_name]
+        try:
+            self._state_spec = observation_spec[self.state_name]
+            self._has_state = True
+        except (KeyError, IndexError):
+            self._state_spec = self._obs_spec
+            self._has_state = False
+
+        self.num_agents, self.action_dim = self._action_spec.shape[-2:]
+
+        train_agent_indices = self.cfg.get("train_agent_indices", None)
+        if train_agent_indices is None:
+            self.train_agent_indices = list(range(self.num_agents))
+        else:
+            self.train_agent_indices = sorted(
+                {int(i) for i in train_agent_indices if 0 <= int(i) < self.num_agents}
+            )
+            if not self.train_agent_indices:
+                raise ValueError(
+                    "cfg.train_agent_indices is empty or out of range for MATD3Policy"
+                )
+
         self.make_model()
 
         self.replay_buffer = TensorDictReplayBuffer(
@@ -83,10 +114,10 @@ class MATD3Policy(object):
     def make_model(self):
 
         self.policy_in_keys = [self.obs_name]
-        self.policy_out_keys = [self.act_name, f"{self.agent_spec.name}.logp"]
+        self.policy_out_keys = [self.act_name]
 
         def create_actor():
-            encoder = make_encoder(self.cfg.actor, self.agent_spec.observation_spec)
+            encoder = make_encoder(self.cfg.actor, self._obs_spec)
             return TensorDictModule(
                 nn.Sequential(
                     encoder,
@@ -100,59 +131,94 @@ class MATD3Policy(object):
 
         if self.cfg.share_actor:
             self.actor = create_actor()
+            self.actor_target = copy.deepcopy(self.actor)
             self.actor_opt = torch.optim.Adam(self.actor.parameters(), lr=self.cfg.actor.lr)
-            self.actor_params = make_functional(self.actor).expand(self.agent_spec.n)
-            self.actor_target_params = self.actor_params.clone()
+            self._shared_actor = True
         else:
-            actors = nn.ModuleList([create_actor() for _ in range(self.agent_spec.n)])
-            self.actor = actors[0]
-            self.actor_opt = torch.optim.Adam(actors.parameters(), lr=self.cfg.actor.lr)
-            self.actor_params = torch.stack([make_functional(actor) for actor in actors])
-            self.actor_target_params = self.actor_params.clone()
+            self.actors = nn.ModuleList([create_actor() for _ in range(self.num_agents)])
+            self.actors_target = nn.ModuleList([copy.deepcopy(actor) for actor in self.actors])
+            self.actor = self.actors[0]
+            self.actor_opt = torch.optim.Adam(self.actors.parameters(), lr=self.cfg.actor.lr)
+            self._shared_actor = False
 
-        if self.agent_spec.state_spec is not None:
-            self.value_in_keys = [self.state_name, self.act_name]
-            self.value_out_keys = [f"{self.agent_spec.name}.q"]
+        critic_state_spec = self._state_spec if self._has_state else self._obs_spec
+        self.value_in_keys = [self.state_name if self._has_state else self.obs_name, self.act_name]
+        self.value_out_keys = [("agents", "q")]
 
-            self.critic = Critic(
-                self.cfg.critic,
-                self.agent_spec.n,
-                self.agent_spec.state_spec,
-                self.agent_spec.action_spec
-            ).to(self.device)
-        else:
-            self.value_in_keys = [self.obs_name, self.act_name]
-            self.value_out_keys = [f"{self.agent_spec.name}.q"]
-
-            self.critic = Critic(
-                self.cfg.critic,
-                self.agent_spec.n,
-                self.agent_spec.observation_spec,
-                self.agent_spec.action_spec
-            ).to(self.device)
+        self.critic = Critic(
+            self.cfg.critic,
+            self.num_agents,
+            critic_state_spec,
+            self._action_spec
+        ).to(self.device)
 
         self.critic_target = copy.deepcopy(self.critic)
         self.critic_opt = torch.optim.Adam(self.critic.parameters(), lr=self.cfg.critic.lr)
         self.critic_loss_fn = {"mse": F.mse_loss, "smooth_l1": F.smooth_l1_loss}[self.cfg.critic_loss]
 
-    def __call__(self, tensordict: TensorDict, deterministic: bool=False) -> TensorDict:
-        actor_output = self._call_actor(tensordict, self.actor_params)
-        action_noise = (
-            actor_output[self.act_name]
-            .clone()
-            .normal_(0, self.policy_noise)
-            .clamp_(-self.noise_clip, self.noise_clip)
-        )
-        actor_output[self.act_name].add_(action_noise)
-        actor_output["action"].batch_size = tensordict.batch_size
-        tensordict.update(actor_output)
-        return tensordict
+    def __call__(self, *args, deterministic: bool = False, **kwargs):
+        """Support both TensorDict and TensorDictModule positional call styles."""
+        if len(args) == 1 and isinstance(args[0], TensorDictBase):
+            tensordict = args[0]
+            actor_output = self._call_actor(tensordict)
+            action = actor_output[self.act_name]  # [..., n, action_dim]
+            if not deterministic and self.policy_noise > 0:
+                action_noise = (
+                    torch.randn_like(action)
+                    .mul_(self.policy_noise)
+                    .clamp_(-self.noise_clip, self.noise_clip)
+                )
+                action = action.add(action_noise)
+            action = action.clamp(-1, 1)
+            tensordict.set(self.act_name, action)
+            return tensordict
 
-    def _call_actor(self, tensordict: TensorDict, params: TensorDict):
-        actor_input = tensordict.select(*self.policy_in_keys)
-        actor_input.batch_size = [*actor_input.batch_size, self.agent_spec.n]
-        actor_output = vmap(self.actor, in_dims=(1, 0), out_dims=1)(actor_input, params)
-        return actor_output
+        if not args:
+            raise TypeError("MATD3Policy.__call__ expected at least one positional argument")
+
+        # TorchRL may wrap callable policies in a TensorDictModule for rollout
+        # and pass the root observation fields as positional args.
+        first = args[0]
+        if isinstance(first, TensorDictBase):
+            obs = first.get("observation")
+            if obs is None:
+                raise KeyError("Expected 'observation' in the first positional TensorDict")
+        elif torch.is_tensor(first):
+            obs = first
+        else:
+            raise TypeError(f"Unsupported MATD3Policy input type: {type(first)}")
+
+        obs_td = TensorDict({self.obs_name: obs}, batch_size=obs.shape[:-2])
+        action = self._call_actor(obs_td)[self.act_name]
+        if not deterministic and self.policy_noise > 0:
+            action_noise = (
+                torch.randn_like(action)
+                .mul_(self.policy_noise)
+                .clamp_(-self.noise_clip, self.noise_clip)
+            )
+            action = action.add(action_noise)
+        return action.clamp(-1, 1)
+
+    def _call_actor(self, tensordict: TensorDict, target: bool = False):
+        obs = tensordict[self.obs_name]
+        batch_size = tensordict.batch_size
+
+        if self._shared_actor:
+            actor_module = self.actor_target if target else self.actor
+            actor_input = TensorDict({self.obs_name: obs}, batch_size=batch_size)
+            action = actor_module(actor_input)[self.act_name]
+            return TensorDict({self.act_name: action}, batch_size=batch_size)
+
+        modules = self.actors_target if target else self.actors
+        actions = []
+        for i, actor_module in enumerate(modules):
+            actor_input = TensorDict(
+                {self.obs_name: obs[:, i:i+1, :]},
+                batch_size=batch_size,
+            )
+            actions.append(actor_module(actor_input)[self.act_name])
+        action = torch.cat(actions, dim=1)
+        return TensorDict({self.act_name: action}, batch_size=batch_size)
 
     def train_op(self, data: TensorDict):
         self.replay_buffer.extend(data.to("cpu").reshape(-1))
@@ -169,19 +235,23 @@ class MATD3Policy(object):
 
                 transition = self.replay_buffer.sample(self.batch_size).to(self.device)
 
-                state   = transition[self.state_name]
+                state = transition[self.state_name]
                 actions_taken = transition[self.act_name]
 
-                reward  = transition[("next", "reward", f"{self.agent_spec.name}.reward")]
-                next_dones  = transition[("next", "done")].float().unsqueeze(-1)
-                next_state  = transition[("next", self.state_name)]
+                reward = transition[("next", *self.reward_name)]
+                # done is [B, 1] (scalar per env). Broadcast to [B, n, 1] so it
+                # matches the per-agent next-Q tensor produced by the critic.
+                next_dones = transition[("next", "done")].float().unsqueeze(-1)
+                if next_dones.dim() < reward.dim():
+                    next_dones = next_dones.unsqueeze(-2).expand_as(reward)
+                next_state = transition[("next", *self.state_name)]
 
                 with torch.no_grad():
                     next_action: torch.Tensor = self._call_actor(
-                        transition["next"], self.actor_target_params
+                        transition["next"], target=True
                     )[self.act_name]
 
-                    if self.target_noise > 0: # target smoothing
+                    if self.target_noise > 0:  # target smoothing
                         action_noise = (
                             next_action
                             .clone()
@@ -212,11 +282,11 @@ class MATD3Policy(object):
 
                     with hold_out_net(self.critic):
 
-                        actor_output = self._call_actor(transition, self.actor_params)
+                        actor_output = self._call_actor(transition)
                         actions_new = actor_output[self.act_name]
 
                         actor_losses = []
-                        for a in range(self.agent_spec.n):
+                        for a in self.train_agent_indices:
                             actions = actions_taken.clone()
                             actions[..., a, :] = actions_new[..., a, :]
                             qs = self.critic(state, actions)
@@ -237,7 +307,11 @@ class MATD3Policy(object):
                         }, []))
 
                     with torch.no_grad():
-                        soft_update_td(self.actor_target_params, self.actor_params, self.cfg.tau)
+                        if self._shared_actor:
+                            soft_update(self.actor_target, self.actor, self.cfg.tau)
+                        else:
+                            for target_actor, actor in zip(self.actors_target, self.actors):
+                                soft_update(target_actor, actor, self.cfg.tau)
                         soft_update(self.critic_target, self.critic, self.cfg.tau)
 
                 t.set_postfix({"critic_loss": critic_loss.item()})
@@ -246,22 +320,15 @@ class MATD3Policy(object):
         infos = {k: torch.mean(v).item() for k, v in infos.items()}
         return infos
 
-def soft_update_td(target_params: TensorDict, params: TensorDict, tau: float):
-    for target_param, param in zip(target_params.values(True, True), params.values(True, True)):
-        target_param.data.copy_(tau * param.data + (1 - tau) * target_param.data)
-
-from .modules.networks import MLP, ENCODERS_MAP
-from .common import make_encoder
-
 
 class Critic(nn.Module):
     def __init__(self,
-        cfg,
-        num_agents: int,
-        state_spec: TensorSpec,
-        action_spec: Bounded,
-        num_critics: int = 2,
-    ) -> None:
+                 cfg,
+                 num_agents: int,
+                 state_spec: TensorSpec,
+                 action_spec: Bounded,
+                 num_critics: int = 2,
+                 ) -> None:
         super().__init__()
         self.cfg = cfg
         self.num_agents = num_agents
@@ -297,6 +364,11 @@ class Critic(nn.Module):
             state: (batch_size, state_dim)
             actions: (batch_size, num_agents, action_dim)
         """
+        # Some envs broadcast the same centralized state for each agent
+        # (shape [B, num_agents, state_dim]). The critic MLP is built from
+        # state_dim, so collapse that duplicated axis before flattening.
+        if state.ndim >= 3 and state.shape[-2] == self.num_agents:
+            state = state[..., 0, :]
         state = state.flatten(1)
         actions = actions.flatten(1)
         x = torch.cat([state, actions], dim=-1)

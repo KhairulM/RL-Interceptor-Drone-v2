@@ -84,7 +84,7 @@ class AgentSpec:
 
 class RenderCallback:
 
-    def __init__(self, interval: int=2):
+    def __init__(self, interval: int = 2):
         self.interval = interval
         self.frames = []
         self.i = 0
@@ -125,4 +125,3 @@ class EpisodeStats:
 
     def __len__(self):
         return len(self._stats)
-
