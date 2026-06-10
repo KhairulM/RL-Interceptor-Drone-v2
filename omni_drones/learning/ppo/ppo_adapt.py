@@ -145,15 +145,20 @@ class PPOAdaptivePolicy(TensorDictModuleBase):
             self.adaptation_key = tuple(self.adaptation_key)
         self.gae = GAE(0.99, 0.95)
 
-        self.n_agents, self.action_dim = action_spec.shape[-2:]
+        self.n_agents, self.action_dim = action_spec[("agents", "action")].shape[-2:]
 
-        intrinsics_dim = observation_spec[("agents", "intrinsics")].shape[-1]
+        if ("agents", "intrinsics") in observation_spec.keys(True):
+            self.privileged_obs_key = ("agents", "intrinsics")
+        else:
+            # Fallback for tasks that expose privileged/global state but no intrinsics.
+            self.privileged_obs_key = ("agents", "state")
+        privileged_dim = observation_spec[self.privileged_obs_key].shape[-1]
 
         fake_input = observation_spec.zero()
 
         self.encoder = TensorDictModule(
-            nn.Sequential(nn.LayerNorm(intrinsics_dim), make_mlp([64, 64])),
-            [("agents", "intrinsics")], ["context"]
+            nn.Sequential(nn.LayerNorm(privileged_dim), make_mlp([64, 64])),
+            [self.privileged_obs_key], ["context"]
         ).to(self.device)
 
         if self.cfg.condition_mode == "cat":
@@ -174,7 +179,8 @@ class PPOAdaptivePolicy(TensorDictModuleBase):
             in_keys=["loc", "scale"],
             out_keys=[("agents", "action")],
             distribution_class=IndependentNormal,
-            return_log_prob=True
+            return_log_prob=True,
+            log_prob_key="sample_log_prob",
         ).to(self.device)
 
         self.critic = TensorDictSequential(
@@ -186,7 +192,7 @@ class PPOAdaptivePolicy(TensorDictModuleBase):
             )
         ).to(self.device)
 
-        self.value_norm = ValueNorm1(reward_spec.shape[-2:]).to(self.device)
+        self.value_norm = ValueNorm1(reward_spec[("agents", "reward")].shape[-2:]).to(self.device)
 
         self.encoder(fake_input)
         self.actor(fake_input)
@@ -205,15 +211,23 @@ class PPOAdaptivePolicy(TensorDictModuleBase):
             self.critic.apply(init_)
             self.encoder.apply(init_)
 
-        self.adaptation_module = TensorDictModule(
-            TConv(fake_input[self.adaptation_key].shape[-1]),
-            [("agents", "observation_h")], [self.adaptation_key]
-        ).to(self.device)
-        self.adaptation_module(fake_input)
-        self.adaptation_loss = MSE(
-            self.adaptation_module,
-            self.adaptation_key,
-        ).to(self.device)
+        self.adaptation_module = None
+        self.adaptation_loss = None
+        if self.phase in ("adaptation", "finetune"):
+            if ("agents", "observation_h") not in observation_spec.keys(True):
+                raise KeyError(
+                    "PPOAdaptivePolicy phase requires ('agents', 'observation_h') in observation_spec. "
+                    "Either add observation_h to the task or use algo.phase=encoder."
+                )
+            self.adaptation_module = TensorDictModule(
+                TConv(fake_input[self.adaptation_key].shape[-1]),
+                [("agents", "observation_h")], [self.adaptation_key]
+            ).to(self.device)
+            self.adaptation_module(fake_input)
+            self.adaptation_loss = MSE(
+                self.adaptation_module,
+                self.adaptation_key,
+            ).to(self.device)
 
         self.encoder_opt = torch.optim.Adam(self.encoder.parameters(), lr=5e-4)
         self.actor_opt = torch.optim.Adam(self.actor.parameters(), lr=5e-4)
@@ -246,6 +260,10 @@ class PPOAdaptivePolicy(TensorDictModuleBase):
         elif self.phase in ("adaptation", "finetune"):
             if self.adaptation_key != "context":
                 self.encoder(tensordict)
+            if self.adaptation_module is None:
+                raise RuntimeError(
+                    "adaptation_module is not initialized. Use phase=encoder or provide observation_h."
+                )
             self.adaptation_module(tensordict)
         assert tensordict.get("context", None) is not None
         return tensordict
@@ -330,6 +348,10 @@ class PPOAdaptivePolicy(TensorDictModuleBase):
         }, [])
 
     def _train_adaptation(self, tensordict: TensorDict):
+        if self.adaptation_loss is None:
+            raise RuntimeError(
+                "Adaptation training requested but adaptation module/loss is not initialized."
+            )
         with torch.no_grad():
             tensordict = self.encoder(tensordict)
 

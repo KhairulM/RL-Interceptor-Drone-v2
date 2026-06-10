@@ -78,7 +78,8 @@ def main(cfg):
 
     observation_keys = list(base_env.observation_spec.keys(True, True))
     reward_keys = list(base_env.reward_spec.keys(True, True))
-    transforms: list = [InitTracker(), VecNormV2(in_keys=observation_keys + reward_keys)]
+    # transforms: list = [InitTracker(), VecNormV2(in_keys=observation_keys + reward_keys)]
+    transforms: list = [InitTracker()]
 
     # a CompositeSpec is by default processed by a entity-based encoder
     # ravel it to use a MLP encoder instead
@@ -138,13 +139,20 @@ def main(cfg):
     env.set_seed(cfg.seed)
 
     try:
-        policy = ALGOS[cfg.algo.name.lower()](
-            cfg.algo,
-            env.observation_spec,
-            env.action_spec,
-            env.reward_spec,
-            device=base_env.device
-        )
+        if cfg.algo.name.lower() in ['sac']:
+            policy = ALGOS[cfg.algo.name.lower()](
+                cfg.algo,
+                env.agent_spec["drone"],
+                device=base_env.device
+            )
+        else:
+            policy = ALGOS[cfg.algo.name.lower()](
+                cfg.algo,
+                env.observation_spec,
+                env.action_spec,
+                env.reward_spec,
+                device=base_env.device
+            )
     except KeyError:
         raise NotImplementedError(f"Unknown algorithm: {cfg.algo.name}")
 
@@ -275,6 +283,7 @@ def main(cfg):
             try:
                 ckpt_path = os.path.join(
                     run.dir, f"checkpoint_{collector._frames}.pt")
+                os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
                 torch.save(policy.state_dict(), ckpt_path)
                 logging.info(f"Saved checkpoint to {str(ckpt_path)}")
             except AttributeError:
@@ -298,6 +307,7 @@ def main(cfg):
 
     try:
         ckpt_path = os.path.join(run.dir, "checkpoint_final.pt")
+        os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
         torch.save(policy.state_dict(), ckpt_path)
 
         if use_wandb:

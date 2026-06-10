@@ -32,6 +32,7 @@ from .sac import SACPolicy
 from .td3 import TD3Policy
 from .matd3 import MATD3Policy
 from .tdmpc import TDMPCPolicy
+from .dreamer import DreamerPolicy
 
 ALGOS = {
     "mappo_old": MAPPOPolicy,
@@ -43,4 +44,5 @@ ALGOS = {
     "sac": SACPolicy,
     "td3": TD3Policy,
     "matd3": MATD3Policy,
+    "dreamer": DreamerPolicy,
 }

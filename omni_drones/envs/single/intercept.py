@@ -31,6 +31,7 @@ from torchrl.data import Composite, UnboundedContinuous
 
 from omni_drones.envs.isaac_env import AgentSpec, IsaacEnv
 from omni_drones.robots.drone import MultirotorBase
+from omni_drones.planners.velocity_obstacle import VelocityObstaclePlanner
 from omni_drones.utils.torch import (
     euler_to_quaternion,
     normalize,
@@ -139,8 +140,14 @@ class Intercept(IsaacEnv):
             "use_relative_velocity", False)
 
         # Trajectory selection. Map enabled types to integer codes used by
-        # _compute_evader_action (0 = linear, 1 = zigzag).
-        self._traj_type_codes = {"linear": 0, "zigzag": 1}
+        # _compute_evader_action (0 = linear, 1 = zigzag, 2 = velocity_obstacle,
+        # 3 = random).
+        self._traj_type_codes = {
+            "linear": 0,
+            "zigzag": 1,
+            "velocity_obstacle": 2,
+            "random": 3,
+        }
         enabled = list(self.evader_cfg.get("trajectory_types", ["linear"]))
         unknown = [t for t in enabled if t not in self._traj_type_codes]
         if unknown:
@@ -155,10 +162,22 @@ class Intercept(IsaacEnv):
         self.evader_zigzag_freq_range = list(
             zigzag_cfg.get("frequency_range", [0.3, 1.0]))
 
+        random_cfg = self.evader_cfg.get("random", {})
+        self.evader_random_turn_interval_range = list(
+            random_cfg.get("turn_interval_range", [20, 80]))
+        self.evader_random_vertical_component_range = list(
+            random_cfg.get("vertical_component_range", [-0.2, 0.2]))
+        self.evader_random_target_lookahead = float(
+            random_cfg.get("target_lookahead", 0.5))
+
         super().__init__(cfg, headless)
 
         self.pursuer.initialize()
         self.evader.initialize()
+
+        # Velocity-obstacle planner used by the "velocity_obstacle" evader
+        # trajectory type. Avoids the pursuer as a single moving obstacle.
+        self.vo_planner = VelocityObstaclePlanner(self.evader.params).to(self.device)
 
         self.pursuer_init_pos_dist = D.Uniform(
             torch.tensor(self.pursuer_cfg.spawn_pos_range.min, device=self.device),
@@ -207,7 +226,7 @@ class Intercept(IsaacEnv):
             self.num_envs, 1, 3, device=self.device)
         self.evader_line_speed = torch.zeros(
             self.num_envs, 1, 1, device=self.device)
-        # Per-env trajectory type code (0 = linear, 1 = zigzag) and zig-zag params.
+        # Per-env trajectory type code and zig-zag params.
         self.evader_traj_type = torch.zeros(
             self.num_envs, 1, device=self.device, dtype=torch.long)
         self.evader_zigzag_amp = torch.zeros(
@@ -216,6 +235,10 @@ class Intercept(IsaacEnv):
             self.num_envs, 1, 1, device=self.device)
         self.evader_zigzag_perp = torch.zeros(
             self.num_envs, 1, 3, device=self.device)
+        self.evader_random_dir = torch.zeros(
+            self.num_envs, 1, 3, device=self.device)
+        self.evader_random_next_turn_step = torch.zeros(
+            self.num_envs, 1, device=self.device, dtype=torch.long)
         # Previous-step pursuer-to-evader distance for the delta-distance reward.
         self.prev_distance = torch.zeros(
             self.num_envs, 1, device=self.device)
@@ -402,6 +425,30 @@ class Intercept(IsaacEnv):
             (n, 1), device=self.device)
         self.evader_traj_type[env_ids] = self._evader_enabled_codes_tensor[sel.squeeze(-1)].unsqueeze(-1)
 
+        # Initialize random-trajectory state (used only when traj type is
+        # "random").
+        random_dir = normalize(torch.randn(n, 1, 3, device=self.device))
+        random_dir[..., 2] = torch.empty(
+            n, 1, device=self.device).uniform_(
+            float(self.evader_random_vertical_component_range[0]),
+            float(self.evader_random_vertical_component_range[1]),
+        )
+        self.evader_random_dir[env_ids] = normalize(random_dir)
+
+        min_turn, max_turn = self.evader_random_turn_interval_range
+        min_turn = max(1, int(min_turn))
+        max_turn = max(min_turn, int(max_turn))
+        turn_steps = torch.randint(
+            min_turn,
+            max_turn + 1,
+            (n, 1),
+            device=self.device,
+            dtype=torch.long,
+        )
+        self.evader_random_next_turn_step[env_ids] = (
+            self.progress_buf[env_ids].unsqueeze(-1).long() + turn_steps
+        )
+
         # Sample zig-zag amplitude / frequency for the reset envs (used only
         # by envs whose traj type is zigzag).
         self.evader_zigzag_amp[env_ids] = self.evader_zigzag_amp_dist.sample(
@@ -512,7 +559,69 @@ class Intercept(IsaacEnv):
         is_zigzag = (self.evader_traj_type.squeeze(-1) == 1).unsqueeze(-1).float()
         pos = pos + lateral * is_zigzag
 
+        # Velocity-obstacle override: for envs whose trajectory type is
+        # velocity_obstacle, replace the open-loop target position with the
+        # VO planner output. pref_velocity = sampled line direction * speed
+        # (speed is sampled per-reset from evader.speed_range).
+        is_vo = (self.evader_traj_type.squeeze(-1) == 2)
+        if bool(is_vo.any()):
+            evader_full = self.evader.get_state()[..., :13]      # [num_envs, 1, 13]
+            pursuer_full = self.pursuer.get_state()[..., :13]    # [num_envs, 1, 13]
+            pref_velocity = self.evader_line_dir * self.evader_line_speed  # [num_envs, 1, 3]
+            vo_out = self.vo_planner.plan(evader_full, pursuer_full, pref_velocity)
+            # Planner output is in the same frame as its inputs (world frame
+            # here); convert to env-local to match the linear/zigzag target.
+            vo_pos_local = vo_out["desired_position"].squeeze(1) - self.envs_positions
+            pos = torch.where(is_vo.unsqueeze(-1), vo_pos_local, pos)
+
         yaw = torch.atan2(direction[..., 1], direction[..., 0])
+
+        # Random trajectory: piecewise-constant velocity direction with
+        # periodically resampled heading.
+        is_random = (self.evader_traj_type.squeeze(-1) == 3).unsqueeze(-1)
+        if bool(is_random.any()):
+            should_turn = is_random & (
+                self.progress_buf.unsqueeze(-1)
+                >= self.evader_random_next_turn_step
+            )
+            if bool(should_turn.any()):
+                turn_idx = should_turn.squeeze(-1).nonzero(as_tuple=False).squeeze(-1)
+                num_turn = int(turn_idx.numel())
+
+                new_dir = normalize(torch.randn(num_turn, 1, 3, device=self.device))
+                new_dir[..., 2] = torch.empty(
+                    num_turn, 1, device=self.device).uniform_(
+                    float(self.evader_random_vertical_component_range[0]),
+                    float(self.evader_random_vertical_component_range[1]),
+                )
+                self.evader_random_dir[turn_idx] = normalize(new_dir)
+
+                min_turn, max_turn = self.evader_random_turn_interval_range
+                min_turn = max(1, int(min_turn))
+                max_turn = max(min_turn, int(max_turn))
+                turn_steps = torch.randint(
+                    min_turn,
+                    max_turn + 1,
+                    (num_turn, 1),
+                    device=self.device,
+                    dtype=torch.long,
+                )
+                self.evader_random_next_turn_step[turn_idx] = (
+                    self.progress_buf[turn_idx].unsqueeze(-1).long() + turn_steps
+                )
+
+            random_dir = self.evader_random_dir.squeeze(1)  # [num_envs, 3]
+            random_speed = speed.unsqueeze(-1)  # [num_envs, 1]
+            random_target = evader_state[..., :3] + (
+                random_dir
+                * random_speed
+                * self.evader_random_target_lookahead
+            )
+            random_target[..., 2] = random_target[..., 2].clamp(min=0.3)
+            random_yaw = torch.atan2(random_dir[..., 1], random_dir[..., 0])
+
+            pos = torch.where(is_random, random_target, pos)
+            yaw = torch.where(is_random.squeeze(-1), random_yaw, yaw)
 
         return self.evader_controller.compute(evader_state, target_pos=pos, target_yaw=yaw)
 
@@ -633,8 +742,8 @@ class Intercept(IsaacEnv):
         # reward = (reward_approach_velocity + reward_distance) / 2.0
         # reward = reward_approach_velocity + reward_action_smoothness + reward_heading_alignment
         # reward = (2.0 * reward - 1.0).clamp(-1.0, 1.0)
-        reward = reward_delta_distance
         # reward = reward_approach_velocity + reward_heading_alignment + reward_delta_distance
+        reward = reward_delta_distance
 
         ######
         # Terminal reward
