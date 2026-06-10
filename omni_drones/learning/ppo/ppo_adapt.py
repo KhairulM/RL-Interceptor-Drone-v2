@@ -42,6 +42,7 @@ from ..utils.valuenorm import ValueNorm1
 from ..modules.distributions import IndependentNormal
 from .common import GAE
 
+
 @dataclass
 class PPOConfig:
     name: str = "ppo_adapt"
@@ -101,7 +102,7 @@ class TConv(nn.Module):
 
     def forward(self, features: torch.Tensor):
         batch_shape = features.shape[:-2]
-        features = features.flatten(0, -3) # [*, D, T]
+        features = features.flatten(0, -3)  # [*, D, T]
         features_tconv = self.tconv(features).flatten(1)
         features = torch.cat([features_tconv, features[:, :, -1]], dim=1)
         features = self.mlp(features)
@@ -125,12 +126,12 @@ class FiLM(nn.Module):
 class PPOAdaptivePolicy(TensorDictModuleBase):
 
     def __init__(self,
-        cfg: PPOConfig,
-        observation_spec: Composite,
-        action_spec: Composite,
-        reward_spec: TensorSpec,
-        device
-    ):
+                 cfg: PPOConfig,
+                 observation_spec: Composite,
+                 action_spec: Composite,
+                 reward_spec: TensorSpec,
+                 device
+                 ):
         super().__init__()
         self.cfg = cfg
         self.device = device
@@ -162,9 +163,9 @@ class PPOAdaptivePolicy(TensorDictModuleBase):
         ).to(self.device)
 
         if self.cfg.condition_mode == "cat":
-            condition = lambda: CatTensors(["_feature", "context"], "_feature", del_keys=False)
+            def condition(): return CatTensors(["_feature", "context"], "_feature", del_keys=False)
         elif self.cfg.condition_mode == "film":
-            condition = lambda: TensorDictModule(FiLM(128), ["_feature", "context"], ["_feature"])
+            def condition(): return TensorDictModule(FiLM(128), ["_feature", "context"], ["_feature"])
 
         actor_module = TensorDictSequential(
             TensorDictModule(make_mlp([128, 128]), [("agents", "observation")], ["_feature"]),
