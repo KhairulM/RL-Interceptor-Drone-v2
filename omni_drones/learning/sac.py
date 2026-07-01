@@ -71,7 +71,11 @@ class SACPolicy(object):
         self.make_critic()
 
         self.action_dim = self.agent_spec.action_spec.shape[-1]
-        self.target_entropy = - torch.tensor(self.action_dim, device=self.device)
+        # Target entropy is expressed in entropy units (positive scalar).
+        self.target_entropy = float(self.cfg.get("target_entropy", self.action_dim))
+        # Numerical safety clamps (prevent SAC value/entropy blow-up).
+        self.logp_clip = float(self.cfg.get("logp_clip", 20.0))
+        self.target_q_clip = self.cfg.get("target_q_clip", None)
         init_entropy = 1.0
         self.log_alpha = nn.Parameter(torch.tensor(init_entropy, device=self.device).log())
         self.alpha_opt = torch.optim.Adam([self.log_alpha], lr=self.cfg.alpha_lr)
@@ -115,13 +119,29 @@ class SACPolicy(object):
         self.critic_opt = torch.optim.Adam(self.critic.parameters(), lr=self.cfg.critic.lr)
         self.critic_loss_fn = {"mse": F.mse_loss, "smooth_l1": F.smooth_l1_loss}[self.cfg.critic_loss]
 
-    def __call__(self, tensordict: TensorDict, deterministic: bool = False) -> TensorDict:
-        # return tensordict.update({self.act_name: self.agent_spec.action_spec.zero()})
-        actor_input = tensordict.select(*self.policy_in_keys)
-        actor_input.batch_size = [*actor_input.batch_size, self.agent_spec.n]
-        actor_output = self.actor(actor_input)
-        tensordict.update(actor_output)
-        return tensordict
+    def __call__(self, *args, deterministic: bool = False, **kwargs):
+        # Support both direct TensorDict calls and TensorDictModule-wrapped
+        # positional calls used by env.rollout in evaluation.
+        if len(args) == 1 and hasattr(args[0], "select"):
+            tensordict = args[0]
+            actor_input = tensordict.select(*self.policy_in_keys)
+            actor_input.batch_size = [*actor_input.batch_size, self.agent_spec.n]
+            actor_output = self.actor(actor_input, deterministic=deterministic)
+            tensordict.update(actor_output)
+            return tensordict
+
+        if not args:
+            raise TypeError("SACPolicy.__call__ expected at least one positional argument")
+
+        obs = args[0]
+        if hasattr(obs, "get"):
+            obs = obs.get("observation")
+        if not torch.is_tensor(obs):
+            raise TypeError(f"Unsupported SACPolicy input type: {type(obs)}")
+
+        obs_td = TensorDict({self.obs_name: obs}, batch_size=obs.shape[:-2])
+        out_td = self.actor(obs_td, deterministic=deterministic)
+        return out_td[self.act_name]
 
     def train_op(self, data: TensorDict, verbose: bool = False):
         self.replay_buffer.extend(data.reshape(-1))
@@ -143,17 +163,22 @@ class SACPolicy(object):
             actions = transition[self.act_name]
 
             reward = transition[("next", "agents", "reward")]
-            next_dones = transition[("next", "done")].float().unsqueeze(-1)
+            next_dones = transition[("next", "terminated")].float().unsqueeze(-1)
             next_state = transition[("next", "agents", "observation")]
 
             with torch.no_grad():
                 actor_output = self.actor(transition["next"], deterministic=False)
                 next_act = actor_output[self.act_name]
                 next_logp = actor_output[f"{self.agent_spec.name}.logp"]
+                # Clamp the entropy bonus so a saturated tanh policy cannot push
+                # the bootstrap target to +/- infinity.
+                next_logp = next_logp.clamp(-self.logp_clip, self.logp_clip)
                 next_qs = self.critic_target(next_state, next_act)
                 next_q = torch.min(next_qs, dim=-1, keepdim=True).values
                 next_q = next_q - self.log_alpha.exp() * next_logp
                 target_q = (reward + self.cfg.gamma * (1 - next_dones) * next_q).detach().squeeze(-1)
+                if self.target_q_clip is not None:
+                    target_q = target_q.clamp(-self.target_q_clip, self.target_q_clip)
                 assert not torch.isinf(target_q).any()
                 assert not torch.isnan(target_q).any()
 
@@ -175,9 +200,10 @@ class SACPolicy(object):
                     actor_output = self.actor(transition, deterministic=False)
                     act = actor_output[self.act_name]
                     logp = actor_output[f"{self.agent_spec.name}.logp"]
+                    logp = logp.clamp(-self.logp_clip, self.logp_clip)
 
                     qs = self.critic(state, act)
-                    q = torch.min(qs, dim=-1).values
+                    q = torch.min(qs, dim=-1, keepdim=True).values
                     actor_loss = (self.log_alpha.exp() * logp - q).mean()
                     self.actor_opt.zero_grad()
                     actor_loss.backward()
@@ -185,9 +211,15 @@ class SACPolicy(object):
                     self.actor_opt.step()
 
                     self.alpha_opt.zero_grad()
-                    alpha_loss = -(self.log_alpha * (logp + self.target_entropy).detach()).mean()
+                    # Dual ascent on entropy constraint: increase alpha when
+                    # policy entropy is above target, decrease otherwise.
+                    entropy_error = (-logp.detach() - self.target_entropy)
+                    alpha_loss = -(self.log_alpha.exp() * entropy_error).mean()
                     alpha_loss.backward()
                     self.alpha_opt.step()
+                    with torch.no_grad():
+                        # Keep temperature in a sane range to avoid numerical collapse/explosion.
+                        self.log_alpha.clamp_(-16.0, 2.0)
 
                     infos_actor.append(TensorDict({
                         "actor_loss": actor_loss,
@@ -209,7 +241,7 @@ class SACPolicy(object):
         state_dict = {
             "actor": self.actor.state_dict(),
             "critic": self.critic.state_dict(),
-            "ctitic_target": self.critic_target.state_dict()
+            "critic_target": self.critic_target.state_dict()
         }
         return state_dict
 
@@ -227,6 +259,7 @@ class Actor(nn.Module):
         self.act = TanhIndependentNormalModule(
             self.encoder.output_shape.numel(),
             action_spec.shape[-1],
+            scale_ub=cfg.get("scale_ub", 2.0),
         )
 
     def forward(self, obs: torch.Tensor, deterministic: bool = False):

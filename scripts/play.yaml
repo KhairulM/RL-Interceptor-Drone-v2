@@ -1,21 +1,46 @@
 # hydra.job.chdir: false
 hydra:
   searchpath:
-  # see https://hydra.cc/docs/advanced/search_path/
-   - file://../cfg
+    # see https://hydra.cc/docs/advanced/search_path/
+    - file://../cfg
 
 headless: true
 
 sim: ${task.sim}
 env: ${task.env}
 
-total_frames: -1
+total_frames: 1_000_000
+max_iters: -1
+eval_interval: -1
+save_interval: -1
 seed: 0
 
+# Optional path to a checkpoint (state_dict) to load before rollout in play.py.
+# Override on the CLI with `checkpoint=/path/to/checkpoint_final.pt`.
+checkpoint: null
+
+# Optional W&B run folder. If provided, play.py will load
+# ${wandb_run_dir}/files/checkpoint_final.pt as the checkpoint.
+# A fresh, dedicated play run is always created (the original run is not modified).
+# Override with `wandb_run_dir=/path/to/wandb/run-YYYYMMDD_HHMMSS-<id>`.
+wandb_run_dir: null
+
 viewer:
-  resolution: [960, 720]
+  # resolution: [960, 720]
+  resolution: [1280, 960]
   eye: [8, 0., 6.]
   lookat: [0., 0., 1.]
+
+wandb:
+  group: ${oc.select:..task.name}
+  run_name: ${oc.select:..task.name,test}-${oc.select:..algo.name,none}-play
+  job_type: play
+  entity: khairul-makirin-team
+  project: RL Drone Interceptor
+  mode: online # set to 'disabled' when debugging locally
+  run_id:
+  monitor_gym: True
+  tags:
 
 defaults:
   - task: Hover

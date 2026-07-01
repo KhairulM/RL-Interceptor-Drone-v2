@@ -1,20 +1,28 @@
 name: sac
 
-buffer_size: 1_000_000
+buffer_size: 500_000
 train_every: 64
-batch_size: 4096
-gamma: 0.95
+batch_size: 1024
+gamma: 0.99
 tau: 0.005
 max_grad_norm: 5
 
 share_actor: true
 
-gradient_steps: 2048
+gradient_steps: 64
+
+# Entropy temperature target (in nats); stabilizes alpha adaptation.
+target_entropy: 2.0
+# Safety clamps to prevent SAC value/entropy blow-up (see learning/sac.py).
+logp_clip: 20.0
+target_q_clip: 100.0
 
 actor:
   hidden_units: [256, 128, 128]
   lr: 0.0005
   layer_norm: true
+  # Upper bound on the pre-tanh Gaussian std to avoid action saturation.
+  scale_ub: 2.0
 
 critic:
   hidden_units: [256, 128, 128]

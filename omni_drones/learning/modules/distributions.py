@@ -222,6 +222,7 @@ class TanhIndependentNormalModule(nn.Module):
         scale_mapping: str = "softplus",
         state_dependent_std: bool = True,
         scale_lb: float = 1e-4,
+        scale_ub: Union[float, None] = None,
         min: Union[torch.Tensor, Number] = -1.0,
         max: Union[torch.Tensor, Number] = 1.0,
         event_dims=1,
@@ -240,6 +241,7 @@ class TanhIndependentNormalModule(nn.Module):
         else:
             raise ValueError("scale_mapping must be a string or a callable function.")
         self.scale_lb = scale_lb
+        self.scale_ub = scale_ub
         self.dist_cls = functools.partial(
             TanhNormalWithEntropy, low=min, high=max, event_dims=event_dims
         )
@@ -251,6 +253,8 @@ class TanhIndependentNormalModule(nn.Module):
         else:
             loc = self.operator(tensor)
             scale = self.scale_mapping(self.log_std).clamp_min(self.scale_lb)
+        if self.scale_ub is not None:
+            scale = scale.clamp_max(self.scale_ub)
         return self.dist_cls(loc, scale)
 
 

@@ -79,7 +79,8 @@ class TD3Policy(object):
     def make_model(self):
 
         self.policy_in_keys = [self.obs_name]
-        self.policy_out_keys = [self.act_name, f"{self.agent_spec.name}.logp"]
+        # Deterministic TD3 actor only outputs action.
+        self.policy_out_keys = [self.act_name]
 
         encoder = make_encoder(self.cfg.actor, self.agent_spec.observation_spec)
         self.actor = TensorDictModule(
@@ -107,19 +108,46 @@ class TD3Policy(object):
         self.critic_opt = torch.optim.Adam(self.critic.parameters(), lr=self.cfg.critic.lr)
         self.critic_loss_fn = {"mse":F.mse_loss, "smooth_l1": F.smooth_l1_loss}[self.cfg.critic_loss]
 
-    def __call__(self, tensordict: TensorDict, deterministic: bool=False) -> TensorDict:
-        actor_input = tensordict.select(*self.policy_in_keys)
-        actor_input.batch_size = [*actor_input.batch_size, self.agent_spec.n]
-        actor_output = self.actor(actor_input)
-        action_noise = (
-            actor_output[self.act_name]
-            .clone()
-            .normal_(0, self.policy_noise)
-            .clamp_(-self.noise_clip, self.noise_clip)
-        )
-        actor_output[self.act_name].add_(action_noise)
-        tensordict.update(actor_output)
-        return tensordict
+    def __call__(self, *args, deterministic: bool = False, **kwargs):
+        # Support both direct TensorDict calls (collector/training) and
+        # positional calls used by env.rollout wrappers in evaluation.
+        if len(args) == 1 and hasattr(args[0], "select"):
+            tensordict = args[0]
+            actor_input = tensordict.select(*self.policy_in_keys)
+            actor_input.batch_size = [*actor_input.batch_size, self.agent_spec.n]
+            actor_output = self.actor(actor_input)
+            if not deterministic:
+                action_noise = (
+                    actor_output[self.act_name]
+                    .clone()
+                    .normal_(0, self.policy_noise)
+                    .clamp_(-self.noise_clip, self.noise_clip)
+                )
+                actor_output[self.act_name].add_(action_noise)
+            actor_output[self.act_name].clamp_(-1.0, 1.0)
+            tensordict.update(actor_output)
+            return tensordict
+
+        if not args:
+            raise TypeError("TD3Policy.__call__ expected at least one positional argument")
+
+        obs = args[0]
+        if hasattr(obs, "get"):
+            obs = obs.get("observation")
+        if not torch.is_tensor(obs):
+            raise TypeError(f"Unsupported TD3Policy input type: {type(obs)}")
+
+        obs_td = TensorDict({self.obs_name: obs}, batch_size=obs.shape[:-2])
+        out_td = self.actor(obs_td)
+        action = out_td[self.act_name]
+        if not deterministic:
+            action_noise = (
+                action.clone()
+                .normal_(0, self.policy_noise)
+                .clamp_(-self.noise_clip, self.noise_clip)
+            )
+            action = action + action_noise
+        return action.clamp(-1.0, 1.0)
 
     def train_op(self, data: TensorDict, verbose: bool=False):
         self.replay_buffer.extend(data.reshape(-1))

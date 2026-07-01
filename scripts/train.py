@@ -126,8 +126,15 @@ def main(cfg):
             controller = getattr(base_env, "controller", None)
             transform = AttitudeController(controller)
             transforms.append(transform)
-        elif action_transform == "PIDrate":
+        elif action_transform == "pidrate":
             controller = getattr(base_env, "controller", None)
+            if controller is None:
+                controller = getattr(base_env, "pursuer_controller", None)
+
+            if controller is None:
+                raise RuntimeError(
+                    "PIDRate action transform requires a controller in the task config."
+                )
             transform = PIDRateController(controller)
             # transforms.append(TanhTransform)
             transforms.append(transform)
@@ -138,15 +145,16 @@ def main(cfg):
     env = TransformedEnv(base_env, Compose(*transforms)).train()
     env.set_seed(cfg.seed)
 
+    algo_name = cfg.algo.name.lower()
     try:
-        if cfg.algo.name.lower() in ['sac']:
-            policy = ALGOS[cfg.algo.name.lower()](
+        if algo_name in ['sac', 'td3']:
+            policy = ALGOS[algo_name](
                 cfg.algo,
                 env.agent_spec["drone"],
                 device=base_env.device
             )
         else:
-            policy = ALGOS[cfg.algo.name.lower()](
+            policy = ALGOS[algo_name](
                 cfg.algo,
                 env.observation_spec,
                 env.action_spec,
@@ -313,9 +321,9 @@ def main(cfg):
         if use_wandb:
             assert wandb is not None
             model_artifact = wandb.Artifact(
-                f"{cfg.task.name}-{cfg.algo.name.lower()}",
+                f"{cfg.task.name}-{algo_name}",
                 type="model",
-                description=f"{cfg.task.name}-{cfg.algo.name.lower()}",
+                description=f"{cfg.task.name}-{algo_name}",
                 metadata=dict(cfg))
 
             model_artifact.add_file(ckpt_path)

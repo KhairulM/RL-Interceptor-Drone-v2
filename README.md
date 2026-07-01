@@ -91,12 +91,34 @@ Outputs (checkpoints, configs, videos) are written under `scripts/outputs/<date>
 
 ### Play / evaluate a trained policy
 
+Use `scripts/play.py` with a checkpoint produced by training. The checkpoint
+override key is `checkpoint`.
+
 ```bash
-python scripts/play.py task=Intercept headless=false \
-    checkpoint_path=scripts/outputs/<date>/<time>/checkpoint_final.pt
+cd scripts
+python play.py task=Intercept headless=false \
+    checkpoint=outputs/<date>/<time>/checkpoint_final.pt
 ```
 
 Set `headless=false` to watch the rollout in the Isaac Sim viewport.
+
+#### Evaluate OOD: random evader trajectory only
+
+To test generalization when the policy was trained on linear + zigzag, force
+the evader to use only the random strategy at evaluation time:
+
+```bash
+cd scripts
+python play.py task=Intercept headless=false \
+    checkpoint=outputs/<date>/<time>/checkpoint_final.pt \
+    'task.evader.trajectory_types=[random]'
+```
+
+Notes:
+
+- Quote the list override in zsh (`'task.evader.trajectory_types=[random]'`) to avoid shell glob expansion.
+- Use `headless=true` for faster, non-visual batch evaluation.
+- For mixed evaluation, use e.g. `'task.evader.trajectory_types=[linear,zigzag,random]'`.
 
 ### Tuning the Intercept scenario
 
@@ -104,7 +126,7 @@ Common knobs in [cfg/task/Intercept.yaml](cfg/task/Intercept.yaml):
 
 - `pursuer.model` / `pursuer.controller` — drone model and low-level controller of the interceptor
 - `evader.model` / `evader.controller` — drone model and controller of the target
-- `evader.trajectories` — list of trajectories sampled per env (`hover`, `linear`, `circular`)
+- `evader.trajectory_types` — list sampled per env (`linear`, `zigzag`, `velocity_obstacle`, `random`)
 - `evader.speed_range`, `evader.spawn_distance_range`, `evader.bounds`, `evader.boundary_mode` — evader motion limits
 - `success_radius`, `reset_thres`, `reward_distance_scale` — reward / termination shaping
 - `env.num_envs`, `env.max_episode_length`, `env.env_spacing` — sim batching

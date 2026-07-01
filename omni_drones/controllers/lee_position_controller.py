@@ -387,13 +387,28 @@ class RateController(ControllerBase):
         return target_rate * torch.pi, target_thrust
 
 
-class PID_controller_flightmare(nn.Module):
-    def __init__(self, dt, uav_params, device):
+class PID_controller_flightmare(ControllerBase):
+    def __init__(self, g, uav_params) -> None:
         super().__init__()
-        self.rotor_config = uav_params["rotor_configuration"]
+        rotor_config = uav_params["rotor_configuration"]
+        self.rotor_config = rotor_config
+        force_constants = torch.as_tensor(rotor_config["force_constants"])
+        max_rot_vel = torch.as_tensor(rotor_config["max_rotation_velocities"])
+
+        self.g = nn.Parameter(torch.tensor(g))
+        # per-rotor max thrust; `max_thrusts.sum(-1)` is the total thrust the
+        # `RateController` action transform uses to scale the RL command.
+        self.max_thrusts = nn.Parameter(max_rot_vel.square() * force_constants)
+        # single-rotor max thrust, used to normalise the per-motor commands.
+        self.max_thrust = rotor_config['force_constants'][0] * rotor_config['max_rotation_velocities'][0]**2
+
         self.mass = uav_params['mass'] + 0.147  # add (imu and rotors)
-        self.inertia = torch.tensor([uav_params['inertia']['xx'], uav_params['inertia']['yy'], uav_params['inertia']['zz']])
-        self.arm_length = self.rotor_config['arm_lengths'][0]
+        self.inertia = nn.Parameter(torch.tensor([
+            uav_params['inertia']['xx'],
+            uav_params['inertia']['yy'],
+            uav_params['inertia']['zz'],
+        ]))
+        self.arm_length = rotor_config['arm_lengths'][0]
         self.K_coef = 0.0178
         self.P_gain = nn.Parameter(torch.tensor([0.11, 0.11, 0.2]))
         self.I_gain = nn.Parameter(torch.tensor([0.008, 0.008, 0.01]))
@@ -402,42 +417,44 @@ class PID_controller_flightmare(nn.Module):
         self.K = nn.Parameter(torch.tensor([1., 1., 1.]))
         self.Int_lim = nn.Parameter(torch.tensor([1.00, 1.00, 1.00]))
         self.fs, self.fc = 50.0, 40.0
-        self.dt = dt
-        self.init_flag = True  # init last_body_rate and inte
-        # self.max_thrust = 10.3659
-        self.max_thrust = self.rotor_config['force_constants'][0] * self.rotor_config['max_rotation_velocities'][0]**2
-        self.allocation_matrix_inv = torch.tensor([[0.25, 2**0.5 / (4 * self.arm_length), -2**0.5 / (4 * self.arm_length), 1 / (4.0 * self.K_coef)],
-                                                   [0.25, -2**0.5 / (4 * self.arm_length), -2**0.5 / (4 * self.arm_length), -1 / (4.0 * self.K_coef)],
-                                                   [0.25, -2**0.5 / (4 * self.arm_length), 2**0.5 / (4 * self.arm_length), 1 / (4.0 * self.K_coef)],
-                                                   [0.25, 2**0.5 / (4 * self.arm_length), 2**0.5 / (4 * self.arm_length), -1 / (4.0 * self.K_coef)]], device=device)
+        self.dt = 0.01
+        self.init_flag = True  # init last_body_rate and integ
+        self.allocation_matrix_inv = nn.Parameter(torch.tensor([
+            [0.25,  2**0.5 / (4 * self.arm_length), -2**0.5 / (4 * self.arm_length),  1 / (4.0 * self.K_coef)],
+            [0.25, -2**0.5 / (4 * self.arm_length), -2**0.5 / (4 * self.arm_length), -1 / (4.0 * self.K_coef)],
+            [0.25, -2**0.5 / (4 * self.arm_length),  2**0.5 / (4 * self.arm_length),  1 / (4.0 * self.K_coef)],
+            [0.25,  2**0.5 / (4 * self.arm_length),  2**0.5 / (4 * self.arm_length), -1 / (4.0 * self.K_coef)],
+        ]))
 
     def forward(
         self,
         root_state: torch.Tensor,
-        target_rate: torch.Tensor,   # [rad/s]
-        target_thrust: torch.Tensor,  # [ms-2]
-        reset_pid: torch.Tensor
+        target_rate: torch.Tensor,    # [rad/s]
+        target_thrust: torch.Tensor,  # total thrust [N]
     ):
-        assert root_state.shape[:-1] == target_rate.shape[:-1]
-        batch_shape = root_state.shape[:-1]      # batch shape [64,1]
-        root_state = root_state.reshape(-1, 13)  # shape
+        if root_state.ndim > 2 and root_state.shape[-2] == 1:
+            root_state = root_state.squeeze(-2)
+        if target_rate.ndim > 2 and target_rate.shape[-2] == 1:
+            target_rate = target_rate.squeeze(-2)
+        if target_thrust.ndim > 2 and target_thrust.shape[-2] == 1:
+            target_thrust = target_thrust.squeeze(-2)
+
+        batch_shape = root_state.shape[:-1]
+        root_state = root_state.reshape(-1, 13)
         target_rate = target_rate.reshape(-1, 3)
         target_thrust = target_thrust.reshape(-1, 1)
-        reset_pid = reset_pid.reshape(-1)
         device = root_state.device
 
         pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
         body_rate = quat_rotate_inverse(rot, angvel)
         rate_error = target_rate - body_rate
 
-        # reset body rate memory and I memory
-        if self.init_flag:
-            device = root_state.device
-            self.last_body_rate = torch.zeros(size=(*batch_shape, 3)).to(device).reshape(-1, 3)
-            self.integ = torch.zeros(size=(*batch_shape, 3)).to(device).reshape(-1, 3)
+        # lazily (re)initialise the low-pass and integral memories
+        if self.init_flag or self.integ.shape[0] != root_state.shape[0]:
+            self.last_body_rate = torch.zeros(root_state.shape[0], 3, device=device)
+            self.integ = torch.zeros(root_state.shape[0], 3, device=device)
             self.init_flag = False
-        self.last_body_rate[reset_pid] = torch.zeros(size=(*batch_shape, 3)).to(device).reshape(-1, 3)[reset_pid]
-        self.integ[reset_pid] = torch.zeros(size=(*batch_shape, 3)).to(device).reshape(-1, 3).to(device)[reset_pid]
+
         filted_body_rate = body_rate * 0.803307 + self.last_body_rate * 0.196693  # lowpass
         angular_accel = (filted_body_rate - self.last_body_rate) / self.dt
         angular_accel[torch.isnan(angular_accel)] = 0.0
@@ -451,24 +468,28 @@ class PID_controller_flightmare(nn.Module):
 
         int_coef = torch.ones(rate_error.shape, device=device) - (rate_error / (2.5 * torch.pi)) ** 2
         int_coef = torch.maximum(int_coef, torch.zeros(int_coef.shape, device=device))
-        self.integ += rate_error * int_coef
+        self.integ = self.integ + rate_error * int_coef
         self.integ = torch.clip(self.integ, -self.Int_lim, self.Int_lim)
 
         # --------rate controller end, next comes mixer-------------
-        force_des = target_thrust * self.mass
-        thrust_and_ang_acc = torch.concatenate((force_des, angacc_desire), dim=-1)  # [1,64,4]
-        thrust_and_ang_acc = thrust_and_ang_acc.unsqueeze(dim=-1)  # [1,64,4,1]
-        motor_thrusts_des = torch.matmul(self.allocation_matrix_inv, thrust_and_ang_acc)  # [1,64,4,1]
-        motor_thrusts_des = motor_thrusts_des.squeeze(-1)  # [1,64,4]
+        force_des = target_thrust  # total thrust force [N]
+        thrust_and_ang_acc = torch.concatenate((force_des, angacc_desire), dim=-1)
+        thrust_and_ang_acc = thrust_and_ang_acc.unsqueeze(dim=-1)
+        motor_thrusts_des = torch.matmul(self.allocation_matrix_inv, thrust_and_ang_acc)
+        motor_thrusts_des = motor_thrusts_des.squeeze(-1)
         motor_thrusts_des = torch.clip(motor_thrusts_des, 0, self.max_thrust)
 
-        cmd = 2 * motor_thrusts_des.reshape(*batch_shape, -1) / self.max_thrust - 1  # -> [-1~1]
-
+        cmd = 2 * motor_thrusts_des.reshape(*batch_shape, -1) / self.max_thrust - 1  # -> [-1, 1]
         return cmd
 
+    def process_rl_actions(self, actions: torch.Tensor):
+        target_rate, target_thrust = actions.split([3, 1], -1)
+        target_thrust = ((target_thrust + 1) / 2).clip(0.) * self.max_thrusts.sum(-1)
+        return target_rate * torch.pi, target_thrust
 
-class PIDRateController(nn.Module):
-    def __init__(self, dt, g, uav_params) -> None:
+
+class PIDRateController(ControllerBase):
+    def __init__(self, g, uav_params) -> None:
         super().__init__()
         rotor_config = uav_params["rotor_configuration"]
         self.rotor_config = rotor_config
@@ -479,7 +500,7 @@ class PIDRateController(nn.Module):
         self.max_thrusts = nn.Parameter(max_rot_vel.square() * force_constants)
 
         # PID param
-        self.dt = nn.Parameter(torch.tensor(dt))
+        self.dt = nn.Parameter(torch.tensor(0.02))
         self.pid_kp = nn.Parameter(torch.tensor([250.0, 250.0, 120.0]))
         self.pid_ki = nn.Parameter(torch.tensor([500.0, 500.0, 16.7]))
         self.pid_kd = nn.Parameter(torch.tensor([2.5, 2.5, 0.0]))
@@ -488,11 +509,15 @@ class PIDRateController(nn.Module):
         self.iLimit = nn.Parameter(torch.tensor([33.3, 33.3, 166.7]))
         self.outLimit = nn.Parameter(torch.tensor((2.0)**15 - 1.0))
 
-        self.target_clip = uav_params['target_clip']
-        self.max_thrust_ratio = uav_params['max_thrust_ratio']
-        self.min_thrust_ratio = uav_params['min_thrust_ratio']
-        self.fixed_yaw = uav_params['fixed_yaw']
-        self.LPF_coef = uav_params['LPF_coef']
+        # Optional parameters used by the CTBR (`PIDrate`) action transform.
+        # Default them so the controller can also be built from standard drone
+        # params via `MultirotorBase.make` / the `rate` action transform.
+        _get = uav_params.get if hasattr(uav_params, "get") else (lambda k, d: d)
+        self.target_clip = _get('target_clip', 1.0)
+        self.max_thrust_ratio = _get('max_thrust_ratio', 1.0)
+        self.min_thrust_ratio = _get('min_thrust_ratio', 0.0)
+        self.fixed_yaw = _get('fixed_yaw', False)
+        self.LPF_coef = _get('LPF_coef', 1.0)
 
         self.init_flag = True  # init last_body_rate and inte
 
@@ -513,30 +538,36 @@ class PIDRateController(nn.Module):
     def forward(
         self,
         root_state: torch.Tensor,
-        target_rate: torch.Tensor,
-        target_thrust: torch.Tensor,
-        reset_pid: torch.Tensor,
+        target_rate: torch.Tensor,    # body rate target [deg/s]
+        target_thrust: torch.Tensor,  # base throttle in [0, 2**16]
+        reset_pid: torch.Tensor = None,  # bool mask of envs whose PID state to reset
     ):
-        assert root_state.shape[:-1] == target_rate.shape[:-1]
-
-        # target_rate: degree/s
-        # target_thrust: [0, 2**16]
-        # body_rate: use degree
+        if root_state.ndim > 2 and root_state.shape[-2] == 1:
+            root_state = root_state.squeeze(-2)
+        if target_rate.ndim > 2 and target_rate.shape[-2] == 1:
+            target_rate = target_rate.squeeze(-2)
+        if target_thrust.ndim > 2 and target_thrust.shape[-2] == 1:
+            target_thrust = target_thrust.squeeze(-2)
+        if reset_pid is not None and reset_pid.ndim > 1 and reset_pid.shape[-1] == 1:
+            reset_pid = reset_pid.squeeze(-1)
 
         batch_shape = root_state.shape[:-1]
         root_state = root_state.reshape(-1, 13)
         target_rate = target_rate.reshape(-1, 3)
         target_thrust = target_thrust.reshape(-1, 1)
-        reset_pid = reset_pid.reshape(-1)
         device = root_state.device
 
-        # pid reset
-        if self.init_flag:
-            self.last_body_rate = torch.zeros(size=(*batch_shape, 3)).to(device).reshape(-1, 3)
-            self.integ = torch.zeros(size=(*batch_shape, 3)).to(device).reshape(-1, 3)
+        # lazily (re)initialise the derivative/integral memories
+        if self.init_flag or self.integ.shape[0] != root_state.shape[0]:
+            self.last_body_rate = torch.zeros(root_state.shape[0], 3, device=device)
+            self.integ = torch.zeros(root_state.shape[0], 3, device=device)
             self.init_flag = False
-        self.last_body_rate[reset_pid] = torch.zeros(size=(*batch_shape, 3)).to(device).reshape(-1, 3)[reset_pid]
-        self.integ[reset_pid] = torch.zeros(size=(*batch_shape, 3)).to(device).reshape(-1, 3).to(device)[reset_pid]
+
+        # selectively reset the PID memory for environments that were just reset
+        if reset_pid is not None:
+            reset_mask = reset_pid.reshape(-1).bool()
+            self.last_body_rate[reset_mask] = 0.0
+            self.integ[reset_mask] = 0.0
 
         pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
         # convert angular velocity from world frame to body frame
@@ -551,7 +582,7 @@ class PIDRateController(nn.Module):
         deriv[torch.isnan(deriv)] = 0.0
         outputD = deriv * self.pid_kd.view(1, -1)
         # I
-        self.integ += rate_error * self.dt
+        self.integ = self.integ + rate_error * self.dt
         self.integ = torch.clip(self.integ, -self.iLimit, self.iLimit)
         outputI = self.integ * self.pid_ki.view(1, -1)
         # kff
@@ -581,10 +612,13 @@ class PIDRateController(nn.Module):
         ctbr = torch.concat([r, p, y, target_thrust], dim=1).reshape(*batch_shape, -1)
 
         cmd = torch.concat([m1, m2, m3, m4], dim=1) / 2**16 * 2 - 1.0
-
         cmd = cmd.reshape(*batch_shape, -1)
-
         return cmd, ctbr
+
+    def process_rl_actions(self, actions: torch.Tensor):
+        target_rate, target_thrust = actions.split([3, 1], -1)
+        target_thrust = ((target_thrust + 1) / 2).clip(0.) * self.max_thrusts.sum(-1)
+        return target_rate * torch.pi, target_thrust
 
     def debug_step(
         self,

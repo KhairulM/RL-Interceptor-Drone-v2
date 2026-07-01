@@ -1,0 +1,11 @@
+# Lee position controller parameters for Crazyflie 2.x
+#
+# position_gain / velocity_gain are acceleration-level (mass-independent) gains.
+# attitude_gain / angular_rate_gain are divided by the inertia matrix in the
+# controller, so they act as torque gains and are scaled by the Crazyflie's tiny
+# inertia (Ixx=Iyy=1.4e-5, Izz=2.17e-5) to keep the same closed-loop attitude
+# bandwidth as the (proven-stable) Hummingbird tuning.
+position_gain: [6, 6, 6]
+velocity_gain: [4, 4, 4]
+attitude_gain: [0.0014, 0.0014, 0.000063]
+angular_rate_gain: [0.0002, 0.0002, 0.000045]

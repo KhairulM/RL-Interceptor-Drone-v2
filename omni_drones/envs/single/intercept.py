@@ -356,8 +356,8 @@ class Intercept(IsaacEnv):
         }).expand(self.num_envs).to(self.device)
         self.info_spec = Composite({
             "drone_state": UnboundedContinuous(torch.Size([1, 13]), device=self.device),
-            # "prev_action": torch.stack([self.drone.action_spec] * self.drone.n, 0).to(self.device),
-            # "policy_action": torch.stack([self.drone.action_spec] * self.drone.n, 0).to(self.device),
+            "prev_action": self.pursuer.action_spec.unsqueeze(0),
+            "policy_action": self.pursuer.action_spec.unsqueeze(0),
             # "prev_prev_action": torch.stack([self.drone.action_spec] * self.drone.n, 0).to(self.device),
         }).expand(self.num_envs).to(self.device)
         # self.info_spec = self.pursuer.info_spec.to(self.device)
