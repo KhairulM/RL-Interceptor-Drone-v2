@@ -24,6 +24,7 @@ The project is laid out as a standard Python package at the repo root. Install i
 ```bash
 git clone git@github.com:KhairulM/RL-Interceptor-Drone-v2.git RLInterceptorDrone
 cd RLInterceptorDrone
+git submodule update --init --recursive
 ```
 
 ### 2. Create the virtual environment
