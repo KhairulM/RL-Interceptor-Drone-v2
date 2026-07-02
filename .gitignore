@@ -106,6 +106,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.venv-crazyswarm/
 # env/
 venv/
 ENV/
@@ -151,3 +152,8 @@ examples/*.mp4
 
 # sphinx docs output
 docs/html
+
+# ROS 2 colcon workspace artifacts
+crazyswarm2_ws/build/
+crazyswarm2_ws/install/
+crazyswarm2_ws/log/

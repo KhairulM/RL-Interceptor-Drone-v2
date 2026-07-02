@@ -60,6 +60,91 @@ python -c "import omni_drones; print(omni_drones.__file__)"
 
 It should print a path inside this repository.
 
+## Optional: Crazyswarm2 isolated environment (recommended)
+
+Use a separate Python **3.10** virtual environment for Crazyswarm2 and Crazyflie tooling.
+This avoids dependency conflicts with the main Isaac Sim / interceptor environment.
+
+### Why separate envs?
+
+- The main interceptor stack is Python 3.11 + Isaac Sim.
+- `cflib` currently pulls dependency versions (for example `packaging~=25`) that can conflict with Isaac-related pins.
+- Keeping Crazyswarm2 in its own env makes both workflows reproducible.
+
+### Setup steps (from repo root)
+
+```bash
+# 1) Create and activate a dedicated env
+python3.10 -m venv --prompt crazyswarm .venv-crazyswarm
+source .venv-crazyswarm/bin/activate
+
+# 2) Upgrade packaging tools
+pip install -U pip setuptools wheel
+
+# 3) Install common Python deps required by ROS/Crazyswarm Python tools
+pip install Jinja2 pyyaml typeguard
+
+# 4) Install local cflib from this repo vendored source
+cd libs/crazyflie-lib-python
+pip install .
+
+# 5) Install math/geometry helpers used in this project
+pip install rowan transforms3d
+
+# 6) Validate environment consistency
+pip check
+```
+
+You should see `No broken requirements found.` at the end.
+
+### Install Crazyswarm2 source tree
+
+From the workspace root:
+
+```bash
+mkdir -p crazyswarm2_ws/src
+cd crazyswarm2_ws/src
+git clone https://github.com/IMRCLab/crazyswarm2 --recursive
+```
+
+### Build Crazyswarm2 (ROS 2 Humble)
+
+With `.venv-crazyswarm` active:
+
+```bash
+cd ~/Projects/RLInterceptorDrone
+source .venv-crazyswarm/bin/activate
+
+# Source ROS 2 first (required for colcon/ament)
+source /opt/ros/humble/setup.zsh
+
+# Required Python build deps used by ROS package parsing/generation
+pip install -U catkin_pkg lark-parser
+
+# ROS Humble expects EmPy 3.x (4.x breaks rosidl templates)
+pip uninstall -y em empy
+pip install empy==3.3.4
+
+cd crazyswarm2_ws
+colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
+```
+
+After a successful build, source overlays before running nodes:
+
+```bash
+cd ~/Projects/RLInterceptorDrone
+source .venv-crazyswarm/bin/activate
+source /opt/ros/humble/setup.zsh
+source crazyswarm2_ws/install/setup.zsh
+```
+
+### Notes
+
+- If you see resolver warnings immediately after `pip install -U pip setuptools wheel`, run `pip check` and install missing packages as reported.
+- Keep `.venv` (interceptor) and `.venv-crazyswarm` (Crazyswarm2) separate; do not mix installs between them.
+- If `colcon build` fails with `No module named 'catkin_pkg'`, install `catkin_pkg` in `.venv-crazyswarm`.
+- If `colcon build` fails with `AttributeError: module 'em' has no attribute 'BUFFERED_OPT'`, pin `empy==3.3.4` in `.venv-crazyswarm`.
+
 ## Running the Intercept task
 
 The `Intercept` task lives at [omni_drones/envs/single/intercept.py](omni_drones/envs/single/intercept.py) and is configured via [cfg/task/Intercept.yaml](cfg/task/Intercept.yaml). A pursuer drone (`RateController`) learns to catch an evader (`LeePositionController`) that follows scripted hover/linear/circular trajectories.

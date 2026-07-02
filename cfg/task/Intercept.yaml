@@ -17,12 +17,13 @@ env:
 time_encoding_dim: 4
 
 reset_thres: 15.0
-success_radius: 0.5
+success_radius: 0.3
 reward_distance_scale: 0.8
 reward_approach_velocity_weight: 1.0
-reward_action_smoothness_weight: 1.0
+reward_action_smoothness_weight: 0.1
 reward_heading_alignment_weight: 1.0
-reward_delta_distance_weight: 1.0
+reward_delta_distance_weight: 10.0
+reward_terminal_weight: 100.0
 
 # action_transform: rate
 action_transform: PIDrate
@@ -82,4 +83,14 @@ evader:
   #   min: [-6.0, -6.0, 1.0]
   #   max: [6.0, 6.0, 4.0]
   use_relative_velocity: false
+
+# Domain randomization applied to the (RL-controlled) pursuer drone.
+# The force constant KF is randomized via `t2w_scale`: on every reset the
+# rotor thrust-to-weight is sampled uniformly from THRUST2WEIGHT_0 * [lo, hi],
+# which sets KF = t2w * mass * 9.81 (see multirotor._randomize).
+# `train`/`eval` phases are selected automatically by env.training.
+randomization:
+  pursuer:
+    train:
+      t2w_scale: [0.95, 1.05]
 

@@ -17,6 +17,7 @@ from omni_drones.utils.torchrl.transforms import (
     FromDiscreteAction,
     ravel_composite,
     RateController,
+    PIDRateController,
 )
 from omni_drones.utils.torchrl import EpisodeStats
 from omni_drones.learning import ALGOS
@@ -248,6 +249,18 @@ def main(cfg):
                 )
 
             transform = RateController(controller.to(base_env.device))
+            transforms.append(transform)
+        elif action_transform == "pidrate":
+            controller = getattr(base_env, "controller", None)
+            if controller is None:
+                controller = getattr(base_env, "pursuer_controller", None)
+
+            if controller is None:
+                raise RuntimeError(
+                    "PIDRate action transform requires a controller in the task config."
+                )
+            transform = PIDRateController(controller)
+            # transforms.append(TanhTransform)
             transforms.append(transform)
         else:
             raise NotImplementedError(

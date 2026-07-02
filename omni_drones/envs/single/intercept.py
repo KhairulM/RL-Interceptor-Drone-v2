@@ -105,13 +105,15 @@ class Intercept(IsaacEnv):
         self.time_encoding_dim = cfg.task.get("time_encoding_dim", 0)
 
         self.reward_action_smoothness_weight = cfg.task.get(
-            "reward_action_smoothness_weight", 0.0)
+            "reward_action_smoothness_weight", 1.0)
         self.reward_heading_alignment_weight = cfg.task.get(
-            "reward_heading_alignment_weight", 0.0)
+            "reward_heading_alignment_weight", 1.0)
         self.reward_approach_velocity_weight = cfg.task.get(
             "reward_approach_velocity_weight", 1.0)
         self.reward_delta_distance_weight = cfg.task.get(
-            "reward_delta_distance_weight", 0.0)
+            "reward_delta_distance_weight", 10.0)
+        self.reward_terminal_weight = cfg.task.get(
+            "reward_terminal_weight", 10.0)
 
         self.pursuer_cfg = cfg.task.pursuer
         self.evader_cfg = cfg.task.evader
@@ -175,6 +177,13 @@ class Intercept(IsaacEnv):
         self.pursuer.initialize()
         self.evader.initialize()
 
+        # Domain randomization for the RL-controlled pursuer (e.g. force
+        # constant KF via `t2w_scale`). The evader is scripted, so it is left
+        # untouched.
+        randomization = self.cfg.task.get("randomization", {})
+        if "pursuer" in randomization:
+            self.pursuer.setup_randomization(randomization["pursuer"])
+
         # Velocity-obstacle planner used by the "velocity_obstacle" evader
         # trajectory type. Avoids the pursuer as a single moving obstacle.
         self.vo_planner = VelocityObstaclePlanner(self.evader.params).to(self.device)
@@ -208,7 +217,8 @@ class Intercept(IsaacEnv):
         self._evader_enabled_codes_tensor = torch.tensor(
             self.evader_enabled_traj_codes, device=self.device, dtype=torch.long)
 
-        # Buffers for storing the local states of the pursuer and evader relative to their spawn positions, which are used for computing observations and resetting the drones
+        # Buffers for the local states of both drones relative to their spawn
+        # positions, used for observations and resets.
         self.pursuer_local_pos = torch.zeros(
             self.num_envs, 1, 3, device=self.device)
         self.pursuer_local_rot = torch.zeros(
@@ -349,6 +359,7 @@ class Intercept(IsaacEnv):
             "reward_action_smoothness": UnboundedContinuous(torch.Size([1]), device=self.device),
             "reward_heading_alignment": UnboundedContinuous(torch.Size([1]), device=self.device),
             "reward_delta_distance": UnboundedContinuous(torch.Size([1]), device=self.device),
+            "reward_terminal": UnboundedContinuous(torch.Size([1]), device=self.device),
             "action_error_order1_mean": UnboundedContinuous(torch.Size([1]), device=self.device),
             "action_error_order1_max": UnboundedContinuous(torch.Size([1]), device=self.device),
             "approach_speed": UnboundedContinuous(torch.Size([1]), device=self.device),
@@ -370,10 +381,8 @@ class Intercept(IsaacEnv):
 
     def _reset_idx(self, env_ids: torch.Tensor):
         """Reset the requested environments and randomize both drones."""
-        # Reset ALL stats (including success_rate) for the new episode. The
-        # value from the previous episode has already been picked up by
-        # EpisodeStats at its terminal step (we latch success_rate inside
-        # _compute_state_and_obs, before the stats are cloned into the obs).
+        # Reset all stats for the new episode; the previous value was already
+        # picked up by EpisodeStats at the terminal step.
         self.stats[env_ids] = 0.0
 
         # Reset the drones
@@ -406,7 +415,7 @@ class Intercept(IsaacEnv):
         # Sample a horizontal direction; the trajectory keeps the spawn altitude.
         line_dir = normalize(torch.randn(
             len(env_ids), 1, 3, device=self.device))
-        line_dir[..., 2] = line_dir[..., 2].abs()  # Make sure the evader moves upwards or horizontally, not downwards, to avoid collisions with the ground plane.
+        line_dir[..., 2] = line_dir[..., 2].abs()  # keep evader from diving into the ground
         # line_dir = normalize(line_dir)
         self.evader_line_dir[env_ids] = line_dir
         speed = self.evader_cfg.get("speed", None)
@@ -524,10 +533,12 @@ class Intercept(IsaacEnv):
 
         # First-order action error (norm of action delta). Matches the
         # quantity that PIDRateController publishes for Track.
-        self.action_error_order1 = torch.norm(
-            actions - self.prev_action, dim=-1
-        )  # [num_envs, 1]
-        self.prev_action = actions.clone()
+        # self.action_error_order1 = torch.norm(
+        #     actions - self.prev_action, dim=-1
+        # )  # [num_envs, 1]
+        # self.prev_action = actions.clone()
+        self.action_error_order1 = tensordict[("stats", "action_error_order1")]  # these are set on the PIDRateController
+        self.prev_action = tensordict[("info", "prev_action")]
 
         self.pursuer_effort = self.pursuer.apply_action(actions)
 
@@ -676,16 +687,26 @@ class Intercept(IsaacEnv):
 
         self.info["drone_state"][:] = pursuer_root_state[..., :13]
 
-        # Latch success here (BEFORE cloning self.stats into the obs) so that
-        # the terminal-step snapshot consumed by EpisodeStats already contains
-        # the success bit. IsaacEnv._step calls _compute_state_and_obs before
-        # _compute_reward_and_done, so latching success inside the reward
-        # function would be one step too late: the terminal step's `next.stats`
-        # would always show 0.
+        # Latch success before cloning self.stats into the obs. _step runs
+        # _compute_state_and_obs before _compute_reward_and_done, so latching
+        # in the reward fn would miss the terminal step's snapshot.
         distance = torch.norm(evader_pos - pursuer_pos, dim=-1)  # [num_envs, 1]
         reached_target = (distance <= self.success_radius).float()  # [num_envs, 1]
         self.stats["success_rate"][:] = torch.maximum(
             self.stats["success_rate"], reached_target
+        )
+
+        # Latch the terminal reward here for the same reason as success_rate:
+        # it is nonzero only on the terminal step, whose snapshot is cloned
+        # below (before _compute_reward_and_done runs).
+        misbehave = (
+            (pursuer_pos[..., 2:3].reshape(self.num_envs, 1) < 0.15)
+            | torch.isnan(pursuer_root_state[..., :13]).any(-1)
+            | (distance > self.reset_thres)
+        ).float()  # [num_envs, 1]
+        self.stats["reward_terminal"][:] = (
+            self.reward_terminal_weight * reached_target
+            - self.reward_terminal_weight * misbehave
         )
 
         return TensorDict(
@@ -715,7 +736,11 @@ class Intercept(IsaacEnv):
         evader_velocity = self._squeeze_batch(evader_velocity)
         pursuer_state = torch.cat(
             [pursuer_pos, pursuer_rot, pursuer_vel], dim=-1)
+
         distance = torch.norm(evader_pos - pursuer_pos, dim=-1, keepdim=True)
+        approach_speed = (pursuer_vel[..., :3] * normalize(evader_pos - pursuer_pos)).sum(
+            dim=-1, keepdim=True
+        )
 
         ######
         # Dense reward shaping
@@ -743,6 +768,7 @@ class Intercept(IsaacEnv):
         # reward = reward_approach_velocity + reward_action_smoothness + reward_heading_alignment
         # reward = (2.0 * reward - 1.0).clamp(-1.0, 1.0)
         # reward = reward_approach_velocity + reward_heading_alignment + reward_delta_distance
+        # reward = reward_delta_distance + reward_action_smoothness
         reward = reward_delta_distance
 
         ######
@@ -761,20 +787,20 @@ class Intercept(IsaacEnv):
         truncated = truncated.reshape(self.num_envs, 1)
         done_mask = terminated | truncated
 
-        terminal_reward = torch.where(
+        terminal_success_reward = torch.where(
             reached_target,
-            torch.ones_like(reward),
-            torch.where(misbehave, -torch.ones_like(reward),
-                        torch.zeros_like(reward)),
+            self.reward_terminal_weight * torch.ones_like(reward),
+            torch.zeros_like(reward),
         )
+        terminal_failure_reward = torch.where(
+            misbehave,
+            -self.reward_terminal_weight * torch.ones_like(reward),
+            torch.zeros_like(reward),
+        )
+        terminal_reward = terminal_success_reward + terminal_failure_reward
 
         reward += terminal_reward
 
-        approach_speed = (pursuer_vel[..., :3] * normalize(evader_pos - pursuer_pos)).sum(
-            dim=-1, keepdim=True
-        )
-
-        self.stats["distance"].lerp_(distance, 1 - self.alpha)
         self.stats["reward_closing"].lerp_(reward_distance, 1 - self.alpha)
         self.stats["reward_approach_speed"].lerp_(reward_approach_velocity, 1 - self.alpha)
         self.stats["reward_action_smoothness"].lerp_(
@@ -788,6 +814,7 @@ class Intercept(IsaacEnv):
         self.stats["action_error_order1_max"].set_(
             torch.max(self.stats["action_error_order1_max"], self.action_error_order1)
         )
+        self.stats["distance"].lerp_(distance, 1 - self.alpha)
         self.stats["approach_speed"].lerp_(approach_speed, 1 - self.alpha)
         self.stats["return"] += reward
         self.stats["episode_len"][:] = self.progress_buf.unsqueeze(1)
