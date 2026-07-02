@@ -85,7 +85,8 @@ pip install -U pip setuptools wheel
 # 3) Install common Python deps required by ROS/Crazyswarm Python tools
 pip install Jinja2 pyyaml typeguard
 
-# 4) Install local cflib from this repo vendored source
+# 4) Install cflib from source (required for udp:// support)
+# We use the official Bitcraze source tree vendored in this repo.
 cd libs/crazyflie-lib-python
 pip install .
 
@@ -130,6 +131,39 @@ cd crazyswarm2_ws
 colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
 ```
 
+### Run with CrazySim (udp:// URI)
+
+If your robot URI is `udp://127.0.0.1:19850` (or another `udp://` URI), use the Python backend:
+
+Preferred (helper script):
+
+```bash
+cd ~/Projects/RLInterceptorDrone
+./scripts/launch_crazyswarm_udp.sh
+```
+
+Optional overrides:
+
+```bash
+./scripts/launch_crazyswarm_udp.sh hello_world cflib
+```
+
+Equivalent manual flow:
+
+```bash
+cd ~/Projects/RLInterceptorDrone/crazyswarm2_ws
+source ~/Projects/RLInterceptorDrone/.venv-crazyswarm/bin/activate
+source /opt/ros/humble/setup.zsh
+source install/setup.zsh
+
+# Ensure ROS Python nodes can see packages installed in .venv-crazyswarm
+export PYTHONPATH="$VIRTUAL_ENV/lib/python3.10/site-packages:$PYTHONPATH"
+
+ros2 launch crazyflie_examples launch.py script:=hello_world backend:=cflib
+```
+
+Do not use `backend:=cpp` with `udp://...` URIs. The C++ backend expects `radio://...` links for broadcast setup and can fail with `Invalid uri ()!`.
+
 After a successful build, source overlays before running nodes:
 
 ```bash
@@ -145,6 +179,7 @@ source crazyswarm2_ws/install/setup.zsh
 - Keep `.venv` (interceptor) and `.venv-crazyswarm` (Crazyswarm2) separate; do not mix installs between them.
 - If `colcon build` fails with `No module named 'catkin_pkg'`, install `catkin_pkg` in `.venv-crazyswarm`.
 - If `colcon build` fails with `AttributeError: module 'em' has no attribute 'BUFFERED_OPT'`, pin `empy==3.3.4` in `.venv-crazyswarm`.
+- If runtime fails with `ModuleNotFoundError: No module named 'cflib'` while using `backend:=cflib`, export `PYTHONPATH` as shown above before launching.
 
 ## Running the Intercept task
 
