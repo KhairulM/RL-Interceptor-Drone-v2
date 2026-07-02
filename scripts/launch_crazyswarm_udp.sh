@@ -21,8 +21,8 @@ if [[ ! -d "$VENV_PATH" ]]; then
   exit 1
 fi
 
-if [[ ! -f "$WS_PATH/install/setup.zsh" ]]; then
-  echo "Missing ROS workspace overlay: $WS_PATH/install/setup.zsh"
+if [[ ! -f "$WS_PATH/install/setup.bash" ]]; then
+  echo "Missing ROS workspace overlay: $WS_PATH/install/setup.bash"
   echo "Build the workspace first with colcon."
   exit 1
 fi
@@ -30,8 +30,12 @@ fi
 cd "$WS_PATH"
 
 source "$VENV_PATH/bin/activate"
-source /opt/ros/humble/setup.zsh
-source install/setup.zsh
+
+# ROS setup scripts can reference unset shell vars; relax nounset while sourcing.
+set +u
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+set -u
 
 # ROS Python entrypoints may use system shebangs; prepend venv site-packages.
 export PYTHONPATH="$VIRTUAL_ENV/lib/python3.10/site-packages:${PYTHONPATH:-}"
