@@ -257,12 +257,43 @@ Common knobs in [cfg/task/Intercept.yaml](cfg/task/Intercept.yaml):
 - On RTX 5090 / Isaac Sim 5.1, the verified-stable Intercept setup uses a **homogeneous Hummingbird pursuer + Hummingbird evader** scene (already the default). Mixing different drone models in the same scene at high `env.num_envs` has been observed to crash the PhysX GPU backend.
 - Start with `env.num_envs=256` and scale up only after confirming stability on your hardware.
 
+## Deploying a policy to CrazySim / Crazyswarm2
+
+To fly a trained Intercept checkpoint on a Crazyflie in **CrazySim** via
+**Crazyswarm2**, use the tools in [deploy/](deploy/). Because the Isaac Sim
+training stack (Python 3.11 `.venv`) and the Crazyswarm2 stack (Python 3.10
+`.venv-crazyswarm`) are separate environments, deployment is a two-step flow:
+
+1. **Export** (Isaac `.venv`) — convert the checkpoint (any RL algorithm) into a
+   standalone TorchScript actor + `metadata.json`:
+
+   ```bash
+   source .venv/bin/activate
+   python deploy/export_policy.py task=Intercept algo=ppo headless=true \
+       checkpoint=scripts/outputs/<date>/<time>/checkpoint_final.pt \
+       export_dir=deploy/artifacts/intercept_ppo
+   ```
+
+2. **Deploy** (Crazyswarm2 `.venv-crazyswarm`) — run the ROS 2 controller that
+   rebuilds the observation from live drone state and streams commands:
+
+   ```bash
+   source .venv-crazyswarm/bin/activate && source /opt/ros/humble/setup.bash
+   source crazyswarm2_ws/install/setup.bash
+   python deploy/intercept_controller.py --ros-args \
+       -p artifact_dir:=deploy/artifacts/intercept_ppo -p pursuer_name:=cf1
+   ```
+
+See [deploy/README.md](deploy/README.md) for full instructions, parameters, and
+an important note on CTBR command fidelity.
+
 ## Repository layout
 
 ```
 cfg/                Hydra configs (task/, algo/, base/)
 omni_drones/        Python package: envs, robots, controllers, learning, sensors, utils
 scripts/            Entry points: train.py, play.py (Hydra apps reading cfg/)
+deploy/             Export + Crazyswarm2/CrazySim controller for trained policies
 examples/           Standalone demo scripts
 docs/               Sphinx documentation source
 ```

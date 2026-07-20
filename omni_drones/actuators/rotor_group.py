@@ -35,8 +35,6 @@ class RotorGroup(nn.Module):
         self.batch_shape = batch_shape
 
         self.dt = dt
-        self.time_up = 0.15
-        self.time_down = 0.15
         self.noise_scale = 0.002
         
         kf_base = max_rot_vels.square() * force_constants
@@ -47,9 +45,15 @@ class RotorGroup(nn.Module):
         self.KM = nn.Parameter(km_base.unsqueeze(0).expand(*batch_shape, -1).clone())
         self.directions = nn.Parameter(dir_base.unsqueeze(0).expand(*batch_shape, -1).clone())
         
+        # First-order motor lag from the (optional) motor time constant [s].
+        # Discrete per-step coefficient for throttle += tau * (target - throttle):
+        #   tau = 1 - exp(-dt / time_constant)
+        # Default fallback ~0.023 s preserves the previous hardcoded tau=0.43 at dt=0.01.
+        time_constant = rotor_config.get("time_constant", 0.023)
+        tau = 1.0 - torch.exp(torch.tensor(-dt / time_constant))
         # Batched state: per-environment (needed for randomization)
-        self.tau_up = nn.Parameter(0.43 * torch.ones(*batch_shape, self.num_rotors))
-        self.tau_down = nn.Parameter(0.43 * torch.ones(*batch_shape, self.num_rotors))
+        self.tau_up = nn.Parameter(tau * torch.ones(*batch_shape, self.num_rotors))
+        self.tau_down = nn.Parameter(tau * torch.ones(*batch_shape, self.num_rotors))
         self.throttle = nn.Parameter(torch.zeros(*batch_shape, self.num_rotors))
 
         self.f = torch.square

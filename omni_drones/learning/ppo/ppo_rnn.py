@@ -162,6 +162,7 @@ class PPOConfig:
 
     checkpoint_path: Union[str, None] = None
 
+
 cs = ConfigStore.instance()
 cs.store("ppo_gru", node=PPOConfig, group="algo")
 cs.store("ppo_lstm", node=PPOConfig(rnn="lstm"), group="algo")
@@ -172,7 +173,7 @@ class PPORNNPolicy(TensorDictModuleBase):
         self,
         cfg: PPOConfig,
         observation_spec: Composite,
-        action_spec: TensorSpec,
+        action_spec: Composite,
         reward_spec: TensorSpec,
         device,
     ):
@@ -183,7 +184,7 @@ class PPORNNPolicy(TensorDictModuleBase):
         self.entropy_coef = 0.001
         self.clip_param = 0.1
         self.critic_loss_fn = nn.HuberLoss(delta=10)
-        self.n_agents, self.action_dim = action_spec.shape[-2:]
+        self.n_agents, self.action_dim = action_spec[("agents", "action")].shape[-2:]
 
         fake_input = observation_spec.zero()
 
@@ -264,6 +265,7 @@ class PPORNNPolicy(TensorDictModuleBase):
             out_keys=[("agents", "action")],
             distribution_class=IndependentNormal,
             return_log_prob=True,
+            log_prob_key="sample_log_prob",
         ).to(self.device)
 
         self._maybe_init_state(fake_input)
@@ -286,7 +288,11 @@ class PPORNNPolicy(TensorDictModuleBase):
 
         self.actor_opt = torch.optim.Adam(self.actor.parameters(), lr=5e-4)
         self.critic_opt = torch.optim.Adam(self.critic.parameters(), lr=5e-4)
-        self.value_norm = ValueNorm1(reward_spec.shape[-2:]).to(self.device)
+        if isinstance(reward_spec, Composite) and ("agents", "reward") in reward_spec.keys(True):
+            value_norm_shape = reward_spec[("agents", "reward")].shape[-2:]
+        else:
+            value_norm_shape = reward_spec.shape[-2:]
+        self.value_norm = ValueNorm1(value_norm_shape).to(self.device)
 
     def _maybe_init_state(self, tensordict: TensorDict):
         shape = tensordict.get(("agents", "observation")).shape[:-1]

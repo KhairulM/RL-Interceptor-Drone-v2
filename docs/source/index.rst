@@ -59,6 +59,7 @@ If you use **OmniDrones** in your research, please cite the paper with the follo
    tutorials/drone
    tutorials/environment
    tutorials/controller
+   tutorials/interceptor_benchmark
 
 .. toctree::
    :caption: Tasks

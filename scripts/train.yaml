@@ -9,7 +9,7 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-total_frames: 250_000_000
+total_frames: 1_000_000_000
 max_iters: -1
 eval_interval: -1
 save_interval: -1
@@ -21,9 +21,11 @@ checkpoint: null
 
 viewer:
   resolution: [960, 720]
-  # resolution: [1280, 960]
-  eye: [8, 0., 6.]
-  lookat: [0., 0., 1.]
+  # The Crazyflie is only ~12 cm across (vs ~54 cm for the Hummingbird), so the
+  # camera must sit close to it to be visible. Move `eye` farther out only when
+  # visualizing larger drones or the whole swarm.
+  eye: [3.0, 0.0, 2.2]
+  lookat: [0.0, 0.0, 1.6]
 
 wandb:
   group: ${oc.select:..task.name}

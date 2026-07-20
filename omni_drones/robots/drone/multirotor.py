@@ -183,8 +183,14 @@ class MultirotorBase(RobotBase):
 
         logging.info(str(self))
 
-        self.drag_coef = torch.zeros(
-            *self.shape, 1, device=self.device) * self.params["drag_coef"]
+        # Linear body drag: F_drag = -drag_coef * mass * v. Only active when
+        # the model yaml sets `use_drag: true` (e.g. to match CrazySim's
+        # so_rpy_rotor_drag model); otherwise zero, preserving the previous
+        # no-drag behavior for all models.
+        use_drag = bool(self.params.get("use_drag", False))
+        drag_coef = float(self.params["drag_coef"]) if use_drag else 0.0
+        self.drag_coef = torch.full(
+            (*self.shape, 1), drag_coef, device=self.device)
         self.intrinsics = self.intrinsics_spec.expand(self.shape).zero()
 
     def setup_randomization(self, cfg):
@@ -292,7 +298,9 @@ class MultirotorBase(RobotBase):
                 quat_rotate(self.rot, self.thrusts.sum(-2)),
                 kz=0.3
             ).sum(-2)
-        self.forces[:] += (self.drag_coef * self.masses) * self.vel[..., :3]
+        # Linear body drag, opposing the velocity (drag_coef is a positive
+        # magnitude; see `initialize`).
+        self.forces[:] -= (self.drag_coef * self.masses) * self.vel[..., :3]
         self.forces[:] = torch.nan_to_num(self.forces)
 
         # IsaacSim 5.1.0 integration: applying a force to a rigid body seems

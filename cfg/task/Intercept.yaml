@@ -7,7 +7,7 @@ defaults:
 
 env:
   num_envs: 4096
-  max_episode_length: 600
+  max_episode_length: 1000 # 600
   env_spacing: 8
 
 # drone_model:
@@ -16,14 +16,26 @@ env:
 
 time_encoding_dim: 4
 
-reset_thres: 15.0
-success_radius: 0.3
+# Curriculum learning parameters
+success_radius_init: 0.3
+success_radius_max: 0.1
+success_radius_lr: 2e-6
+success_radius_eval: 0.15
+
+reset_thres: 9.0
 reward_distance_scale: 0.8
 reward_approach_velocity_weight: 1.0
-reward_action_smoothness_weight: 0.1
 reward_heading_alignment_weight: 1.0
+reward_action_smoothness_weight: 0.5
 reward_delta_distance_weight: 10.0
+# Potential-difference precision reward: weight * (exp(-scale*d_t) - exp(-scale*d_{t-1})).
+# Pays only for *closing* distance (zero when orbiting at constant range) and
+# steepens sharply in the final ~1/scale meters, giving a dense gradient for
+# the terminal approach that delta_distance alone lacks.
+reward_precision_weight: 10.0
+reward_precision_scale: 5.0
 reward_terminal_weight: 100.0
+reward_action_norm_weight: 0.5
 
 # action_transform: rate
 action_transform: PIDrate
@@ -44,7 +56,7 @@ pursuer:
   use_ab_world_frame: false
 
 evader:
-  # model: Crazyflie
+  # model: Hummingbird
   # controller: LeePositionController
   model: Crazyflie
   controller: LeePositionController
@@ -63,12 +75,12 @@ evader:
   #     ang_vel: 1.0
   #   - type: linear
   #     speed: 5.0
-  speed_range: [2.0, 10.0]
-  spawn_distance_range: [2.0, 7.0]
+  speed_range: [1.0, 6.0]
+  spawn_distance_range: [1.0, 7.0]
   # Each env samples uniformly from this list of enabled trajectory types
   # on every reset. Supported: "linear", "zigzag", "velocity_obstacle", "random".
   # trajectory_types: [linear, zigzag, random]
-  trajectory_types: [linear, zigzag] # for training
+  trajectory_types: [hover, linear, zigzag] # for training
   # trajectory_types: [random] # for generalization evaluation
   # trajectory_types: [velocity_obstacle]
   zigzag:
@@ -85,12 +97,23 @@ evader:
   use_relative_velocity: false
 
 # Domain randomization applied to the (RL-controlled) pursuer drone.
-# The force constant KF is randomized via `t2w_scale`: on every reset the
-# rotor thrust-to-weight is sampled uniformly from THRUST2WEIGHT_0 * [lo, hi],
-# which sets KF = t2w * mass * 9.81 (see multirotor._randomize).
+# Conservative set: only the parameters that matter most for CTBR sim-to-real
+# transfer, centered on the (now-corrected) CrazySim-matched nominals.
+#   t2w_scale  -> KF = t2w * mass * 9.81 (thrust curve / battery sag)
+#   tau_up/down-> per-step motor lag (0-1); [0.05,0.10] ~ motor tau in [0.095,0.19] s
+#   mass_scale -> battery charge / markers
 # `train`/`eval` phases are selected automatically by env.training.
 randomization:
   pursuer:
     train:
-      t2w_scale: [0.95, 1.05]
+      mass_scale: [0.95, 1.15]
+      t2w_scale: [0.95, 1.15]
+      inertia_scale: [0.95, 1.15]
+      # tau_up: [0.05, 0.10]
+      # tau_down: [0.05, 0.10]
+    # eval:
+    #   mass_scale: [0.95, 1.10]
+    #   t2w_scale: [0.95, 1.15]
+    #   tau_up: [0.05, 0.10]
+    #   tau_down: [0.05, 0.10]
 

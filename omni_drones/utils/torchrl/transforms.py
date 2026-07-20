@@ -267,6 +267,18 @@ class RateController(Transform):
     def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
         drone_state = tensordict[("info", "drone_state")][..., :13]
         action = tensordict[self.action_key]
+
+        # First-order action error (norm of action delta), mirroring
+        # PIDRateController so downstream tasks (e.g. Intercept) can read the
+        # ("stats", "action_error_order1") and ("info", "prev_action") keys.
+        tensordict.set(("info", "policy_action"), action)
+        prev_action = tensordict.get(("info", "prev_action"), None)
+        if prev_action is None:
+            prev_action = torch.zeros_like(action)
+        action_error = torch.norm(action - prev_action, dim=-1)
+        tensordict.set(("stats", "action_error_order1"), action_error)
+        tensordict.set(("info", "prev_action"), action)
+
         # Preserve the original action shape (with agent dimension if present)
         original_shape = action.shape
         has_agent_dim = len(original_shape) > 2
@@ -364,21 +376,21 @@ class PIDRateController(Transform):
         drone_state = tensordict[("info", "drone_state")][..., :13]
         action = tensordict[self.action_key]
 
-        action = torch.tanh(action)
-        # action: [-1, 1]
-        tensordict.set(("info", "policy_action"), action)
+        action = torch.tanh(action)  # action: [-1, 1]
         target_rate, target_thrust = action.split([3, 1], -1)
 
-        # raw action error
         ctbr_action = torch.concat([target_rate, target_thrust], dim=-1)
         prev_ctbr_action = tensordict[("info", "prev_action")]
 
         # LPF
         ctbr_action = self.LPF_coef * ctbr_action + (1.0 - self.LPF_coef) * prev_ctbr_action
 
+        # action error
         action_error = torch.norm(ctbr_action - prev_ctbr_action, dim=-1)
-        tensordict.set(("stats", "action_error_order1"), action_error)
+
+        tensordict.set(("info", "policy_action"), action)
         tensordict.set(("info", "prev_action"), ctbr_action)
+        tensordict.set(("stats", "action_error_order1"), action_error)
 
         # target_rate: [-1, 1], target_thrust: [min_thrust_ratio, max_thrust_ratio]
         target_thrust = torch.clamp((target_thrust + 1) / 2, min=self.min_thrust_ratio, max=self.max_thrust_ratio)
