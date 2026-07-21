@@ -19,6 +19,7 @@ from tqdm import tqdm
 from omni_drones import init_simulation_app
 from omni_drones.controllers.intercept_baseline_common import GeometricCTBR
 from omni_drones.controllers.kinematic_mpc_controller import KinematicMPCController
+from omni_drones.controllers.nonlinear_mpc_controller import NonlinearMPCController
 from omni_drones.controllers.proportional_navigation_controller import (
     ProportionalNavigationController,
 )
@@ -290,12 +291,23 @@ def _build_classical_policy(method: str, cfg, base_env):
         max_tilt_deg=35.0,
     )
 
+    # Raw calibration shared with the sampling-based nonlinear MPC.
+    ctbr_params = {
+        "g": g,
+        "hover_throttle": hover_throttle,
+        "target_clip": float(pc.target_clip),
+        "min_ratio": float(pc.min_thrust_ratio),
+        "max_ratio": float(pc.max_thrust_ratio),
+    }
+
     if method == "pure_pursuit":
         controller = PurePursuitController(ctbr, cfg.task)
     elif method == "pn":
         controller = ProportionalNavigationController(ctbr, cfg.task, dt=float(cfg.sim.dt))
     elif method == "kinematic_mpc":
         controller = KinematicMPCController(ctbr, cfg.task, dt=float(cfg.sim.dt))
+    elif method == "nonlinear_mpc":
+        controller = NonlinearMPCController(ctbr_params, cfg.task, dt=float(cfg.sim.dt))
     else:
         raise ValueError(f"Unknown classical method: {method}")
 

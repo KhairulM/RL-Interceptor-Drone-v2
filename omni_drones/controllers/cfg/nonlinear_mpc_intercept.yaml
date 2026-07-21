@@ -1,0 +1,19 @@
+# Sampling-based nonlinear MPC (MPPI) over the full quadrotor dynamics.
+# horizon x step_mult x sim_dt = lookahead time (e.g. 16 * 4 * 0.01 = 0.64 s).
+horizon: 16
+step_mult: 4
+# num_samples: rollouts scored per control step (higher = better, slower).
+num_samples: 256
+# temperature: lower -> greedier averaging of the sampled rollouts.
+temperature: 0.15
+discount: 0.99
+# Sampling noise std: body-rate [rad/s] and thrust-accel [m/s^2].
+noise_rate: 1.5
+noise_thrust: 2.5
+# Cost weights.
+w_dist: 2.0
+w_terminal: 12.0
+w_rate: 0.01
+w_tilt: 1.0
+w_ground: 50.0
+min_altitude: 0.2

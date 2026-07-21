@@ -7,7 +7,8 @@ This tutorial compares a trained RL interceptor with traditional guidance baseli
 - RL policy evaluation from checkpoint
 - Pure pursuit baseline
 - Proportional Navigation (PN) baseline
-- Lightweight kinematic MPC baseline
+- Kinematic MPC baseline (point-mass, intercept-point)
+- Nonlinear MPC baseline (full quadrotor dynamics, sampling-based / MPPI)
 - Shared fairness checks across all methods
 - JSON summary export and optional Weights & Biases table logging
 
@@ -18,10 +19,12 @@ This tutorial compares a trained RL interceptor with traditional guidance baseli
 - `omni_drones/controllers/pure_pursuit_controller.py`
 - `omni_drones/controllers/proportional_navigation_controller.py`
 - `omni_drones/controllers/kinematic_mpc_controller.py`
+- `omni_drones/controllers/nonlinear_mpc_controller.py`
 - `omni_drones/controllers/intercept_baseline_common.py`
 - `omni_drones/controllers/cfg/pure_pursuit_intercept.yaml`
 - `omni_drones/controllers/cfg/pn_intercept.yaml`
 - `omni_drones/controllers/cfg/kinematic_mpc_intercept.yaml`
+- `omni_drones/controllers/cfg/nonlinear_mpc_intercept.yaml`
 
 ## Run The Benchmark
 
@@ -49,7 +52,7 @@ python evaluate.py \
 
 Edit `scripts/evaluate.yaml`:
 
-- `eval.methods`: method list (`rl`, `pure_pursuit`, `pn`, `kinematic_mpc`)
+- `eval.methods`: method list (`rl`, `pure_pursuit`, `pn`, `kinematic_mpc`, `nonlinear_mpc`)
 - `eval.seeds`: benchmark seeds
 - `eval.num_envs`: vectorized env count for evaluation
 - `eval.steps_per_env`: rollout horizon per method/seed/scenario
@@ -109,6 +112,18 @@ Each guidance law differs only in the target it picks:
   (evader position led by its velocity over the estimated time-to-go).
 - **Kinematic MPC**: predict the evader position over the time-to-go and track
   it, matching the evader velocity at intercept.
+
+The **nonlinear MPC** is different: rather than picking a target for the
+geometric loop, it is a sampling-based (MPPI) controller that rolls out the
+**full 6-DOF quadrotor dynamics** for many sampled CTBR input sequences, scores
+them against the predicted evader trajectory, and emits the importance-weighted
+optimal first input directly as a CTBR action
+([nonlinear_mpc_controller.py](omni_drones/controllers/nonlinear_mpc_controller.py)).
+The modelled dynamics are
+``p_dot = v``, ``v_dot = thrust_accel * (R e3) + g``, ``R_dot = R * skew(omega)``
+with inputs ``(omega, thrust_accel)``. Its cost/sampling knobs live in
+[cfg/nonlinear_mpc_intercept.yaml](omni_drones/controllers/cfg/nonlinear_mpc_intercept.yaml)
+(horizon, num_samples, temperature, sampling noise, cost weights).
 
 > Note: the classical guidance laws use the full relative state (range +
 > bearing + evader velocity), which PN/MPC fundamentally require. The RL policy
