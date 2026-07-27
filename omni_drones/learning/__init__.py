@@ -26,6 +26,7 @@ from .mappo_new import MAPPO
 from .ppo import *
 from .happo import HAPPOPolicy
 from .qmix import QMIXPolicy
+from .competitive_mappo import CompetitiveMAPPO
 
 from .dqn import DQNPolicy
 from .sac import SACPolicy
@@ -45,4 +46,5 @@ ALGOS = {
     "td3": TD3Policy,
     "matd3": MATD3Policy,
     "dreamer": DreamerPolicy,
+    "competitive_mappo": CompetitiveMAPPO,
 }

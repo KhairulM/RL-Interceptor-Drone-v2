@@ -6,7 +6,6 @@
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, subject to the conditions in the LICENSE
 # file at the repository root.
-
 """Shared, dependency-light building blocks for deploying an Intercept policy.
 
 This module intentionally depends **only** on ``torch`` and the Python standard
@@ -30,13 +29,14 @@ bit-for-bit live here:
 Keeping these in one small, unit-testable module avoids silent drift between
 training and deployment.
 """
-
 from __future__ import annotations
 
 import dataclasses
 import json
 import os
-from dataclasses import dataclass, field
+import numpy as np
+from dataclasses import dataclass
+from dataclasses import field
 from typing import Optional
 
 import torch
@@ -66,15 +66,16 @@ class ObsConfig:
 
     def expected_obs_dim(self) -> int:
         """Recompute the observation dimension from the layout flags."""
+        evader_state_dim = 3  # relative heading
+        if self.use_relative_velocity:
+            evader_state_dim += 3
+
         pursuer_state_dim = 3 + 9 + 1  # lin vel + rot matrix + altitude
         if self.use_ab_world_frame:
             pursuer_state_dim += 3 - 1  # full position replaces altitude
         if self.use_rot_speed:
             pursuer_state_dim += 3
-        evader_state_dim = 3  # relative heading
-        if self.use_relative_velocity:
-            evader_state_dim += 3
-        return pursuer_state_dim + evader_state_dim
+        return evader_state_dim + pursuer_state_dim
 
 
 @dataclass
@@ -88,7 +89,7 @@ class CTBRConfig:
 
     target_clip: float = 1.0
     min_thrust_ratio: float = 0.0
-    max_thrust_ratio: float = 1.0
+    max_thrust_ratio: float = 0.9
     # ``LPF_coef`` is kept for completeness / diagnostics only; it does not
     # influence the command sent to the drone (see decode_action_to_ctbr).
     lpf_coef: float = 1.0
@@ -110,41 +111,41 @@ class PolicyMetadata:
     # -- (de)serialisation ---------------------------------------------------
     def to_dict(self) -> dict:
         return {
-            "artifact_version": self.artifact_version,
-            "algo": self.algo,
-            "obs": dataclasses.asdict(self.obs),
-            "ctbr": dataclasses.asdict(self.ctbr),
-            "sim_dt": self.sim_dt,
-            "notes": self.notes,
+            'artifact_version': self.artifact_version,
+            'algo': self.algo,
+            'obs': dataclasses.asdict(self.obs),
+            'ctbr': dataclasses.asdict(self.ctbr),
+            'sim_dt': self.sim_dt,
+            'notes': self.notes,
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "PolicyMetadata":
+    def from_dict(cls, data: dict) -> 'PolicyMetadata':
         return cls(
-            artifact_version=int(data["artifact_version"]),
-            algo=str(data["algo"]),
-            obs=ObsConfig(**data["obs"]),
-            ctbr=CTBRConfig(**data["ctbr"]),
-            sim_dt=float(data.get("sim_dt", 0.02)),
-            notes=dict(data.get("notes", {})),
+            artifact_version=int(data['artifact_version']),
+            algo=str(data['algo']),
+            obs=ObsConfig(**data['obs']),
+            ctbr=CTBRConfig(**data['ctbr']),
+            sim_dt=float(data.get('sim_dt', 0.02)),
+            notes=dict(data.get('notes', {})),
         )
 
 
 def save_metadata(metadata: PolicyMetadata, path: str) -> None:
     """Write ``metadata`` to ``path`` as pretty-printed JSON."""
-    with open(path, "w", encoding="utf-8") as handle:
+    with open(path, 'w', encoding='utf-8') as handle:
         json.dump(metadata.to_dict(), handle, indent=2, sort_keys=True)
 
 
 def load_metadata(path: str) -> PolicyMetadata:
     """Read :class:`PolicyMetadata` from a JSON file, validating the version."""
-    with open(path, "r", encoding="utf-8") as handle:
+    with open(path, 'r', encoding='utf-8') as handle:
         data = json.load(handle)
     metadata = PolicyMetadata.from_dict(data)
     if metadata.artifact_version != ARTIFACT_VERSION:
         raise ValueError(
-            f"Incompatible artifact version {metadata.artifact_version} "
-            f"(expected {ARTIFACT_VERSION}). Re-run export_policy.py."
+            f'Incompatible artifact version {metadata.artifact_version} '
+            f'(expected {ARTIFACT_VERSION}). Re-run export_policy.py.'
         )
     return metadata
 
@@ -196,6 +197,44 @@ def quaternion_to_rotation_matrix(quaternion: torch.Tensor) -> torch.Tensor:
     return matrix.unflatten(matrix.dim() - 1, (3, 3))
 
 
+def quaternion_to_rotation_matrix_np(quat_wxyz: np.ndarray) -> np.ndarray:
+    """Convert a ``(w, x, y, z)`` quaternion to a 3x3 rotation matrix as a NumPy array."""
+    w, x, y, z = quat_wxyz
+    tx, ty, tz = 2.0 * x, 2.0 * y, 2.0 * z
+    twx, twy, twz = tx * w, ty * w, tz * w
+    txx, txy, txz = tx * x, ty * x, tz * x
+    tyy, tyz, tzz = ty * y, tz * y, tz * z
+    return np.array([
+        [1 - (tyy + tzz), txy - twz, txz + twy],
+        [txy + twz, 1 - (txx + tzz), tyz - twx],
+        [txz - twy, tyz + twx, 1 - (txx + tyy)],
+    ], dtype=np.float64)
+
+
+def quat_rotate_inverse(quat_wxyz: torch.Tensor, vec: torch.Tensor) -> torch.Tensor:
+    """Rotate a vector by the inverse of a quaternion (world -> body frame).
+
+    Equivalent to ``R^T @ v`` where ``R`` is the rotation matrix for ``quat_wxyz``.
+    Matches ``omni_drones/utils/torch.py::quat_rotate_inverse`` so that the
+    deployment observation pipeline produces bit-identical values to training.
+
+    Args:
+        quat_wxyz: ``[..., 4]`` quaternion in ``(w, x, y, z)`` convention.
+        vec: ``[..., 3]`` vector expressed in world frame.
+
+    Returns:
+        ``[..., 3]`` vector rotated into the body frame.
+    """
+    q_vec = quat_wxyz[..., 1:]          # (x, y, z)
+    q_imag_sq = (q_vec * q_vec).sum(-1, keepdim=True)
+
+    # v' = (w^2 - |v|^2) * v + 2 * (v . v_q) * v_q + 2 * w * (v_q x v)
+    factor0 = quat_wxyz[..., :1] ** 2 - q_imag_sq
+    dot = (q_vec * vec).sum(-1, keepdim=True)
+    cross = torch.cross(q_vec, vec, dim=-1)
+    return factor0 * vec + 2.0 * dot * q_vec + 2.0 * quat_wxyz[..., :1] * cross
+
+
 # ---------------------------------------------------------------------------
 # Observation construction
 # ---------------------------------------------------------------------------
@@ -215,6 +254,10 @@ def build_observation(
     the quaternion is ``(w, x, y, z)`` and linear/angular velocities are
     expressed in the **world** frame (as returned by ``drone.get_state()``).
 
+    Velocities are transformed to the pursuer's body frame before being
+    concatenated, so that the observation matches what training sees
+    (see :meth:`Intercept._compute_state_and_obs`).
+
     Args:
         cfg: Observation layout flags (must match the trained policy).
         pursuer_pos: ``[..., 3]`` pursuer position in world frame.
@@ -233,7 +276,12 @@ def build_observation(
     pursuer_rot = quaternion_to_rotation_matrix(pursuer_quat_wxyz)
     pursuer_rot = pursuer_rot.reshape(*pursuer_rot.shape[:-2], 9)  # (9)
 
-    components = [evader_rel_hdg, pursuer_lin_vel_world, pursuer_rot]
+    # Transform velocities to pursuer body frame so the deployment observation
+    # matches bit-for-bit what training produces.
+    pursuer_lin_vel_body = quat_rotate_inverse(
+        pursuer_quat_wxyz, pursuer_lin_vel_world)
+
+    components = [evader_rel_hdg, pursuer_lin_vel_body, pursuer_rot]
 
     if cfg.use_ab_world_frame:
         components.append(pursuer_pos)  # (3)
@@ -243,22 +291,27 @@ def build_observation(
     if cfg.use_relative_velocity:
         if evader_lin_vel_world is None:
             raise ValueError(
-                "use_relative_velocity=True requires evader_lin_vel_world."
+                'use_relative_velocity=True requires evader_lin_vel_world.'
             )
-        components.append(evader_lin_vel_world - pursuer_lin_vel_world)  # (3)
+        # Both velocities in body frame so the difference is also body-frame.
+        evader_lin_vel_body = quat_rotate_inverse(
+            pursuer_quat_wxyz, evader_lin_vel_world)
+        components.append(evader_lin_vel_body - pursuer_lin_vel_body)  # (3)
 
     if cfg.use_rot_speed:
         if pursuer_ang_vel_world is None:
             raise ValueError(
-                "use_rot_speed=True requires pursuer_ang_vel_world."
+                'use_rot_speed=True requires pursuer_ang_vel_world.'
             )
-        components.append(pursuer_ang_vel_world)  # (3)
+        pursuer_ang_vel_body = quat_rotate_inverse(
+            pursuer_quat_wxyz, pursuer_ang_vel_world)
+        components.append(pursuer_ang_vel_body)  # (3)
 
     obs = torch.cat(components, dim=-1)
     if obs.shape[-1] != cfg.obs_dim:
         raise ValueError(
-            f"Assembled observation has dim {obs.shape[-1]} but metadata "
-            f"declares obs_dim={cfg.obs_dim}. Check the ObsConfig flags."
+            f'Assembled observation has dim {obs.shape[-1]} but metadata '
+            f'declares obs_dim={cfg.obs_dim}. Check the ObsConfig flags.'
         )
     return obs
 
@@ -320,14 +373,181 @@ def decode_action_to_ctbr(raw_action: torch.Tensor, cfg: CTBRConfig) -> CTBRComm
     )
 
 
+# ---------------------------------------------------------------------------
+# Motion-capture (OptiTrack / NatNet) pose transformation
+# ---------------------------------------------------------------------------
+# These helpers deliberately use plain Python floats (not torch) so they add
+# negligible per-frame overhead at mocap streaming rates (100-360 Hz) and keep
+# this module importable in every deployment environment.
+
+# Default body-frame correction (qx, qy, qz, qw) mapping the rigid-body axes as
+# defined in Motive onto the ROS FLU body convention (X forward, Y left, Z up).
+# Tune per rigid-body definition; override via MocapConfig.body_to_flu_quat_xyzw.
+DEFAULT_MOCAP_BODY_TO_FLU_QUAT_XYZW = (
+    0.0, 0.0, -0.7071067811865476, 0.7071067811865476,
+)
+
+
+def _read_yaml(path: str) -> dict:
+    """Parse a YAML file into a plain ``dict`` (``yaml`` imported lazily)."""
+    import yaml  # type: ignore[import]
+
+    with open(path, 'r', encoding='utf-8') as handle:
+        return yaml.safe_load(handle)
+
+
+@dataclass
+class MocapConfig:
+    """Network + frame-convention settings for a NatNet mocap stream.
+
+    Quaternions here follow the NatNet/ROS ``(qx, qy, qz, qw)`` ordering (note
+    that this differs from the Isaac ``(w, x, y, z)`` order used by the
+    observation helpers above).
+    """
+
+    enabled: bool = True
+    server_ip: str = '127.0.0.1'
+    # None => auto-detect the local interface that routes to ``server_ip``.
+    local_ip: Optional[str] = None
+    multicast_address: str = '239.255.42.99'
+    command_port: int = 1510
+    data_port: int = 1511
+    pursuer_rigid_body_id: int = 31
+    evader_rigid_body_id: int = 32
+    # Maximum forwarding rate for extpose updates to the drone.
+    mocap_send_rate_hz: float = 30.0
+    body_to_flu_quat_xyzw: tuple = DEFAULT_MOCAP_BODY_TO_FLU_QUAT_XYZW
+    publish_tf: bool = True
+    world_frame: str = 'world'
+    orientation_align_time: float = 2.0  # seconds to align mocap orientation with EKF
+
+
+def load_mocap_config_from_yaml(path: str) -> MocapConfig:
+    """Load a :class:`MocapConfig` from the ``mocap`` section of a YAML file.
+
+    Extra keys are ignored; missing optional fields fall back to their defaults.
+    """
+    return MocapConfig(**_read_yaml(path)['mocap'])
+
+
+@dataclass
+class MocapPose:
+    """A transformed rigid-body pose ready to feed a Crazyflie / ROS TF tree."""
+
+    rigid_body_id: int
+    position: tuple            # (x, y, z) metres, world frame (Z up)
+    quat_xyzw: tuple           # (qx, qy, qz, qw) ROS FLU body-in-world
+    tracking_valid: bool
+
+    @property
+    def quat_wxyz(self) -> tuple:
+        """Return the orientation in Isaac ``(w, x, y, z)`` order."""
+        x, y, z, w = self.quat_xyzw
+        return (w, x, y, z)
+
+
+def quat_multiply_xyzw(q1: tuple, q2: tuple) -> tuple:
+    """Hamilton product of two ``(x, y, z, w)`` quaternions."""
+    x1, y1, z1, w1 = q1
+    x2, y2, z2, w2 = q2
+    return (
+        w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+        w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+        w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+        w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+    )
+
+
+def quat_normalize_xyzw(q: tuple, eps: float = 1e-12) -> tuple:
+    """Return the unit quaternion for ``(x, y, z, w)`` (identity if degenerate)."""
+    x, y, z, w = q
+    norm = (x * x + y * y + z * z + w * w) ** 0.5
+    if norm < eps:
+        return (0.0, 0.0, 0.0, 1.0)
+    inv = 1.0 / norm
+    return (x * inv, y * inv, z * inv, w * inv)
+
+
+def transform_mocap_pose(
+    cfg: MocapConfig,
+    rigid_body_id: int,
+    position,
+    quat_xyzw,
+    tracking_valid: bool,
+) -> MocapPose:
+    """Transform a raw NatNet rigid-body pose into the ROS FLU convention.
+
+    The fixed ``cfg.body_to_flu_quat_xyzw`` correction is applied on the right
+    of the measured orientation so that the reported body axes coincide with the
+    ROS FLU convention (X forward, Y left, Z up). Position is passed through
+    unchanged (configure Motive for a Z-up world to match ROS REP-103).
+
+    Args:
+        cfg: Mocap configuration carrying the body-frame correction.
+        rigid_body_id: Motive streaming id of the rigid body.
+        position: ``(x, y, z)`` world-frame position (metres).
+        quat_xyzw: ``(qx, qy, qz, qw)`` orientation as reported by NatNet.
+        tracking_valid: Motive's per-body tracking-valid flag.
+
+    Returns:
+        A :class:`MocapPose` with the corrected orientation.
+    """
+    corrected = quat_normalize_xyzw(
+        quat_multiply_xyzw(tuple(quat_xyzw), tuple(cfg.body_to_flu_quat_xyzw)))
+    return MocapPose(
+        rigid_body_id=int(rigid_body_id),
+        position=(float(position[0]), float(position[1]), float(position[2])),
+        quat_xyzw=corrected,
+        tracking_valid=bool(tracking_valid),
+    )
+
+
 # Standard artifact file names, referenced by both scripts.
-POLICY_TS_FILENAME = "policy_ts.pt"
-METADATA_FILENAME = "metadata.json"
+POLICY_TS_FILENAME = 'policy_ts.pt'
+METADATA_FILENAME = 'metadata.json'
 
 
-def artifact_paths(output_dir: str) -> "tuple[str, str]":
+def artifact_paths(output_dir: str) -> 'tuple[str, str]':
     """Return ``(torchscript_path, metadata_path)`` inside ``output_dir``."""
     return (
         os.path.join(output_dir, POLICY_TS_FILENAME),
         os.path.join(output_dir, METADATA_FILENAME),
     )
+
+
+# ---------------------------------------------------------------------------
+# Drone representation
+# ---------------------------------------------------------------------------
+@dataclass
+class DroneConfig:
+    """Configuration for a single drone, used to instantiate a :class:`Drone`."""
+
+    name: str
+    uri: str
+    cache_dir: Optional[str] = None
+    control_dt: float = 0.02
+    max_thrust_pwm: float = 65535.0
+    rate_sign: list[float] = field(default_factory=lambda: [1.0, 1.0, 1.0])
+    need_rot_speed: bool = False
+    log_period_ms: int = 20
+    state_timeout: float = 0.5
+    min_altitude: float = 0.15
+
+
+def load_drone_config_from_yaml(path: str, drone_name: str) -> DroneConfig:
+    """Load a :class:`DroneConfig` from the ``drone_name`` section of a YAML file.
+
+    Extra keys are ignored; missing optional fields fall back to their defaults.
+    """
+    return DroneConfig(**_read_yaml(path)[drone_name])
+
+
+@dataclass
+class DroneState:
+    """World-frame drone state with an Isaac-style ``(w, x, y, z)`` quaternion."""
+
+    pos: np.ndarray                 # (3,)
+    quat_wxyz: np.ndarray           # (4,)
+    lin_vel: np.ndarray             # (3,) world frame
+    ang_vel: np.ndarray             # (3,) world frame (rad/s)
+    stamp: float                    # seconds (wall clock)

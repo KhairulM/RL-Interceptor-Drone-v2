@@ -1,0 +1,80 @@
+# Intercept controller configuration.
+#
+# All runtime settings for intercept_controller.py live here (no CLI flags).
+# Run with:  python intercept_controller.py [--config intercept_config.yaml]
+# Any key omitted below falls back to the documented default.
+
+artifact_dir: artifacts/intercept_ppo_crazyflie_v7  # Folder with policy_ts.pt + metadata.json (required).
+
+# -- Controller runtime -----------------------------------------------------
+controller:
+  evader_source: cf            # cf | scripted.
+  control_dt: 0.02             # 0 = use pursuer config or policy dt.
+  takeoff_height: 1.0          # Takeoff height for both drones (m).
+  takeoff_duration: 3.0        # Takeoff duration for both drones (s).
+  state_timeout: 0.5           # Stop if pursuer state is stale this long (s).
+  min_altitude: 0.15           # Safety cutoff altitude (m).
+  log_commands: false          # Print decoded CTBR commands.
+  publish_tf: false            # Also publish mocap poses on the ROS 2 /tf tree.
+  mocap_world_frame: world     # Parent frame id for published TF transforms.
+  evader_motion:
+    type: hover                # hover | random | trajectory.
+    yaw_deg: 0.0               # Yaw command for evader position setpoints (deg).
+    anchor: [1.0, 0.0, 1.0]    # Default hover/random center [x, y, z] (m).
+    trajectory_file: ''        # CSV path (absolute or relative to this config).
+    trajectory_loop: true      # Loop the trajectory when reaching the end.
+    random:
+      speed: 0.25              # Random-motion speed (m/s).
+      radius_xy: 1.0           # Random-motion radius around anchor in XY (m).
+      update_interval: 2.0     # Seconds between random target updates.
+      seed: null               # Optional RNG seed for repeatable random motion.
+
+# -- Pursuer drone config ----------------------------------------------------
+pursuer:
+  name: pursuer
+  # uri: radio://0/40/2M/E7E7E7E701      # Crazyflie URI of the pursuer.
+  uri: udp://127.0.0.1:19850
+  cache_dir: ./cache-pursuer                    # cflib read/write cache directory.
+  control_dt: 0.02                 # 0 = use the policy's training dt.
+  log_period_ms: 20                 # Log decoded body rates + thrust every N ms (0 = disable).
+  max_thrust_pwm: 65535.0              # Upper clamp on commanded thrust (0..65535).
+  rate_sign: [1.0, 1.0, 1.0]           # Per-axis sign flips: [roll, pitch, yaw].
+  state_timeout: 0.1                   # Stop if state is stale this long (s).
+  min_altitude: 0.1                   # Safety cutoff altitude (m).
+  need_rot_speed: false                  # Whether to request motor speeds from the pursuer (for logging).
+
+
+# -- Evader drone config -----------------------------------------------------
+evader:
+  name: evader
+  # uri: radio://1/80/2M/E7E7E7E702    # Evader Crazyflie URI (when source == cf).
+  uri: udp://127.0.0.1:19851
+  cache_dir: ./cache-evader                    # cflib read/write cache directory.
+  control_dt: 0.02                 # 0 = use the policy's training dt.
+  log_period_ms: 20                 # Log decoded body rates + thrust every N ms (0 = disable).
+  max_thrust_pwm: 65535.0              # Upper clamp on commanded thrust (0..65535).
+  rate_sign: [1.0, 1.0, 1.0]           # Per-axis sign flips: [roll, pitch, yaw].
+
+# -- Trajectory logging ------------------------------------------------------
+trajectory:
+  save: true
+  dir: ./trajectory_logs
+  prefix: intercept
+
+# -- Motion capture (OptiTrack / NatNet) -------------------------------------
+mocap:
+  enabled: true
+  server_ip: 192.168.0.210           # Motive/NatNet server IP.
+  local_ip: ""                       # Local NIC IP for multicast ("" = auto-detect).
+  multicast_address: 239.255.42.99           # NatNet multicast group address.
+  command_port: 1510
+  data_port: 1511
+  # Body-frame correction quaternion [qx, qy, qz, qw] mapping Motive -> ROS FLU.
+  body_to_flu_quat_xyzw: [0.0, 0.0, -0.7071067811865476, 0.7071067811865476]
+  # body_to_flu_quat_xyzw: [0.0, 0.0, 1.0, 0.0]
+  
+  pursuer_rigid_body_id: 31
+  evader_rigid_body_id: 32
+  mocap_send_rate_hz: 60.0
+  world_frame: world                 # Parent frame id for published TF transforms.
+  orientation_align_time: 2.0     # Time to align mocap orientation with EKF (s). Mocap will publish position + orientation first before publishing only position.

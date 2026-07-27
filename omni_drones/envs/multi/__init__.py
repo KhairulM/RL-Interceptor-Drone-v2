@@ -21,3 +21,4 @@
 # SOFTWARE.
 
 from .intercept_competitive import InterceptCompetitive
+from .intercept_competitive_ma import InterceptCompetitiveMA

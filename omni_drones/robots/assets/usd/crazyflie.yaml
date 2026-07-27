@@ -1,5 +1,7 @@
 # SysID from SimpleFlight adapted for Crazyflie 2.1+ using 
 # parameters from CrazySim cf2x_L250
+# mass from real drone (0.034 kg)
+# inertia from CrazySim cf2x_L250 (1.68e-5, 1.68e-5, 2.98e-5)
 
 update_sim: True
 name: crazyflie
@@ -16,7 +18,7 @@ inertia:
   yy: 1.68e-5
   yz: 0.0
   zz: 2.98e-5
-mass: 0.0319 # originally 0.0321
+mass: 0.034 # originally 0.0321
 l: 0.096
 # Linear body drag: F_drag = -drag_coef * mass * v, applied only when
 # use_drag is true. CrazySim (so_rpy_rotor_drag) drag_matrix diag is

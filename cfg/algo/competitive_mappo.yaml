@@ -1,0 +1,25 @@
+name: competitive_mappo
+
+# PPO knobs
+ppo_epochs: 4
+num_minibatches: 8
+clip_param: 0.1
+entropy_coef: 0.001
+
+# GAE
+gamma: 0.99
+gae_lambda: 0.95
+normalize_advantages: true
+
+# Data collection
+train_every: 16
+buffer_size: 500_000
+batch_size: 2048
+
+actor:
+  hidden_units: [256, 256]
+  lr: 3.0e-4
+
+critic:
+  hidden_units: [256, 256]
+  lr: 3.0e-4

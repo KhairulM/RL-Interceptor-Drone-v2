@@ -674,16 +674,15 @@ class PIDRateController(ControllerBase):
         # output: r, p, y
         r = (output[:, 0] / 2.0).unsqueeze(1)
         p = (output[:, 1] / 2.0).unsqueeze(1)
-        y = - output[:, 2].unsqueeze(1)  # 固件实现，sim中用的正数
-        # y = output[:, 2].unsqueeze(1)
+        y = output[:, 2].unsqueeze(1)
 
-        m1 = target_thrust - r + p + y  # 固件实现，sim中13对调，24对调
-        m2 = target_thrust - r - p - y
-        m3 = target_thrust + r - p + y
-        m4 = target_thrust + r + p - y
+        m1 = target_thrust + r - p + y
+        m2 = target_thrust + r + p - y
+        m3 = target_thrust - r + p + y
+        m4 = target_thrust - r - p - y
 
         cmd = torch.concat([m1, m2, m3, m4], dim=1) / 2**16 * 2 - 1
-
+        ctbr = torch.concat([r, p, y, target_thrust], dim=1).reshape(*batch_shape, -1)
         cmd = cmd.reshape(*batch_shape, -1)
 
-        return cmd, (r, p, y, target_thrust)
+        return cmd, ctbr

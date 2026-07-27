@@ -42,7 +42,21 @@ class VelocityObstaclePlanner(PlannerBase):
         * desired_velocity: tensor of shape (..., 1, 3).
     """
 
-    def __init__(self, uav_params):
+    def __init__(self, uav_params, max_n_directions: int | None = None):
+        """Build the velocity-obstacle planner.
+
+        Parameters
+        ----------
+        uav_params : dict
+            UAV parameter dictionary (must contain ``"l"`` for body radius).
+        max_n_directions : int or None
+            If provided, the candidate buffer is pre-allocated to hold this
+            many directions (times ``n_speeds`` from config), plus the zero-
+            velocity fallback.  When a curriculum increases ``n_directions``,
+            the planner can reuse the existing buffer instead of reallocating.
+            If ``None``, the default value from ``velocity_obstacle.yaml`` is
+            used for both allocation and the initial active count.
+        """
         super().__init__()
         self.uav_params = uav_params
 
@@ -68,16 +82,71 @@ class VelocityObstaclePlanner(PlannerBase):
             torch.as_tensor(planner_params["lookahead_dt"]).float()
         )
 
-        n_dirs = int(planner_params["n_directions"])
+        # Build initial candidate set from config.
+        n_dirs_cfg = int(planner_params["n_directions"])
         n_speeds = int(planner_params["n_speeds"])
-        max_v = float(planner_params["max_velocity"])
-        dirs = _fibonacci_sphere(n_dirs)                                   # (n_dirs, 3)
-        speeds = torch.linspace(max_v / n_speeds, max_v, n_speeds)         # (n_speeds,)
-        cands = dirs.unsqueeze(0) * speeds.view(-1, 1, 1)                  # (n_speeds, n_dirs, 3)
+        self.n_speeds = n_speeds  # Keep for rebuilds.
+
+        # Pre-allocate buffer to max_n_directions if given, otherwise use
+        # the config default.  This avoids reallocating when the curriculum
+        # increases n_directions.
+        alloc_dirs = int(max_n_directions) if max_n_directions is not None else n_dirs_cfg
+
+        dirs = _fibonacci_sphere(alloc_dirs)                           # (alloc_dirs, 3)
+        speeds = torch.linspace(float(self.max_velocity) / n_speeds, float(self.max_velocity), n_speeds)  # (n_speeds,)
+        cands = dirs.unsqueeze(0) * speeds.view(-1, 1, 1)              # (n_speeds, alloc_dirs, 3)
         cands = cands.reshape(-1, 3)
         # Index 0 reserved as the zero-velocity fallback.
-        cands = torch.cat([torch.zeros(1, 3), cands], dim=0)               # (K, 3)
+        cands = torch.cat([torch.zeros(1, 3), cands], dim=0)           # (K, 3)
         self.register_buffer("candidates", cands)
+
+        # Active candidate count (including index-0 zero-fallback).  When the
+        # curriculum lowers n_directions, only the first ``active_count``
+        # candidates participate in the VO optimisation; excess slots are
+        # silently ignored by masking them as invalid.
+        initial_active = 1 + n_dirs_cfg * n_speeds
+        self.active_candidate_count = initial_active
+
+    def _rebuild_candidates(self, n_directions: int):
+        """Rebuild the velocity candidate grid from scratch.
+
+        The buffer is already pre-allocated at max size; this method
+        regenerates directions and speeds in-place and updates
+        ``active_candidate_count`` so only the desired number of candidates
+        participate in planning.
+
+        Index 0 is always reserved as the zero-velocity fallback.
+        """
+        dirs = _fibonacci_sphere(n_directions)                         # (n_dirs, 3)
+        speeds = torch.linspace(
+            float(self.max_velocity) / self.n_speeds,
+            float(self.max_velocity),
+            self.n_speeds,
+        )                                                             # (n_speeds,)
+        cands = dirs.unsqueeze(0) * speeds.view(-1, 1, 1)             # (n_speeds, n_dirs, 3)
+        cands = cands.reshape(-1, 3)
+        # Index 0 reserved as the zero-velocity fallback.
+        cands = torch.cat([torch.zeros(1, 3), cands], dim=0)          # (K_active, 3)
+
+        # Copy new candidates into the beginning of the pre-allocated buffer.
+        active = cands.shape[0]  # number of candidate rows to copy
+        self.candidates[:active].copy_(cands)
+        self.active_candidate_count = active
+
+    def set_params(self, time_horizon=None, drone_radius=None, max_velocity=None):
+        """In-place override for scalar parameters.
+
+        Pass ``None`` for any parameter you do not want to change. This is
+        designed for curriculum updates: the environment can call this every
+        simulator step (or lazily) to drive harder avoidance behaviour over
+        time without reconstructing the planner object.
+        """
+        if time_horizon is not None:
+            self.time_horizon.data.fill_(float(time_horizon))
+        if drone_radius is not None:
+            self.drone_radius.data.fill_(float(drone_radius))
+        if max_velocity is not None:
+            self.max_velocity.data.fill_(float(max_velocity))
 
     def plan(
         self,
@@ -98,11 +167,11 @@ class VelocityObstaclePlanner(PlannerBase):
         R = 2.0 * self.drone_radius
         R2 = R * R
 
-        cands = self.candidates                             # (K, 3)
-        K = cands.shape[0]
+        cands = self.candidates[:self.active_candidate_count]  # (K_active, 3) — only active candidates
+        K = self.active_candidate_count
         expand_ones = (1,) * len(batch_shape)
 
-        v_cand = cands.view(*expand_ones, K, 1, 3)          # (1.., K, 1, 3)
+        v_cand = cands.view(*expand_ones, K, 1, 3)          # (1.., K_active, 1, 3)
         v_other_b = others_vel.unsqueeze(-3)                # (*B, 1, N, 3)
         p_rel_b = p_rel.unsqueeze(-3)                       # (*B, 1, N, 3)
 

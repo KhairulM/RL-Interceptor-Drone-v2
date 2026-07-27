@@ -10,10 +10,6 @@ env:
   max_episode_length: 1000 # 600
   env_spacing: 8
 
-# drone_model:
-#   name: Hummingbird
-#   controller: RateController
-
 time_encoding_dim: 4
 
 # Curriculum learning parameters
@@ -22,27 +18,30 @@ success_radius_max: 0.1
 success_radius_lr: 2e-6
 success_radius_eval: 0.15
 
+# Reset threshold
 reset_thres: 9.0
+minimum_altitude: 0.15
+
 reward_distance_scale: 0.8
 reward_approach_velocity_weight: 1.0
 reward_heading_alignment_weight: 1.0
 reward_action_smoothness_weight: 0.5
 reward_delta_distance_weight: 10.0
-# Potential-difference precision reward: weight * (exp(-scale*d_t) - exp(-scale*d_{t-1})).
-# Pays only for *closing* distance (zero when orbiting at constant range) and
-# steepens sharply in the final ~1/scale meters, giving a dense gradient for
-# the terminal approach that delta_distance alone lacks.
+# Potential-difference precision reward: pays for closing distance, zero when orbiting.
 reward_precision_weight: 10.0
 reward_precision_scale: 5.0
 reward_terminal_weight: 100.0
 reward_action_norm_weight: 0.5
 
-# action_transform: rate
+observation:
+  include_noise: false
+  use_world_frame_pos: false
+  include_rot_speed: false
+  include_evader_rel_lin_vel: false
+
 action_transform: PIDrate
 
 pursuer:
-  # model: Hummingbird
-  # controller: RateController
   model: Crazyflie
   controller: PIDRateController
   spawn_pos_range:
@@ -56,33 +55,11 @@ pursuer:
   use_ab_world_frame: false
 
 evader:
-  # model: Hummingbird
-  # controller: LeePositionController
   model: Crazyflie
   controller: LeePositionController
-  # speed: 5.0
-  # trajectory:
-    # type: circular
-    # radius: 5.0
-    # ang_vel: 1.0
-    # type: hover
-    # type: linear
-    # speed: 5.0
-  # trajectories:
-  #   - type: hover
-  #   - type: circular
-  #     radius: 1.0
-  #     ang_vel: 1.0
-  #   - type: linear
-  #     speed: 5.0
   speed_range: [1.0, 6.0]
   spawn_distance_range: [1.0, 7.0]
-  # Each env samples uniformly from this list of enabled trajectory types
-  # on every reset. Supported: "linear", "zigzag", "velocity_obstacle", "random".
-  # trajectory_types: [linear, zigzag, random]
   trajectory_types: [hover, linear, zigzag] # for training
-  # trajectory_types: [random] # for generalization evaluation
-  # trajectory_types: [velocity_obstacle]
   zigzag:
     amplitude_range: [1.0, 3.0]
     frequency_range: [0.3, 1.0]
@@ -90,25 +67,34 @@ evader:
     turn_interval_range: [20, 80]
     vertical_component_range: [-0.2, 0.2]
     target_lookahead: 0.5
-  # boundary_mode: bounce
-  # bounds:
-  #   min: [-6.0, -6.0, 1.0]
-  #   max: [6.0, 6.0, 4.0]
   use_relative_velocity: false
 
-# Domain randomization applied to the (RL-controlled) pursuer drone.
-# Conservative set: only the parameters that matter most for CTBR sim-to-real
-# transfer, centered on the (now-corrected) CrazySim-matched nominals.
-#   t2w_scale  -> KF = t2w * mass * 9.81 (thrust curve / battery sag)
-#   tau_up/down-> per-step motor lag (0-1); [0.05,0.10] ~ motor tau in [0.095,0.19] s
-#   mass_scale -> battery charge / markers
-# `train`/`eval` phases are selected automatically by env.training.
+  # VO curriculum: each param ramps linearly init→max over training via `lr`.
+  vo_curriculum:
+    time_horizon:
+      init: 1.0
+      max: 5.0
+      lr: 2e-6
+    inflation_radius:
+      init: 0.0
+      max: 0.3
+      lr: 5e-8
+    max_velocity:
+      init: 3.0
+      max: 10.0
+      lr: 3e-7
+    n_directions:
+      init: 32
+      max: 256
+      lr: 2e-6
+
+# Domain randomization for the RL-controlled pursuer.
 randomization:
   pursuer:
     train:
-      mass_scale: [0.95, 1.15]
-      t2w_scale: [0.95, 1.15]
-      inertia_scale: [0.95, 1.15]
+      mass_scale: [0.95, 1.05]
+      t2w_scale: [0.90, 1.15]
+      inertia_scale: [0.90, 1.15]
       # tau_up: [0.05, 0.10]
       # tau_down: [0.05, 0.10]
     # eval:
