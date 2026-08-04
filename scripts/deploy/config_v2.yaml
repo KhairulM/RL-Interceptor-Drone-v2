@@ -4,7 +4,7 @@
 # Run with:  python intercept_controller.py [--config intercept_config.yaml]
 # Any key omitted below falls back to the documented default.
 
-artifact_dir: artifacts/intercept_ppo_crazyflie_v7  # Folder with policy_ts.pt + metadata.json (required).
+artifact_dir: artifacts/intercept_ppo_crazyflie_v7.7  # Folder with policy_ts.pt + metadata.json (required).
 
 # -- Controller runtime -----------------------------------------------------
 controller:
@@ -21,7 +21,7 @@ controller:
     type: hover                # hover | random | trajectory.
     yaw_deg: 0.0               # Yaw command for evader position setpoints (deg).
     anchor: [1.0, 0.0, 1.0]    # Default hover/random center [x, y, z] (m).
-    trajectory_file: ''        # CSV path (absolute or relative to this config).
+    trajectory_file: 'trajectories/linear_y.csv'        # CSV path (absolute or relative to this config).
     trajectory_loop: true      # Loop the trajectory when reaching the end.
     random:
       speed: 0.25              # Random-motion speed (m/s).
@@ -41,7 +41,6 @@ pursuer:
   rate_sign: [1.0, 1.0, 1.0]           # Per-axis sign flips: [roll, pitch, yaw].
   state_timeout: 0.1                   # Stop if state is stale this long (s).
   min_altitude: 0.1                   # Safety cutoff altitude (m).
-  need_rot_speed: false                  # Whether to request motor speeds from the pursuer (for logging).
 
 
 # -- Evader drone config -----------------------------------------------------

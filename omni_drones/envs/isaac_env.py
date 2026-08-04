@@ -21,6 +21,11 @@
 # SOFTWARE.
 
 
+from tensordict.tensordict import TensorDict, TensorDictBase
+from omni_drones.utils.torchrl import AgentSpec
+from omni_drones.robots.robot import RobotBase
+from torchrl.envs import EnvBase
+from torchrl.data import Composite, TensorSpec, DiscreteTensorSpec
 import abc
 
 from typing import Dict, List, Optional, Tuple, Type, Union, Callable
@@ -38,15 +43,10 @@ import isaacsim.core.utils.extensions as _ext_mod
 from isaacsim.core.utils.viewports import set_camera_view
 from isaacsim.util.debug_draw import _debug_draw
 
+
 def enable_extension(name):
     return _ext_mod.enable_extension(name)
 
-from tensordict.tensordict import TensorDict, TensorDictBase
-from torchrl.data import Composite, TensorSpec, DiscreteTensorSpec
-from torchrl.envs import EnvBase
-
-from omni_drones.robots.robot import RobotBase
-from omni_drones.utils.torchrl import AgentSpec
 
 class DebugDraw:
     def __init__(self):
@@ -116,7 +116,7 @@ class IsaacEnv(EnvBase):
         self.sim = SimulationContext(
             stage_units_in_meters=1.0,
             physics_dt=self.cfg.sim.dt,
-            rendering_dt=self.cfg.sim.dt, # * self.cfg.sim.substeps,
+            rendering_dt=self.cfg.sim.dt,  # * self.cfg.sim.substeps,
             backend="torch",
             sim_params=sim_params,
             physics_prim_path="/physicsScene",
@@ -190,7 +190,6 @@ class IsaacEnv(EnvBase):
         import pprint
         pprint.pprint(self.fake_tensordict().shapes)
 
-
     @classmethod
     def __init_subclass__(cls, **kwargs):
         if cls.__name__ in IsaacEnv.REGISTRY:
@@ -242,7 +241,7 @@ class IsaacEnv(EnvBase):
                     timeline.stop()
             except Exception as e:
                 logging.warning(f"Failed to stop timeline: {e}")
-            
+
             try:
                 if hasattr(self, 'sim') and self.sim is not None:
                     self.sim.stop()
@@ -252,7 +251,7 @@ class IsaacEnv(EnvBase):
                         self.sim.clear()
             except Exception as e:
                 logging.warning(f"Failed to stop/clear simulation: {e}")
-            
+
             self._is_closed = True
             logging.info("IsaacEnv closed.")
 
@@ -262,9 +261,9 @@ class IsaacEnv(EnvBase):
         else:
             env_mask = torch.ones(self.num_envs, dtype=bool, device=self.device)
         env_ids = env_mask.nonzero().squeeze(-1)
-        
+
         self._reset_idx(env_ids)
-        
+
         self.progress_buf[env_ids] = 0.
         tensordict = TensorDict({}, self.batch_size, device=self.device)
         tensordict.update(self._compute_state_and_obs())
@@ -372,7 +371,7 @@ class IsaacEnv(EnvBase):
         else:
             return pos + self.envs_positions, rot
 
-    def enable_render(self, enable: Union[bool, Callable]=True):
+    def enable_render(self, enable: Union[bool, Callable] = True):
         if isinstance(enable, bool):
             self._should_render = lambda substep: enable
         elif callable(enable):
@@ -380,7 +379,7 @@ class IsaacEnv(EnvBase):
         else:
             raise TypeError("enable_render must be a bool or callable.")
 
-    def render(self, mode: str="human"):
+    def render(self, mode: str = "human"):
         if mode == "human":
             return None
         elif mode == "rgb_array":

@@ -1,6 +1,6 @@
 # Sampling-based nonlinear MPC (MPPI) over the full quadrotor dynamics.
-# horizon x step_mult x sim_dt = lookahead time (e.g. 16 * 4 * 0.01 = 0.64 s).
-horizon: 16
+# horizon x step_mult x sim_dt = lookahead time (e.g. 24 * 4 * 0.01 = 0.96 s).
+horizon: 24
 step_mult: 4
 # num_samples: rollouts scored per control step (higher = better, slower).
 num_samples: 256

@@ -54,8 +54,8 @@ from omni_drones import init_simulation_app  # noqa: E402
 # ``algo=ppo`` cannot be resolved. It does not require Isaac Sim.
 from omni_drones.learning import ALGOS  # noqa: E402
 
-_REPO_ROOT = os.path.dirname(_THIS_DIR)
-_SCRIPTS_DIR = os.path.join(_REPO_ROOT, "scripts")
+_SCRIPTS_DIR = os.path.split(_THIS_DIR)[0]  # parent of deploy/
+_REPO_ROOT = os.path.dirname(_SCRIPTS_DIR)
 
 
 # ---------------------------------------------------------------------------
@@ -180,11 +180,12 @@ def build_metadata(cfg, base_env, obs_dim: int, action_dim: int) -> ic.PolicyMet
     """Read the observation/CTBR parameters off the live env and config."""
     pursuer_cfg = cfg.task.pursuer
     evader_cfg = cfg.task.evader
+    obs_cfg = cfg.task.observation
 
     obs_cfg = ic.ObsConfig(
-        use_ab_world_frame=bool(pursuer_cfg.get("use_ab_world_frame", False)),
-        use_rot_speed=bool(pursuer_cfg.get("use_rot_speed", False)),
-        use_relative_velocity=bool(evader_cfg.get("use_relative_velocity", False)),
+        use_ab_world_frame=bool(obs_cfg.get("use_world_frame_pos", False)),
+        use_relative_velocity=bool(obs_cfg.get("include_evader_rel_lin_vel", False)),
+        use_previous_action=bool(obs_cfg.get("include_previous_action", True)),
         obs_dim=obs_dim,
         action_dim=action_dim,
     )
@@ -203,7 +204,7 @@ def build_metadata(cfg, base_env, obs_dim: int, action_dim: int) -> ic.PolicyMet
         min_thrust_ratio=float(controller.min_thrust_ratio),
         max_thrust_ratio=float(controller.max_thrust_ratio),
         lpf_coef=float(controller.LPF_coef),
-        dt=float(cfg.sim.dt),
+        dt=float(cfg.sim.dt * cfg.sim.substeps),
     )
 
     return ic.PolicyMetadata(

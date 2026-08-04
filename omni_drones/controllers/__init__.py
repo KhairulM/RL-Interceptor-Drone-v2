@@ -28,7 +28,10 @@ from .lee_position_controller import (
     RateController,
     PIDRateController,
     PID_controller_flightmare,
+    AMSPBRateController,
 )
 from .pure_pursuit_controller import PurePursuitController
 from .proportional_navigation_controller import ProportionalNavigationController
 from .kinematic_mpc_controller import KinematicMPCController
+from .evader_controller import Repel_Evade
+from .pursuit_controller import PID_Pursuit, FRPN_Pursuit

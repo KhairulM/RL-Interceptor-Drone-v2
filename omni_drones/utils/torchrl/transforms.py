@@ -479,3 +479,36 @@ class History(Transform):
                 item_history = tensordict.get(out_key)
                 item_history[_reset] = 0.
         return tensordict
+
+
+class AMSPBRateController(Transform):
+    def __init__(
+        self,
+        controller,
+        action_key: str = ("agents", "action"),
+        in_keys_inv: str = ("agents", "drone_state"),
+    ):
+        super().__init__([], in_keys_inv=[in_keys_inv])
+        self.controller = controller
+        self.action_key = action_key
+        self.max_thrust = self.controller.max_thrusts.sum(-1)
+
+    def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
+        action_spec = input_spec[("full_action_spec", *self.action_key)]
+        spec = UnboundedContinuous(action_spec.shape[:-1]+(4,), device=action_spec.device)
+        input_spec[("full_action_spec", *self.action_key)] = spec
+        return input_spec
+
+    def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
+        drone_state = tensordict[self.in_keys_inv[0]][..., :13]
+        action = tensordict[self.action_key]
+        target_rate, target_thrust = action.split([3, 1], -1)
+        target_thrust = ((target_thrust + 1) / 2).clip(0.) * self.max_thrust
+        cmds = self.controller(
+            drone_state,
+            target_rate=target_rate*torch.pi,
+            target_thrust=target_thrust
+        )
+        torch.nan_to_num_(cmds, 0.)
+        tensordict.set(self.action_key, cmds)
+        return tensordict

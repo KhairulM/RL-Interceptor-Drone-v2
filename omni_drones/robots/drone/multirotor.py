@@ -72,8 +72,13 @@ class MultirotorBase(RobotBase):
             "drag_coef": Unbounded(1),
         }).to(self.device)
 
+        intrinsics_flat_dim = 0
+        for k, v in self.intrinsics_spec.items():
+            intrinsics_flat_dim += v.shape.numel()
+
         state_dim = 19 + self.num_rotors
         self.state_spec = Unbounded(state_dim, device=self.device)
+        self.intrinsics_spec_flattened = Unbounded(intrinsics_flat_dim, device=self.device)
         self.randomization = defaultdict(dict)
 
     @property
@@ -82,6 +87,59 @@ class MultirotorBase(RobotBase):
             self._action_spec = Bounded(-1, 1,
                                         self.num_rotors, device=self.device)
         return self._action_spec
+
+    def _create_prim(self, prim_path, translation, orientation):
+        """Create a drone prim using PAYLOAD instead of REFERENCE.
+
+        In Isaac Sim 5.x, PhysX tensor API cannot discover articulation schemas
+        through USD references after GridCloner cloning. Payloads get merged into
+        the stage at load time, making physics schemas directly visible to PhysX.
+        """
+        import omni.usd
+        from pxr import PhysxSchema, UsdPhysics
+
+        stage = omni.usd.get_context().get_stage()
+
+        prim = stage.GetPrimAtPath(prim_path)
+        if not prim.IsValid():
+            prim = stage.DefinePrim(prim_path, "Xform")
+
+        if not prim.IsValid():
+            return None
+
+        # Use payload instead of reference so physics schemas are merged into the stage
+        try:
+            prim.GetPayloads().AddPayload(self.usd_path)
+        except Exception as e:
+            print(f"[WARN] Failed to add payload {self.usd_path} to {prim_path}: {e}")
+            prim.GetReferences().AddReference(self.usd_path)
+
+        # Apply transformations
+        from isaacsim.core.api.simulation_context.simulation_context import SimulationContext
+        from isaacsim.core.prims import XFormPrim
+
+        sim_ctx = SimulationContext.instance()
+        if sim_ctx is not None:
+            device = sim_ctx.device
+            backend_utils = sim_ctx.backend_utils
+        else:
+            import isaacsim.core.utils.numpy as backend_utils
+            device = "cpu"
+
+        if translation is not None:
+            translation = backend_utils.expand_dims(backend_utils.convert(translation, device), 0)
+        if orientation is not None:
+            orientation = backend_utils.expand_dims(backend_utils.convert(orientation, device), 0)
+
+        XFormPrim(prim_path, translations=translation, orientations=orientation)
+
+        # Ensure articulation schemas are present
+        if not UsdPhysics.ArticulationRootAPI(prim):
+            UsdPhysics.ArticulationRootAPI.Apply(prim)
+        if PhysxSchema is not None and not PhysxSchema.PhysxArticulationAPI(prim):
+            PhysxSchema.PhysxArticulationAPI.Apply(prim)
+
+        return prim
 
     def initialize(
         self,
@@ -491,6 +549,29 @@ class MultirotorBase(RobotBase):
             controller = controller_cls(
                 drone.gravity[1], drone.params).to(device)
         return drone, controller
+
+    @staticmethod
+    def make_amspb(drone_model: str, controller_list: list, controller_params: dict = None, env_params: dict = None,
+                   device: str = "cpu", drone_id: str = None, drone_color: str = None):
+        drone_cls = MultirotorBase.REGISTRY[drone_model]
+        drone = drone_cls(name=drone_id)
+        if drone_color is not None:
+            drone.usd_path = drone.usd_path.replace(drone_model.lower(), f"{drone_model}_{drone_color}".lower())
+        from omni_drones.controllers import ControllerBase
+        controllers = []
+        for controller in controller_list:
+            if controller is not None:
+                controller_cls = ControllerBase.REGISTRY[controller]
+                controllers.append(controller_cls(drone.gravity[1], drone.params, controller_params, env_params).to(device))
+            else:
+                controllers.append(None)
+        return drone, controllers
+
+    @staticmethod
+    def reset_registry():
+        MultirotorBase._robots = {}
+        RobotBase._robots = {}
+        RobotBase._envs_positions = None
 
 
 def separation(p0, p1, p1_d):

@@ -52,7 +52,7 @@ def require_sim_initialized(func):
             sim = SimulationContext.instance()
         except Exception:
             raise RuntimeError("SimulationContext not initialized.")
-        if hasattr(sim, "_physics_sim_view") and sim._physics_sim_view is None:
+        if sim.physics_sim_view is None:
             raise RuntimeError("SimulationContext not initialized.")
         return func(*args, **kwargs)
 
@@ -92,8 +92,14 @@ class ArticulationView(_ArticulationView):
             physics_sim_view (omni.physics.tensors.SimulationView, optional): current physics simulation view. Defaults to None.
         """
         if physics_sim_view is None:
-            physics_sim_view = omni.physics.tensors.create_simulation_view(self._backend)
-            physics_sim_view.set_subspace_roots("/")
+            # Reuse the existing simulation view from SimulationContext instead of creating a new one
+            # Creating a new simulation view fails in Isaac Sim 5.x with "no active physics scene found"
+            _sim = SimulationContext.instance()
+            if hasattr(_sim, "physics_sim_view") and _sim.physics_sim_view is not None:
+                physics_sim_view = _sim.physics_sim_view
+            else:
+                physics_sim_view = omni.physics.tensors.create_simulation_view(self._backend)
+                physics_sim_view.set_subspace_roots("/")
         carb.log_info("initializing view for {}".format(self._name))
         # TODO: add a callback to set physics view to None once stop is called
         self._physics_view = physics_sim_view.create_articulation_view(

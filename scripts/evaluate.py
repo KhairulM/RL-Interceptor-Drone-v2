@@ -17,13 +17,6 @@ from torchrl.envs.utils import ExplorationType, set_exploration_type
 from tqdm import tqdm
 
 from omni_drones import init_simulation_app
-from omni_drones.controllers.intercept_baseline_common import GeometricCTBR
-from omni_drones.controllers.kinematic_mpc_controller import KinematicMPCController
-from omni_drones.controllers.nonlinear_mpc_controller import NonlinearMPCController
-from omni_drones.controllers.proportional_navigation_controller import (
-    ProportionalNavigationController,
-)
-from omni_drones.controllers.pure_pursuit_controller import PurePursuitController
 from omni_drones.learning import ALGOS
 from omni_drones.utils.torchrl import Collector, EpisodeStats
 from omni_drones.utils.torchrl.transforms import (
@@ -261,13 +254,33 @@ def _build_rl_policy(cfg, env, base_env):
 
     try:
         policy.load_state_dict(state)
-    except RuntimeError:
+    except RuntimeError as e:
+        err_msg = str(e)
+        # If the mismatch is due to a changed observation layout (e.g., adding
+        # previous_action), hint at the correct CLI override instead of falling
+        # through to strict=False which also fails on shape mismatches.
+        if "size mismatch" in err_msg and "actor.module" in err_msg:
+            raise RuntimeError(
+                f"Checkpoint observation dim does not match the current env config.\n"
+                f"This usually means the checkpoint was trained with a different\n"
+                f"observation layout (e.g., include_previous_action=true vs false).\n\n"
+                f"Try overriding the flag to match the checkpoint:\n"
+                f"  evaluate.py ... task.observation.include_previous_action=false\n"
+            ) from e
         policy.load_state_dict(state, strict=False)
 
     return policy
 
 
 def _build_classical_policy(method: str, cfg, base_env):
+    from omni_drones.controllers.intercept_baseline_common import GeometricCTBR
+    from omni_drones.controllers.kinematic_mpc_controller import KinematicMPCController
+    from omni_drones.controllers.nonlinear_mpc_controller import NonlinearMPCController
+    from omni_drones.controllers.proportional_navigation_controller import (
+        ProportionalNavigationController,
+    )
+    from omni_drones.controllers.pure_pursuit_controller import PurePursuitController
+
     # Drive the baselines through the pursuer's proven PIDrate CTBR stack via a
     # geometric outer loop. Calibrate the hover throttle from the drone params:
     # per-rotor max thrust KF = max_rot_vel^2 * force_const, hover per rotor =
@@ -284,11 +297,11 @@ def _build_classical_policy(method: str, cfg, base_env):
         target_clip=float(pc.target_clip),
         min_ratio=float(pc.min_thrust_ratio),
         max_ratio=float(pc.max_thrust_ratio),
-        kp=6.0,
-        kv=4.0,
-        k_att=10.0,
+        kp=8.0,
+        kv=6.0,
+        k_att=12.0,
         k_yaw=2.0,
-        max_tilt_deg=35.0,
+        max_tilt_deg=42.0,
     )
 
     # Raw calibration shared with the sampling-based nonlinear MPC.
@@ -459,6 +472,15 @@ def main(cfg):
             cfg.wandb.run_id = inferred_run_id
 
     simulation_app = init_simulation_app(cfg)
+
+    # Import isaacsim-dependent controllers after SimulationApp is instantiated
+    from omni_drones.controllers.intercept_baseline_common import GeometricCTBR
+    from omni_drones.controllers.kinematic_mpc_controller import KinematicMPCController
+    from omni_drones.controllers.nonlinear_mpc_controller import NonlinearMPCController
+    from omni_drones.controllers.proportional_navigation_controller import (
+        ProportionalNavigationController,
+    )
+    from omni_drones.controllers.pure_pursuit_controller import PurePursuitController
 
     use_wandb = wandb is not None and str(cfg.wandb.mode).lower() != "disabled"
     if use_wandb:

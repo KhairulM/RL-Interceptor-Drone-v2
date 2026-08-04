@@ -1,6 +1,6 @@
-import intercept_common as ic
-from mocap import MocapReceiver, MocapTfPublisher
-from drone import CrazyflieDrone, DronePosePublisher
+import scripts.deploy.intercept_common as ic
+from scripts.deploy.mocap import MocapReceiver, MocapTfPublisher
+from scripts.deploy.drone import CrazyflieDrone, DronePosePublisher
 import cflib.crtp
 import logging
 import time

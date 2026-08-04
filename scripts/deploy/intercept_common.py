@@ -43,7 +43,8 @@ import torch
 
 # Format identifier written into ``metadata.json`` so the controller can refuse
 # to load artifacts produced by an incompatible exporter.
-ARTIFACT_VERSION = 1
+# v2: observation reordered and body-rate component made unconditional.
+ARTIFACT_VERSION = 2
 
 
 # ---------------------------------------------------------------------------
@@ -55,27 +56,34 @@ class ObsConfig:
 
     Mirrors the flags read in ``Intercept.__init__`` / ``_set_specs`` that
     determine the observation composition. The defaults match
-    ``cfg/task/Intercept.yaml`` (``obs_dim == 16``).
+    ``cfg/task/Intercept.yaml`` (``obs_dim == 19`` without previous action,
+    ``obs_dim == 23`` with it).
+
+    The component order is fixed by ``Intercept._compute_state_and_obs``:
+    altitude/position, rotation matrix, body linear velocity, body angular
+    velocity, relative heading, [relative linear velocity], [previous action].
     """
 
     use_ab_world_frame: bool = False
-    use_rot_speed: bool = False
     use_relative_velocity: bool = False
-    obs_dim: int = 16
+    use_previous_action: bool = False
+    obs_dim: int = 19
     action_dim: int = 4
 
     def expected_obs_dim(self) -> int:
         """Recompute the observation dimension from the layout flags."""
+        # rot matrix + body lin vel + body rot vel
+        pursuer_state_dim = 9 + 3 + 3
+        pursuer_state_dim += 3 if self.use_ab_world_frame else 1
+
         evader_state_dim = 3  # relative heading
         if self.use_relative_velocity:
             evader_state_dim += 3
 
-        pursuer_state_dim = 3 + 9 + 1  # lin vel + rot matrix + altitude
-        if self.use_ab_world_frame:
-            pursuer_state_dim += 3 - 1  # full position replaces altitude
-        if self.use_rot_speed:
-            pursuer_state_dim += 3
-        return evader_state_dim + pursuer_state_dim
+        result = pursuer_state_dim + evader_state_dim
+        if self.use_previous_action:
+            result += self.action_dim
+        return result
 
 
 @dataclass
@@ -141,13 +149,14 @@ def load_metadata(path: str) -> PolicyMetadata:
     """Read :class:`PolicyMetadata` from a JSON file, validating the version."""
     with open(path, 'r', encoding='utf-8') as handle:
         data = json.load(handle)
-    metadata = PolicyMetadata.from_dict(data)
-    if metadata.artifact_version != ARTIFACT_VERSION:
+    # Checked before parsing: older payloads carry fields this version dropped.
+    version = int(data.get('artifact_version', -1))
+    if version != ARTIFACT_VERSION:
         raise ValueError(
-            f'Incompatible artifact version {metadata.artifact_version} '
+            f'Incompatible artifact version {version} '
             f'(expected {ARTIFACT_VERSION}). Re-run export_policy.py.'
         )
-    return metadata
+    return PolicyMetadata.from_dict(data)
 
 
 # ---------------------------------------------------------------------------
@@ -242,31 +251,35 @@ def build_observation(
     cfg: ObsConfig,
     pursuer_pos: torch.Tensor,
     pursuer_quat_wxyz: torch.Tensor,
-    pursuer_lin_vel_world: torch.Tensor,
+    pursuer_lin_vel: torch.Tensor,
+    pursuer_ang_vel: torch.Tensor,
     evader_pos: torch.Tensor,
-    pursuer_ang_vel_world: Optional[torch.Tensor] = None,
+    previous_action: Optional[torch.Tensor] = None,
     evader_lin_vel_world: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
-    """Assemble the Intercept observation vector from raw world-frame states.
+    """Assemble the Intercept observation vector from raw states.
 
     All tensors have a trailing feature dimension and may carry arbitrary
     leading batch dimensions. Rotational quantities follow Isaac conventions:
-    the quaternion is ``(w, x, y, z)`` and linear/angular velocities are
-    expressed in the **world** frame (as returned by ``drone.get_state()``).
+    the quaternion is ``(w, x, y, z)``. Pursuer linear/angular velocities are
+    already expressed in the **body** frame (as returned by
+    ``drone.get_state()``), so no further rotation is applied for those.
 
-    Velocities are transformed to the pursuer's body frame before being
-    concatenated, so that the observation matches what training sees
-    (see :meth:`Intercept._compute_state_and_obs`).
+    Evader velocity (when provided via ``use_relative_velocity``) is expected
+    in the world frame and *is* rotated into the pursuer body frame before
+    computing the relative difference, so that the observation matches what
+    training sees (see :meth:`Intercept._compute_state_and_obs`).
 
     Args:
         cfg: Observation layout flags (must match the trained policy).
         pursuer_pos: ``[..., 3]`` pursuer position in world frame.
         pursuer_quat_wxyz: ``[..., 4]`` pursuer orientation as ``(w, x, y, z)``.
-        pursuer_lin_vel_world: ``[..., 3]`` pursuer linear velocity (world).
+        pursuer_lin_vel: ``[..., 3]`` pursuer linear velocity (body frame).
+        pursuer_ang_vel: ``[..., 3]`` pursuer angular velocity (body frame).
         evader_pos: ``[..., 3]`` evader (target) position in world frame.
-        pursuer_ang_vel_world: ``[..., 3]`` pursuer angular velocity (world),
-            required only when ``cfg.use_rot_speed`` is True.
-        evader_lin_vel_world: ``[..., 3]`` evader linear velocity (world),
+        previous_action: ``[..., 4]`` previous action of the pursuer [-1, 1],
+            required only when ``cfg.use_previous_action`` is True.
+        evader_lin_vel_world: ``[..., 3]`` evader linear velocity (world frame),
             required only when ``cfg.use_relative_velocity`` is True.
 
     Returns:
@@ -276,36 +289,34 @@ def build_observation(
     pursuer_rot = quaternion_to_rotation_matrix(pursuer_quat_wxyz)
     pursuer_rot = pursuer_rot.reshape(*pursuer_rot.shape[:-2], 9)  # (9)
 
-    # Transform velocities to pursuer body frame so the deployment observation
-    # matches bit-for-bit what training produces.
-    pursuer_lin_vel_body = quat_rotate_inverse(
-        pursuer_quat_wxyz, pursuer_lin_vel_world)
-
-    components = [evader_rel_hdg, pursuer_lin_vel_body, pursuer_rot]
-
     if cfg.use_ab_world_frame:
-        components.append(pursuer_pos)  # (3)
+        components = [pursuer_pos]  # (3)
     else:
-        components.append(pursuer_pos[..., 2:3])  # altitude only (1)
+        components = [pursuer_pos[..., 2:3]]  # altitude only (1)
+
+    components += [
+        pursuer_rot,      # (9)
+        pursuer_lin_vel,  # (3)
+        pursuer_ang_vel,  # (3)
+        evader_rel_hdg,   # (3)
+    ]
 
     if cfg.use_relative_velocity:
         if evader_lin_vel_world is None:
             raise ValueError(
                 'use_relative_velocity=True requires evader_lin_vel_world.'
             )
-        # Both velocities in body frame so the difference is also body-frame.
+        # R^T v_e - v_p_body == R^T (v_e - v_p), matching the env formulation.
         evader_lin_vel_body = quat_rotate_inverse(
             pursuer_quat_wxyz, evader_lin_vel_world)
-        components.append(evader_lin_vel_body - pursuer_lin_vel_body)  # (3)
+        components.append(evader_lin_vel_body - pursuer_lin_vel)  # (3)
 
-    if cfg.use_rot_speed:
-        if pursuer_ang_vel_world is None:
+    if cfg.use_previous_action:
+        if previous_action is None:
             raise ValueError(
-                'use_rot_speed=True requires pursuer_ang_vel_world.'
+                'use_previous_action=True requires previous_action.'
             )
-        pursuer_ang_vel_body = quat_rotate_inverse(
-            pursuer_quat_wxyz, pursuer_ang_vel_world)
-        components.append(pursuer_ang_vel_body)  # (3)
+        components.append(previous_action)  # (4)
 
     obs = torch.cat(components, dim=-1)
     if obs.shape[-1] != cfg.obs_dim:
@@ -528,7 +539,6 @@ class DroneConfig:
     control_dt: float = 0.02
     max_thrust_pwm: float = 65535.0
     rate_sign: list[float] = field(default_factory=lambda: [1.0, 1.0, 1.0])
-    need_rot_speed: bool = False
     log_period_ms: int = 20
     state_timeout: float = 0.5
     min_altitude: float = 0.15
@@ -548,6 +558,6 @@ class DroneState:
 
     pos: np.ndarray                 # (3,)
     quat_wxyz: np.ndarray           # (4,)
-    lin_vel: np.ndarray             # (3,) world frame
-    ang_vel: np.ndarray             # (3,) world frame (rad/s)
+    lin_vel: np.ndarray             # (3,) body frame
+    ang_vel: np.ndarray             # (3,) body frame (rad/s)
     stamp: float                    # seconds (wall clock)

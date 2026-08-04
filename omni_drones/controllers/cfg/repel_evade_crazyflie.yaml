@@ -1,0 +1,11 @@
+# Repel-Evade controller parameters for Crazyflie 2.x
+# Adapted from hummingbird - coefficients are virtual force field gains,
+# so they transfer directly. max_speed reduced for Crazyflie's lower
+# thrust-to-weight ratio (~1.4x vs ~2-3x for larger drones).
+k_pursuer: 1.0
+k_wall: 1.0
+order_den_pursuer: 3
+order_den_wall: 2
+min_wall_dist: 100.0
+min_pursuer_dist: 100.0
+max_speed: 3.0  # Crazyflie is lightweight (34g) with limited t2w, ~3 m/s is aggressive but feasible

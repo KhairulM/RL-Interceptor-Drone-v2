@@ -1,6 +1,7 @@
 # closing_speed [m/s]: floor on the closing speed used to estimate time-to-go.
-closing_speed: 4.0
+closing_speed: 5.5
 # nav_gain: multiplier on the lead time (constant-bearing intercept lead).
-nav_gain: 1.0
+# Values of 3-4 are standard for proportional navigation; higher = more aggressive leading.
+nav_gain: 4.0
 # max_tgo [s]: cap on the estimated time-to-go used for the target-position lead.
 max_tgo: 3.0

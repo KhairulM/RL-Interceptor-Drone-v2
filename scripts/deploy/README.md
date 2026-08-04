@@ -50,9 +50,10 @@ Notes:
 - Set `algo=` to whatever algorithm produced the checkpoint. Supported for
   extraction: `ppo`, `mappo`, `happo`, `sac`, `td3` (and their aliases).
 - Use the **same** task overrides you trained/evaluated with if they change the
-  observation layout (e.g. `task.pursuer.use_ab_world_frame`,
-  `task.pursuer.use_rot_speed`, `task.evader.use_relative_velocity`). The
-  exporter records these in `metadata.json` and the controller enforces them.
+  observation layout (`task.observation.use_world_frame_pos`,
+  `task.observation.include_evader_rel_lin_vel`,
+  `task.observation.include_previous_action`). The exporter records these in
+  `metadata.json` and the controller enforces them.
 - The exporter numerically validates the TorchScript trace against the eager
   policy before writing it; a mismatch aborts the export.
 
@@ -105,10 +106,10 @@ starting this node, or extend the node to call the `takeoff` service.
 | `state_timeout` | `0.5` | Stop the drone if pose is stale for this long (s). |
 | `vel_lpf` | `0.4` | Low-pass factor for finite-difference velocity. |
 
-The controller estimates the pursuer's **world-frame linear velocity** by
-finite-differencing its pose (works with just `PoseStamped`; no odometry/twist
-topic required). Angular velocity and evader velocity are only needed when the
-policy's `metadata.json` enables `use_rot_speed` / `use_relative_velocity`.
+The pursuer's **body-frame linear velocity** comes from the on-board Kalman
+filter (`kalman.statePX/Y/Z`) and its **body rates** from the gyro; both are
+always part of the observation. The evader's world-frame velocity is only
+needed when the policy's `metadata.json` enables `use_relative_velocity`.
 
 ## Command fidelity (important)
 

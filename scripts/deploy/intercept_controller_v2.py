@@ -19,9 +19,9 @@ from typing import Optional
 import numpy as np
 import torch
 
-import intercept_common as ic
-from drone import CrazyflieDrone, ScriptedDrone, DronePosePublisher
-from mocap import MocapReceiver, MocapTfPublisher
+import scripts.deploy.intercept_common as ic
+from scripts.deploy.drone import CrazyflieDrone, ScriptedDrone, DronePosePublisher
+from scripts.deploy.mocap import MocapReceiver, MocapTfPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -91,20 +91,23 @@ def _load_policy(artifact_dir: str):
 
 def _build_command(policy: torch.nn.Module, metadata: ic.PolicyMetadata,
                    pursuer: ic.DroneState, evader: ic.DroneState,
-                   device: torch.device) -> ic.CTBRCommand:
+                   previous_action: Optional[torch.Tensor] = None,
+                   device: torch.device = torch.device('cpu')) -> tuple[torch.Tensor, ic.CTBRCommand]:
+    """Run the policy to produce a CTBR command for the pursuer and return the tanh-scaled action and the decoded CTBR command."""
     obs = ic.build_observation(
         metadata.obs,
         pursuer_pos=torch.as_tensor(pursuer.pos, dtype=torch.float32, device=device),
         pursuer_quat_wxyz=torch.as_tensor(pursuer.quat_wxyz, dtype=torch.float32, device=device),
-        pursuer_lin_vel_world=torch.as_tensor(pursuer.lin_vel, dtype=torch.float32, device=device),
+        pursuer_lin_vel=torch.as_tensor(pursuer.lin_vel, dtype=torch.float32, device=device),
         evader_pos=torch.as_tensor(evader.pos, dtype=torch.float32, device=device),
-        pursuer_ang_vel_world=torch.as_tensor(pursuer.ang_vel, dtype=torch.float32, device=device),
+        previous_action=torch.as_tensor(previous_action, dtype=torch.float32, device=device),
+        pursuer_ang_vel=torch.as_tensor(pursuer.ang_vel, dtype=torch.float32, device=device),
         evader_lin_vel_world=torch.as_tensor(evader.lin_vel, dtype=torch.float32, device=device),
     ).reshape(1, metadata.obs.obs_dim)
 
     with torch.no_grad():
         raw_action = policy(obs)
-    return ic.decode_action_to_ctbr(raw_action, metadata.ctbr)
+    return torch.tanh(raw_action).squeeze(0), ic.decode_action_to_ctbr(raw_action, metadata.ctbr)
 
 
 class InterceptController:
@@ -187,6 +190,8 @@ class InterceptController:
 
         self.mocap_tf_publisher: Optional[MocapTfPublisher] = None
         self.mocap_receiver: Optional[MocapReceiver] = None
+
+        self.previous_action: torch.Tensor = torch.zeros(4, dtype=torch.float32, device=self.device)
 
     @staticmethod
     def _vec3_from_config(value, default: np.ndarray, name: str) -> np.ndarray:
@@ -461,10 +466,12 @@ class InterceptController:
                     )
                     break
 
-                command = _build_command(
-                    self.policy, self.metadata, pursuer_state, evader_state, self.device
+                policy_action, command = _build_command(
+                    self.policy, self.metadata, pursuer_state, evader_state, self.previous_action, self.device
                 )
+
                 self.pursuer.send_ctbr(command)
+                self.previous_action = policy_action.detach()
 
                 if self.log_commands:
                     rates = command.body_rate_deg.detach().cpu().numpy().reshape(-1)

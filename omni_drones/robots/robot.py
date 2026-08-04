@@ -96,10 +96,11 @@ class RobotBase(abc.ABC):
         self,
         translations=[(0.0, 0.0, 0.5)],
         orientations=None,
+        scale=1.0,
         prim_paths: Sequence[str] = None
     ):
         _sim = SimulationContext.instance()
-        if hasattr(_sim, "_physics_sim_view") and _sim._physics_sim_view is not None:
+        if hasattr(_sim, "physics_sim_view") and _sim.physics_sim_view is not None:
             raise RuntimeError(
                 "Cannot spawn robots after simulation_context.reset() is called."
             )
@@ -123,6 +124,8 @@ class RobotBase(abc.ABC):
             if prim_utils.is_prim_path_valid(prim_path):
                 raise RuntimeError(f"Duplicate prim at {prim_path}.")
             prim = self._create_prim(prim_path, translation, orientation)
+            prim_utils.set_prim_property(prim_path, "xformOp:scale", (scale, scale, scale))
+
             # apply rigid body properties
             kit_utils.set_nested_rigid_body_properties(
                 prim_path,
@@ -162,7 +165,7 @@ class RobotBase(abc.ABC):
         prim_paths_expr: str = None,
     ):
         _sim = SimulationContext.instance()
-        if hasattr(_sim, "_physics_sim_view") and _sim._physics_sim_view is None:
+        if hasattr(_sim, "physics_sim_view") and _sim.physics_sim_view is None:
             raise RuntimeError(
                 f"Cannot initialize {self.__class__.__name__} before the simulation context resets."
                 "Call simulation_context.reset() first."
@@ -203,22 +206,22 @@ class RobotBase(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _reset_idx(self, env_ids: torch.Tensor, train: bool=True):
+    def _reset_idx(self, env_ids: torch.Tensor, train: bool = True):
         raise NotImplementedError
 
-    def get_world_poses(self, clone: bool=False):
+    def get_world_poses(self, clone: bool = False):
         return self._view.get_world_poses(clone=clone)
 
-    def set_world_poses(self, positions: torch.Tensor=None, orientations: torch.Tensor=None, env_indices: torch.Tensor = None):
+    def set_world_poses(self, positions: torch.Tensor = None, orientations: torch.Tensor = None, env_indices: torch.Tensor = None):
         return self._view.set_world_poses(positions, orientations, env_indices=env_indices)
 
-    def get_velocities(self, clone: bool=False):
+    def get_velocities(self, clone: bool = False):
         return self._view.get_velocities(clone=clone)
 
     def set_velocities(self, velocities: torch.Tensor, env_indices: torch.Tensor = None):
         return self._view.set_velocities(velocities, env_indices=env_indices)
 
-    def get_joint_positions(self, clone: bool=False):
+    def get_joint_positions(self, clone: bool = False):
         if not self.is_articulation:
             raise NotImplementedError
         return self._view.get_joint_positions(clone=clone)
@@ -233,13 +236,13 @@ class RobotBase(abc.ABC):
             raise NotImplementedError
         self._view.set_joint_position_targets(pos, env_indices=env_indices)
 
-    def get_joint_velocities(self, clone: bool=False):
+    def get_joint_velocities(self, clone: bool = False):
         return self._view.get_joint_velocities(clone=clone)
 
     def set_joint_velocities(self, vel: torch.Tensor, env_indices: torch.Tensor = None):
         return self._view.set_joint_velocities(vel, env_indices=env_indices)
 
-    def get_force_sensor_forces(self, clone: bool=False):
+    def get_force_sensor_forces(self, clone: bool = False):
         if self.is_articulation:
             forces = self._view.get_force_sensor_forces(clone=clone)
         else:
@@ -250,4 +253,3 @@ class RobotBase(abc.ABC):
 
     def get_state(self):
         raise NotImplementedError
-

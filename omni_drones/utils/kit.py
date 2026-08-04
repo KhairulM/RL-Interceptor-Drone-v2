@@ -253,9 +253,10 @@ def set_articulation_properties(
     """
     # get articulation USD prim
     articulation_prim = prim_utils.get_prim_at_path(prim_path)
-    # check if prim has articulation applied on it
+    # check if prim has articulation applied on it; apply if missing
     if not UsdPhysics.ArticulationRootAPI(articulation_prim):
-        raise ValueError(f"No articulation schema present for prim '{prim_path}'.")
+        UsdPhysics.ArticulationRootAPI.Apply(articulation_prim)
+        # raise ValueError(f"No articulation schema present for prim '{prim_path}'.")
     # retrieve the articulation api
     physx_articulation_api = PhysxSchema.PhysxArticulationAPI(articulation_prim)
     if not physx_articulation_api:

@@ -7,9 +7,9 @@ import rclpy
 from tf2_msgs.msg import TFMessage
 from geometry_msgs.msg import TransformStamped
 
-from NatNetClient import NatNetClient
-import intercept_common as ic
-from drone import Drone
+from scripts.deploy.NatNetClient import NatNetClient
+import scripts.deploy.intercept_common as ic
+from scripts.deploy.drone import Drone
 
 
 def _detect_local_ip_for_server(server_ip: str) -> str:
@@ -139,7 +139,7 @@ class MocapReceiver:
                        tracking_valid) -> None:
         if not self._connected:
             return
-        
+
         if not tracking_valid:
             return
 
@@ -156,9 +156,9 @@ class MocapReceiver:
                 if (now - last_stamp) < self._min_dt:
                     return
                 self._last_send_stamp[rb_id] = now
-        
+
         drone, frame_id = target
-        
+
         # Send the first pose with orientation to align the EKF, then send only position for the rest of the time.
         first_send_stamp = self._first_send_stamp.get(rb_id)
         if first_send_stamp is None:
@@ -167,14 +167,14 @@ class MocapReceiver:
 
         pose = ic.transform_mocap_pose(
             self._cfg, rb_id, position, rotation, tracking_valid)
-        
+
         try:
             if (now - first_send_stamp) < self._orientation_align_time:
                 drone.send_mocap_pose(pose)
             else:
                 if not drone.mocap_orientation_aligned.is_set():
                     drone.mocap_orientation_aligned.set()
-                    
+
                 drone.send_mocap_pos(pose.position)
         except Exception:  # pragma: no cover - link may be tearing down
             return

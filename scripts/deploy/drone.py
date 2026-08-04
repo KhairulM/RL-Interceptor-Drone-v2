@@ -14,7 +14,7 @@ from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.log import LogConfig
 from cflib.crazyflie.syncLogger import SyncLogger
 
-import intercept_common as ic
+import scripts.deploy.intercept_common as ic
 
 logger = logging.getLogger(__name__)
 
@@ -104,13 +104,11 @@ class StateBuffer:
         with self._lock:
             if self._pos_stamp == 0.0 or self._att_stamp == 0.0:
                 return None
-            rot = ic.quaternion_to_rotation_matrix_np(self._quat_wxyz)
-            ang_vel_world = rot @ self._ang_vel_body_rad
             return ic.DroneState(
                 pos=self._pos.copy(),
                 quat_wxyz=self._quat_wxyz.copy(),
                 lin_vel=self._vel.copy(),
-                ang_vel=ang_vel_world,
+                ang_vel=self._ang_vel_body_rad.copy(),
                 stamp=min(self._pos_stamp, self._att_stamp),
             )
 
@@ -359,7 +357,7 @@ class CrazyflieDrone(Drone):
         self._start_log(
             'pos_vel',
             ('stateEstimate.x', 'stateEstimate.y', 'stateEstimate.z',
-             'stateEstimate.vx', 'stateEstimate.vy', 'stateEstimate.vz'),
+             'kalman.statePX', 'kalman.statePY', 'kalman.statePZ'),
             ('float', 'float', 'float', 'float', 'float', 'float'),
             self._pos_vel_cb,
         )
@@ -370,13 +368,14 @@ class CrazyflieDrone(Drone):
             ('float', 'float', 'float', 'float'),
             self._att_cb,
         )
-        if self.drone_config.need_rot_speed:
-            self._start_log(
-                'gyro',
-                ('gyro.x', 'gyro.y', 'gyro.z'),
-                ('float', 'float', 'float'),
-                self._gyro_cb,
-            )
+        # Body rates are an unconditional observation component now, so the
+        # gyro log is always required.
+        self._start_log(
+            'gyro',
+            ('gyro.x', 'gyro.y', 'gyro.z'),
+            ('float', 'float', 'float'),
+            self._gyro_cb,
+        )
 
     def _start_log(self, name, variables, types, callback):
         log_config = LogConfig(name=name, period_in_ms=self.log_period_ms)
@@ -392,9 +391,9 @@ class CrazyflieDrone(Drone):
             data['stateEstimate.x'],
             data['stateEstimate.y'],
             data['stateEstimate.z'],
-            data['stateEstimate.vx'],
-            data['stateEstimate.vy'],
-            data['stateEstimate.vz'],
+            data['kalman.statePX'],
+            data['kalman.statePY'],
+            data['kalman.statePZ'],
         )
 
     def _att_cb(self, timestamp, data, logconf_name):

@@ -14,7 +14,7 @@ required)::
     python deploy/test_intercept_common.py
 """
 
-import intercept_common as ic
+import scripts.deploy.intercept_common as ic
 import math
 import os
 import sys
@@ -51,46 +51,53 @@ def test_identity_quat_gives_identity_rotation():
 
 
 def test_observation_dim_default_layout():
-    cfg = ic.ObsConfig()  # obs_dim == 16
-    assert cfg.expected_obs_dim() == 16
+    cfg = ic.ObsConfig()  # obs_dim == 19
+    assert cfg.expected_obs_dim() == 19
     obs = ic.build_observation(
         cfg,
         pursuer_pos=torch.tensor([0.0, 0.0, 1.6]),
         pursuer_quat_wxyz=torch.tensor([1.0, 0.0, 0.0, 0.0]),
-        pursuer_lin_vel_world=torch.tensor([0.1, 0.2, 0.3]),
+        pursuer_lin_vel=torch.tensor([0.1, 0.2, 0.3]),
+        pursuer_ang_vel=torch.tensor([0.5, 0.6, 0.7]),
         evader_pos=torch.tensor([3.0, 0.0, 1.6]),
     )
-    assert obs.shape == (16,)
-    # evader_rel_hdg points from pursuer to evader -> +x.
-    assert torch.allclose(obs[:3], torch.tensor([1.0, 0.0, 0.0]), atol=1e-4)
-    # pursuer_lin_vel component.
-    assert torch.allclose(obs[3:6], torch.tensor([0.1, 0.2, 0.3]), atol=1e-6)
-    # rotation matrix (identity) flattened.
-    assert torch.allclose(obs[6:15], torch.eye(3).reshape(9), atol=1e-6)
+    assert obs.shape == (19,)
     # altitude.
-    assert math.isclose(obs[15].item(), 1.6, rel_tol=1e-5)
+    assert math.isclose(obs[0].item(), 1.6, rel_tol=1e-5)
+    # rotation matrix (identity) flattened.
+    assert torch.allclose(obs[1:10], torch.eye(3).reshape(9), atol=1e-6)
+    # body-frame linear velocity.
+    assert torch.allclose(obs[10:13], torch.tensor([0.1, 0.2, 0.3]), atol=1e-6)
+    # body-frame angular velocity.
+    assert torch.allclose(obs[13:16], torch.tensor([0.5, 0.6, 0.7]), atol=1e-6)
+    # evader_rel_hdg points from pursuer to evader -> +x.
+    assert torch.allclose(obs[16:19], torch.tensor([1.0, 0.0, 0.0]), atol=1e-4)
 
 
 def test_observation_optional_components():
     cfg = ic.ObsConfig(
         use_ab_world_frame=True,
-        use_rot_speed=True,
         use_relative_velocity=True,
+        use_previous_action=True,
     )
     cfg.obs_dim = cfg.expected_obs_dim()
-    assert cfg.obs_dim == 3 + 3 + 9 + 3 + 3 + 3  # 24
+    assert cfg.obs_dim == 3 + 9 + 3 + 3 + 3 + 3 + 4  # 28
     obs = ic.build_observation(
         cfg,
         pursuer_pos=torch.tensor([1.0, 2.0, 3.0]),
         pursuer_quat_wxyz=torch.tensor([1.0, 0.0, 0.0, 0.0]),
-        pursuer_lin_vel_world=torch.tensor([0.0, 0.0, 0.0]),
+        pursuer_lin_vel=torch.tensor([0.0, 0.0, 0.0]),
+        pursuer_ang_vel=torch.tensor([0.5, 0.6, 0.7]),
         evader_pos=torch.tensor([1.0, 2.0, 5.0]),
-        pursuer_ang_vel_world=torch.tensor([0.5, 0.6, 0.7]),
         evader_lin_vel_world=torch.tensor([1.0, 0.0, 0.0]),
+        previous_action=torch.tensor([0.1, 0.2, 0.3, 0.4]),
     )
-    assert obs.shape == (24,)
+    assert obs.shape == (28,)
     # world-frame position block.
-    assert torch.allclose(obs[15:18], torch.tensor([1.0, 2.0, 3.0]), atol=1e-6)
+    assert torch.allclose(obs[:3], torch.tensor([1.0, 2.0, 3.0]), atol=1e-6)
+    # identity rotation -> relative velocity stays in world axes.
+    assert torch.allclose(obs[21:24], torch.tensor([1.0, 0.0, 0.0]), atol=1e-6)
+    assert torch.allclose(obs[24:], torch.tensor([0.1, 0.2, 0.3, 0.4]), atol=1e-6)
 
 
 def test_decode_action_hover_and_ranges():
@@ -132,7 +139,7 @@ def test_metadata_roundtrip(tmp_path=None):
         ic.save_metadata(meta, path)
         loaded = ic.load_metadata(path)
     assert loaded.algo == "ppo"
-    assert loaded.obs.obs_dim == 16
+    assert loaded.obs.obs_dim == 19
     assert loaded.ctbr.target_clip == 1.0
     assert loaded.notes["task"] == "Intercept"
 

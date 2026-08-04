@@ -27,3 +27,7 @@ from .fly_through import FlyThrough
 from .intercept import Intercept
 from .forest import Forest
 from .pinball import Pinball
+
+# AMSPB PEG Tasks
+from .evasion import Evasion
+from .pursuit import Pursuit

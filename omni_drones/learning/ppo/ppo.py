@@ -48,6 +48,10 @@ class PPOConfig:
     ppo_epochs: int = 4
     num_minibatches: int = 16
 
+    clip_param: float = 0.1
+    learning_rate: float = 5e-4
+    gamma: float = 0.99
+
     # whether to use privileged information
     priv_actor: bool = False
     priv_critic: bool = False
