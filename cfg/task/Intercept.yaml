@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 256
+  num_envs: 4096
   max_episode_length: 1000 # 600
   env_spacing: 8
 
@@ -14,9 +14,9 @@ time_encoding_dim: 4
 
 # Curriculum learning parameters
 success_radius_init: 0.3
-success_radius_max: 0.1
+success_radius_end: 0.1
 success_radius_lr: 2e-6
-success_radius_eval: 0.15
+success_radius_eval: 0.1
 
 # Reset threshold
 reset_thres: 9.0
@@ -54,8 +54,8 @@ pursuer:
     min: [-0.5, -0.5, 0.5]
     max: [0.5, 0.5, 5.0]
   spawn_rpy_range:
-    min: [-1.0, -1.0, -0.25]
-    max: [1.0, 1.0, 0.25]
+    min: [-1.0, -1.0, -1.0]
+    max: [1.0, 1.0, 1.0]
   target_speed: 10.0
   initial_velocity:
     enabled: true
@@ -68,11 +68,8 @@ evader:
   controller: LeePositionController
   speed_range: [0.0, 6.0]
   spawn_distance_range: [0.2, 7.0]
-  # trajectory_types: [hover, linear, zigzag] # for training
-  trajectory_types: [hover, random] # for evaluation
-  zigzag:
-    amplitude_range: [1.0, 3.0]
-    frequency_range: [0.3, 1.0]
+  trajectory_types: [hover, linear, random] # for training
+  # trajectory_types: [hover, random] # for evaluation
   random:
     turn_interval_range: [20, 80]
     vertical_component_range: [-0.5, 0.5]
