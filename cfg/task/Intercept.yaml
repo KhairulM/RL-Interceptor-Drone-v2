@@ -26,9 +26,9 @@ minimum_altitude: 0.1
 reward_distance_scale: 0.8
 reward_approach_velocity_weight: 1.0
 reward_heading_alignment_weight: 1.0
-reward_action_smoothness_weight: 1.0
 reward_delta_distance_weight: 10.0
 reward_terminal_weight: 100.0
+reward_action_smoothness_weight: 0.2
 reward_action_norm_weight: 0.5
 # Potential-difference precision reward: pays for closing distance, zero when orbiting.
 reward_precision_weight: 10.0
