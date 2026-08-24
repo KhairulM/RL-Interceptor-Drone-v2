@@ -88,17 +88,18 @@ class Intercept(IsaacEnv):
             "reward_terminal_weight", 10.0)
         self.reward_action_norm_weight = cfg.task.get(
             "reward_action_norm_weight", 1.0)
+        self.reward_action_body_rate_weight = cfg.task.get(
+            "reward_action_body_rate_weight", 1.0)
         self.reward_terminal_precision_weight = cfg.task.get(
             "reward_terminal_precision_weight", 150.0)
         self.reward_terminal_precision_scale = cfg.task.get(
             "reward_terminal_precision_scale", 5.0)
-        # +weight when the evader is inside the pursuer camera FOV, -weight when
-        # it is outside (symmetric; magnitude tuned by this single weight).
         self.reward_fov_weight = cfg.task.get("reward_fov_weight", 1.0)
 
         self.pursuer_cfg = cfg.task.pursuer
         self.evader_cfg = cfg.task.evader
         self.obs_cfg = cfg.task.observation
+        self.reward_cfg = cfg.task.reward
 
         self.pursuer_model_name = self.pursuer_cfg.get("model", "Hummingbird")
         self.pursuer_controller_name = self.pursuer_cfg.get(
@@ -130,12 +131,6 @@ class Intercept(IsaacEnv):
             "initial_velocity", {}
         )
 
-        self.obs_include_noise = self.obs_cfg.get("include_noise", False)
-        self.obs_include_previous_action = self.obs_cfg.get("include_previous_action", False)
-        self.obs_use_world_frame_pos = self.obs_cfg.get("use_world_frame_pos", False)
-        self.obs_include_evader_rel_lin_vel = self.obs_cfg.get(
-            "include_evader_rel_lin_vel", False)
-
         # Per-component Gaussian noise stds (sensor-matched defaults).
         noise_cfg = self.obs_cfg.get("noise", {})
         self.obs_noise_rel_hdg_std = float(noise_cfg.get("rel_hdg_std", 0.02))      # ~1° angular
@@ -149,8 +144,6 @@ class Intercept(IsaacEnv):
             "hover": 0,
             "linear": 1,
             "random": 2,
-            "frpn": 3,
-            "apf": 4,
         }
 
         enabled = list(self.evader_cfg.get("trajectory_types", ["linear"]))
@@ -168,29 +161,6 @@ class Intercept(IsaacEnv):
             random_cfg.get("vertical_component_range", [-0.2, 0.2]))
         self.evader_random_target_lookahead = float(
             random_cfg.get("target_lookahead", 0.5))
-
-        frpn_cfg = self.evader_cfg.get("frpn", {})
-        self.evader_frpn_gain = float(frpn_cfg.get("gain", 5.0))
-        self.evader_frpn_position_blend = float(
-            frpn_cfg.get("position_blend", 0.2))
-        self.evader_frpn_min_relative_speed = float(
-            frpn_cfg.get("min_relative_speed", 0.1))
-        self.evader_frpn_max_time_to_go = float(
-            frpn_cfg.get("max_time_to_go", 2.0))
-        self.evader_frpn_target_lookahead = float(
-            frpn_cfg.get("target_lookahead", 0.5))
-        self.evader_frpn_max_speed = float(frpn_cfg.get("max_speed", 3.0))
-
-        apf_cfg = self.evader_cfg.get("apf", {})
-        self.evader_apf_pursuer_gain = float(apf_cfg.get("pursuer_gain", 1.0))
-        self.evader_apf_pursuer_power = float(apf_cfg.get("pursuer_power", 3.0))
-        self.evader_apf_containment_radius = float(
-            apf_cfg.get("containment_radius", 3.5))
-        self.evader_apf_containment_gain = float(
-            apf_cfg.get("containment_gain", 1.0))
-        self.evader_apf_target_lookahead = float(
-            apf_cfg.get("target_lookahead", 0.5))
-        self.evader_apf_max_speed = float(apf_cfg.get("max_speed", 3.0))
 
         super().__init__(cfg, headless)
 
@@ -447,23 +417,23 @@ class Intercept(IsaacEnv):
         """Define observation, action, reward, and stats specs."""
         pursuer_state_dim = 9 + 3 + 3  # rot matrix + lin vel + rot vel
 
-        if self.obs_use_world_frame_pos:
+        if self.obs_cfg.use_world_frame_pos:
             pursuer_state_dim += 3  # absolute position in world frame
         else:
             pursuer_state_dim += 1  # altitude only
 
         evader_state_dim = 3  # relative heading
 
-        if self.obs_include_evader_rel_lin_vel:
+        if self.obs_cfg.include_evader_rel_lin_vel:
             evader_state_dim += 3  # relative evader linear velocity
 
         obs_dim = pursuer_state_dim + evader_state_dim
 
-        if self.obs_include_previous_action:
+        if self.obs_cfg.include_previous_action:
             obs_dim += self.pursuer.action_spec.shape[-1]  # previous action
 
-        if self.time_encoding_dim:
-            state_dim = obs_dim + self.time_encoding_dim
+        if self.obs_cfg.use_time_encoding:
+            state_dim = obs_dim + self.obs_cfg.time_encoding_dim
         else:
             state_dim = obs_dim
 
@@ -664,7 +634,6 @@ class Intercept(IsaacEnv):
     def _compute_evader_action(self, _tensordict: TensorDictBase) -> torch.Tensor:
         """Compute the evader action based on the current trajectory mode and target."""
         evader_state = self.evader.get_state()[..., :13].squeeze(1)
-        pursuer_state = self.pursuer.get_state()[..., :13].squeeze(1)
         # Keep trajectory code strictly per-env [num_envs] to avoid accidental
         # broadcasting (e.g. [N, 1] masks with [N] values -> [N, N]).
         traj_type = self.evader_traj_type.reshape(self.num_envs)
@@ -682,8 +651,6 @@ class Intercept(IsaacEnv):
 
         is_random = traj_type == self._traj_type_codes["random"]
         is_hover = traj_type == self._traj_type_codes["hover"]
-        is_frpn = traj_type == self._traj_type_codes["frpn"]
-        is_apf = traj_type == self._traj_type_codes["apf"]
 
         # Random trajectory: piecewise-constant heading with periodic resampling.
         if bool(is_random.any()):
@@ -713,73 +680,6 @@ class Intercept(IsaacEnv):
 
             pos = torch.where(is_random.unsqueeze(-1), random_target, pos)
             yaw = torch.where(is_random, random_yaw, yaw)
-
-        # FRPN and APF trajectories use the pursuer's current state to choose
-        # a target velocity, then give the position controller a short-horizon
-        # position target in that direction.
-        if bool((is_frpn | is_apf).any()):
-            rel_pos = evader_state[..., :3] - pursuer_state[..., :3]
-            rel_vel = evader_state[..., 7:10] - pursuer_state[..., 7:10]
-            rel_distance = torch.norm(rel_pos, dim=-1, keepdim=True).clamp_min(1e-3)
-            away = rel_pos / rel_distance
-
-            # Fast-response proportional navigation, expressed from the
-            # evader's perspective so the commanded direction escapes the
-            # pursuer while responding to relative velocity.
-            rel_speed = torch.norm(rel_vel, dim=-1, keepdim=True).clamp_min(
-                self.evader_frpn_min_relative_speed)
-            time_to_go = (rel_distance / rel_speed).clamp(
-                max=self.evader_frpn_max_time_to_go)
-            pn_term = (rel_pos + rel_vel * time_to_go) / time_to_go.square().clamp_min(1e-3)
-            frpn_velocity = self.evader_frpn_gain * (
-                self.evader_frpn_position_blend * rel_pos
-                + (1.0 - self.evader_frpn_position_blend) * pn_term
-            )
-            frpn_velocity = self._limit_velocity(
-                frpn_velocity, self.evader_frpn_max_speed)
-            frpn_target = evader_state[..., :3] + (
-                frpn_velocity * self.evader_frpn_target_lookahead
-            )
-
-            # Artificial potential field: repel the pursuer while attracting
-            # the evader back toward its spawn neighborhood past the configured
-            # radius. This avoids immediately ending an episode at reset_thres.
-            pursuer_force = (
-                self.evader_apf_pursuer_gain
-                * away
-                / rel_distance.pow(self.evader_apf_pursuer_power)
-            )
-            displacement = evader_state[..., :3] - self.evader_local_pos.squeeze(1)
-            displacement_norm = torch.norm(
-                displacement, dim=-1, keepdim=True).clamp_min(1e-3)
-            containment_excess = (
-                displacement_norm - self.evader_apf_containment_radius
-            ).clamp_min(0.0)
-            containment_force = (
-                -self.evader_apf_containment_gain
-                * containment_excess
-                * displacement
-                / displacement_norm
-            )
-            apf_velocity = self._limit_velocity(
-                pursuer_force + containment_force,
-                self.evader_apf_max_speed,
-            )
-            apf_target = evader_state[..., :3] + (
-                apf_velocity * self.evader_apf_target_lookahead
-            )
-
-            frpn_target[..., 2] = frpn_target[..., 2].clamp(
-                min=self.minimum_altitude + 0.1)
-            apf_target[..., 2] = apf_target[..., 2].clamp(
-                min=self.minimum_altitude + 0.1)
-            frpn_yaw = torch.atan2(frpn_velocity[..., 1], frpn_velocity[..., 0])
-            apf_yaw = torch.atan2(apf_velocity[..., 1], apf_velocity[..., 0])
-
-            pos = torch.where(is_frpn.unsqueeze(-1), frpn_target, pos)
-            yaw = torch.where(is_frpn, frpn_yaw, yaw)
-            pos = torch.where(is_apf.unsqueeze(-1), apf_target, pos)
-            yaw = torch.where(is_apf, apf_yaw, yaw)
 
         # Hover trajectory: evader stays in place.
         if bool(is_hover.any()):
@@ -825,7 +725,7 @@ class Intercept(IsaacEnv):
 
         obs = []
 
-        if self.obs_use_world_frame_pos:
+        if self.obs_cfg.use_world_frame_pos:
             obs.append(self.pursuer_pos)
         else:
             obs.append(self.pursuer_alt)
@@ -839,7 +739,7 @@ class Intercept(IsaacEnv):
         ]
 
         # observation noise for default observation space
-        if self.obs_include_noise:
+        if self.obs_cfg.include_noise:
             # Position/altitude: additive Gaussian.
             noise_pos = obs[0] + torch.randn_like(
                 obs[0]) * self.obs_noise_alt_std
@@ -865,8 +765,8 @@ class Intercept(IsaacEnv):
                 self.evader_rel_hdg) * self.obs_noise_rel_hdg_std
             obs[4] = normalize(noisy_hdg)
 
-        if self.obs_include_evader_rel_lin_vel:
-            if self.obs_include_noise:
+        if self.obs_cfg.include_evader_rel_lin_vel:
+            if self.obs_cfg.include_noise:
                 noisy_rel_vel = self.evader_rel_lin_vel + torch.randn_like(
                     self.evader_rel_lin_vel) * self.obs_noise_rel_lin_vel_std
                 obs.append(noisy_rel_vel)
@@ -874,7 +774,7 @@ class Intercept(IsaacEnv):
                 obs.append(self.evader_rel_lin_vel)
 
         # Previous action
-        if self.obs_include_previous_action:
+        if self.obs_cfg.include_previous_action:
             obs.append(self.current_action)
 
         state = obs.copy()
@@ -960,6 +860,8 @@ class Intercept(IsaacEnv):
             dim=-1, keepdim=True
         )
 
+        reward = self.reward_spec.zero()
+
         # Dense rewards.
         # reward_distance = self._reward_distance_to_evader(
         #     pursuer_pos, evader_pos)
@@ -974,19 +876,40 @@ class Intercept(IsaacEnv):
         # )
         # reward_heading_alignment = self._reward_heading_alignment()
 
-        reward_delta_distance = self._reward_delta_distance(distance)
-        reward_precision = self._reward_precision(distance)
-        reward_action_smoothness = self._reward_action_smoothness()
-        reward_fov = self._reward_fov()
+        if self.reward_cfg.use_delta_distance:
+            reward_delta_distance = self._reward_delta_distance(distance)
+            reward += reward_delta_distance
+        else:
+            reward_delta_distance = 0.0
+
+        if self.reward_cfg.use_precision:
+            reward_precision = self._reward_precision(distance)
+            reward += reward_precision
+        else:
+            reward_precision = 0.0
+
+        if self.reward_cfg.use_action_smoothness:
+            reward_action_smoothness = self._reward_action_smoothness()
+            reward += reward_action_smoothness
+        else:
+            reward_action_smoothness = 0.0
+
+        if self.reward_cfg.use_action_body_rate:
+            reward_action_body_rate = self._reward_action_body_rate()
+            reward += reward_action_body_rate
+        else:
+            reward_action_body_rate = 0.0
+
+        if self.reward_cfg.use_fov:
+            reward_fov = self._reward_fov()
+            reward += reward_fov
+        else:
+            reward_fov = 0.0
 
         self.prev_distance = distance.detach().clone()
 
         action_norm = torch.norm(self.current_action, dim=-1)
         # reward_action_norm = self._reward_action_norm()
-
-        # reward = reward_delta_distance + reward_precision + reward_action_smoothness + reward_fov
-        reward = reward_delta_distance + reward_precision + reward_action_smoothness
-        # reward = reward_precision + reward_action_smoothness
 
         # Terminal rewards.
         reached_target = (distance <= self.active_success_radius).reshape(
@@ -1191,17 +1114,23 @@ class Intercept(IsaacEnv):
         not_begin_flag = (self.progress_buf > 1).unsqueeze(1).float()
         return (
             self.reward_action_smoothness_weight
-            * -self.action_error_order1
+            * (-self.action_error_order1)
             * not_begin_flag
         )
 
     def _reward_action_norm(self) -> torch.Tensor:
-        """Exponential decay on action magnitude, gated to zero on first two steps."""
-        not_begin_flag = (self.progress_buf > 1).unsqueeze(1).float()
+        """Exponential decay on action magnitude"""
         return (
             self.reward_action_norm_weight
             * torch.exp(-torch.norm(self.current_action, dim=-1))
-            * not_begin_flag
+        )
+
+    def _reward_action_body_rate(self) -> torch.Tensor:
+        """-||body_rates||, compute the norm of the current action body rate and apply a negative weight."""
+        target_rate, _ = self.current_action.split([3, 1], dim=-1)
+
+        return -self.reward_action_body_rate_weight * torch.norm(
+            target_rate, dim=-1, keepdim=True
         )
 
     def _reward_precision(self, distance: torch.Tensor) -> torch.Tensor:
@@ -1240,12 +1169,6 @@ class Intercept(IsaacEnv):
             float(self.evader_random_vertical_component_range[1]),
         )
         return normalize(random_dir)
-
-    @staticmethod
-    def _limit_velocity(velocity: torch.Tensor, max_speed: float) -> torch.Tensor:
-        """Cap vector magnitude while preserving direction."""
-        speed = torch.norm(velocity, dim=-1, keepdim=True)
-        return velocity * (max_speed / speed.clamp_min(max_speed))
 
     def _sample_random_turn_steps(self, n: int) -> torch.Tensor:
         """Sample per-env turn intervals for the random trajectory mode."""

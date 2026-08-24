@@ -11,7 +11,6 @@ env:
   max_episode_length: 1000 # 600
   env_spacing: 8
 
-time_encoding_dim: 4
 
 # Curriculum learning parameters
 success_radius_init: 0.3
@@ -39,12 +38,22 @@ reward_terminal_precision_scale: 5.0
 # FOV reward: +weight when the evader is inside the pursuer camera's field of
 # view, -weight when outside (symmetric magnitude; set to 0 to disable).
 reward_fov_weight: 0.5
+reward_action_body_rate_weight: 0.5
 
 observation:
   include_noise: false
   use_world_frame_pos: false
   include_evader_rel_lin_vel: false
   include_previous_action: true
+  use_time_encoding: true
+  time_encoding_dim: 4
+
+reward:
+  use_delta_distance: true
+  use_precision: true
+  use_action_smoothness: true
+  use_action_body_rate: true
+  use_fov: false
 
 action_transform: PIDrate
 # action_transform: rate
