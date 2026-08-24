@@ -70,7 +70,11 @@ class Intercept(IsaacEnv):
         self.reset_thres = cfg.task.get("reset_thres", 9.0)
         self.minimum_altitude = cfg.task.get("minimum_altitude", 0.15)
 
-        self.time_encoding_dim = cfg.task.get("time_encoding_dim", 0)
+        self.time_encoding_dim = (
+            cfg.task.observation.get("time_encoding_dim", 0)
+            if cfg.task.observation.get("use_time_encoding", False)
+            else 0
+        )
 
         self.reward_action_smoothness_weight = cfg.task.get(
             "reward_action_smoothness_weight", 1.0)
@@ -424,12 +428,12 @@ class Intercept(IsaacEnv):
 
         evader_state_dim = 3  # relative heading
 
-        if self.obs_cfg.include_evader_rel_lin_vel:
+        if self.obs_cfg.use_evader_rel_lin_vel:
             evader_state_dim += 3  # relative evader linear velocity
 
         obs_dim = pursuer_state_dim + evader_state_dim
 
-        if self.obs_cfg.include_previous_action:
+        if self.obs_cfg.use_previous_action:
             obs_dim += self.pursuer.action_spec.shape[-1]  # previous action
 
         if self.obs_cfg.use_time_encoding:
@@ -474,6 +478,7 @@ class Intercept(IsaacEnv):
             "reward_time_to_intercept": UnboundedContinuous(torch.Size([1]), device=self.device),
             "reward_action_smoothness": UnboundedContinuous(torch.Size([1]), device=self.device),
             "reward_action_norm": UnboundedContinuous(torch.Size([1]), device=self.device),
+            "reward_action_body_rate": UnboundedContinuous(torch.Size([1]), device=self.device),
             "reward_heading_alignment": UnboundedContinuous(torch.Size([1]), device=self.device),
             "reward_delta_distance": UnboundedContinuous(torch.Size([1]), device=self.device),
             "reward_precision": UnboundedContinuous(torch.Size([1]), device=self.device),
@@ -765,7 +770,7 @@ class Intercept(IsaacEnv):
                 self.evader_rel_hdg) * self.obs_noise_rel_hdg_std
             obs[4] = normalize(noisy_hdg)
 
-        if self.obs_cfg.include_evader_rel_lin_vel:
+        if self.obs_cfg.use_evader_rel_lin_vel:
             if self.obs_cfg.include_noise:
                 noisy_rel_vel = self.evader_rel_lin_vel + torch.randn_like(
                     self.evader_rel_lin_vel) * self.obs_noise_rel_lin_vel_std
@@ -774,7 +779,7 @@ class Intercept(IsaacEnv):
                 obs.append(self.evader_rel_lin_vel)
 
         # Previous action
-        if self.obs_cfg.include_previous_action:
+        if self.obs_cfg.use_previous_action:
             obs.append(self.current_action)
 
         state = obs.copy()
@@ -859,8 +864,9 @@ class Intercept(IsaacEnv):
         approach_speed = (pursuer_vel[..., :3] * normalize(evader_pos - pursuer_pos)).sum(
             dim=-1, keepdim=True
         )
+        action_norm = torch.norm(self.current_action, dim=-1)
 
-        reward = self.reward_spec.zero()
+        reward = torch.zeros(self.num_envs, 1, device=self.device)
 
         # Dense rewards.
         # reward_distance = self._reward_distance_to_evader(
@@ -875,41 +881,39 @@ class Intercept(IsaacEnv):
         #     pursuer_pos, pursuer_vel, evader_pos, evader_velocity
         # )
         # reward_heading_alignment = self._reward_heading_alignment()
+        # reward_action_norm = self._reward_action_norm()
 
         if self.reward_cfg.use_delta_distance:
             reward_delta_distance = self._reward_delta_distance(distance)
             reward += reward_delta_distance
         else:
-            reward_delta_distance = 0.0
+            reward_delta_distance = torch.zeros_like(reward)
 
         if self.reward_cfg.use_precision:
             reward_precision = self._reward_precision(distance)
             reward += reward_precision
         else:
-            reward_precision = 0.0
+            reward_precision = torch.zeros_like(reward)
 
         if self.reward_cfg.use_action_smoothness:
             reward_action_smoothness = self._reward_action_smoothness()
             reward += reward_action_smoothness
         else:
-            reward_action_smoothness = 0.0
+            reward_action_smoothness = torch.zeros_like(reward)
 
         if self.reward_cfg.use_action_body_rate:
             reward_action_body_rate = self._reward_action_body_rate()
             reward += reward_action_body_rate
         else:
-            reward_action_body_rate = 0.0
+            reward_action_body_rate = torch.zeros_like(reward)
 
         if self.reward_cfg.use_fov:
             reward_fov = self._reward_fov()
             reward += reward_fov
         else:
-            reward_fov = 0.0
+            reward_fov = torch.zeros_like(reward)
 
         self.prev_distance = distance.detach().clone()
-
-        action_norm = torch.norm(self.current_action, dim=-1)
-        # reward_action_norm = self._reward_action_norm()
 
         # Terminal rewards.
         reached_target = (distance <= self.active_success_radius).reshape(
@@ -951,6 +955,8 @@ class Intercept(IsaacEnv):
             reward_action_smoothness, 1 - self.alpha)
         # self.stats["reward_action_norm"].lerp_(
         #     reward_action_norm, 1 - self.alpha)
+        self.stats["reward_action_body_rate"].lerp_(
+            reward_action_body_rate, 1 - self.alpha)
         # self.stats["reward_heading_alignment"].lerp_(
         #     reward_heading_alignment, 1 - self.alpha)
         self.stats["reward_delta_distance"].lerp_(
@@ -1130,7 +1136,7 @@ class Intercept(IsaacEnv):
         target_rate, _ = self.current_action.split([3, 1], dim=-1)
 
         return -self.reward_action_body_rate_weight * torch.norm(
-            target_rate, dim=-1, keepdim=True
+            target_rate, dim=-1
         )
 
     def _reward_precision(self, distance: torch.Tensor) -> torch.Tensor:
