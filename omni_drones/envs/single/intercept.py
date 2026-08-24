@@ -985,8 +985,8 @@ class Intercept(IsaacEnv):
         # reward_action_norm = self._reward_action_norm()
 
         # reward = reward_delta_distance + reward_precision + reward_action_smoothness + reward_fov
-        # reward = reward_delta_distance + reward_precision + reward_action_smoothness
-        reward = reward_precision + reward_action_smoothness
+        reward = reward_delta_distance + reward_precision + reward_action_smoothness
+        # reward = reward_precision + reward_action_smoothness
 
         # Terminal rewards.
         reached_target = (distance <= self.active_success_radius).reshape(
