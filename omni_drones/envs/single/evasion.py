@@ -130,10 +130,10 @@ class Evasion(IsaacEnv):
     def parse_cfg(self, cfg):
         evader_policy = cfg.task.evader_model.policy.lower()
         if "velocity" in evader_policy:
-            cfg.task.evader_model.controller = ["LeePositionController"]
+            cfg.task.evader_model.controller = ["AMSPBLeePositionController"]
             cfg.task.action_transform = "velocity"
         elif "rate" in evader_policy:
-            cfg.task.evader_model.controller = ["RateController"]
+            cfg.task.evader_model.controller = ["AMSPBRateController"]
             cfg.task.action_transform = "rate"
         elif "thrust" in evader_policy:
             cfg.task.evader_model.controller = [None]
@@ -144,7 +144,7 @@ class Evasion(IsaacEnv):
         pursuer_controllers = []
         for pursuer_policy in cfg.task.pursuer_model.policy:
             if "fixed_path" in pursuer_policy:
-                pursuer_controllers.append("LeePositionController")
+                pursuer_controllers.append("AMSPBLeePositionController")
             elif "pid" in pursuer_policy:
                 pursuer_controllers.append("PID_Pursuit")
             elif "frpn" in pursuer_policy:
@@ -152,9 +152,9 @@ class Evasion(IsaacEnv):
             elif "thrust" in pursuer_policy:
                 pursuer_controllers.append(None)
             elif "velocity" in pursuer_policy:
-                pursuer_controllers.append("LeePositionController")
+                pursuer_controllers.append("AMSPBLeePositionController")
             elif "rate" in pursuer_policy:
-                pursuer_controllers.append("RateController")
+                pursuer_controllers.append("AMSPBRateController")
             else:
                 Warning(f"Policy {pursuer_policy} not recognized, using None")
                 pursuer_controllers.append(None)
@@ -475,12 +475,24 @@ class Evasion(IsaacEnv):
 
         obs = torch.cat(obs, dim=-1)
 
+        intrinsics_dict = self.evader.intrinsics
+        intrinsics_flat = torch.cat([
+            intrinsics_dict["mass"],
+            intrinsics_dict["inertia"],
+            intrinsics_dict["com"],
+            intrinsics_dict["KF"],
+            intrinsics_dict["KM"],
+            intrinsics_dict["tau_up"],
+            intrinsics_dict["tau_down"],
+            intrinsics_dict["drag_coef"],
+        ], dim=-1)
+
         return TensorDict(
             {
                 "agents": {
                     "observation": obs,
                     "evader_state": self.evader_state,
-                    "intrinsics": self.evader.intrinsics,
+                    "intrinsics": intrinsics_flat,
                 },
             },
             self.batch_size,

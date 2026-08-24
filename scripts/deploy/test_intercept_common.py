@@ -14,7 +14,7 @@ required)::
     python deploy/test_intercept_common.py
 """
 
-import scripts.deploy.intercept_common as ic
+import json
 import math
 import os
 import sys
@@ -22,8 +22,11 @@ import sys
 import torch
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-if _THIS_DIR not in sys.path:
-    sys.path.insert(0, _THIS_DIR)
+_REPO_ROOT = os.path.dirname(os.path.dirname(_THIS_DIR))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+import scripts.deploy.intercept_common as ic
 
 
 def _reference_rotation_matrix(quat):
@@ -72,6 +75,32 @@ def test_observation_dim_default_layout():
     assert torch.allclose(obs[13:16], torch.tensor([0.5, 0.6, 0.7]), atol=1e-6)
     # evader_rel_hdg points from pursuer to evader -> +x.
     assert torch.allclose(obs[16:19], torch.tensor([1.0, 0.0, 0.0]), atol=1e-4)
+
+
+def test_relative_heading_is_in_pursuer_body_frame():
+    cfg = ic.ObsConfig()
+    half_yaw = math.pi / 4.0
+    obs = ic.build_observation(
+        cfg,
+        pursuer_pos=torch.zeros(3),
+        pursuer_quat_wxyz=torch.tensor([
+            math.cos(half_yaw), 0.0, 0.0, math.sin(half_yaw)
+        ]),
+        pursuer_lin_vel=torch.zeros(3),
+        pursuer_ang_vel=torch.zeros(3),
+        evader_pos=torch.tensor([1.0, 0.0, 0.0]),
+    )
+    # Under the project quaternion convention, this maps world +x to body +y.
+    assert torch.allclose(obs[16:19], torch.tensor([0.0, 1.0, 0.0]), atol=1e-5)
+
+
+def test_world_velocity_rotates_to_pursuer_body_frame():
+    half_yaw = math.pi / 4.0
+    quat = torch.tensor([
+        math.cos(half_yaw), 0.0, 0.0, math.sin(half_yaw)
+    ])
+    body_velocity = ic.quat_rotate_inverse(quat, torch.tensor([1.0, 0.0, 0.0]))
+    assert torch.allclose(body_velocity, torch.tensor([0.0, 1.0, 0.0]), atol=1e-5)
 
 
 def test_observation_optional_components():
@@ -142,6 +171,25 @@ def test_metadata_roundtrip(tmp_path=None):
     assert loaded.obs.obs_dim == 19
     assert loaded.ctbr.target_clip == 1.0
     assert loaded.notes["task"] == "Intercept"
+
+
+def test_metadata_rejects_pre_body_frame_heading_version():
+    import tempfile
+
+    metadata = ic.PolicyMetadata(
+        artifact_version=ic.ARTIFACT_VERSION - 1,
+        algo="ppo",
+    )
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "metadata.json")
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(metadata.to_dict(), handle)
+        try:
+            ic.load_metadata(path)
+        except ValueError as err:
+            assert "Incompatible artifact version" in str(err)
+        else:
+            raise AssertionError("Expected incompatible metadata to be rejected.")
 
 
 def _run_all():

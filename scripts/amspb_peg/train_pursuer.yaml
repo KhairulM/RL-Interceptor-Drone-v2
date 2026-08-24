@@ -13,9 +13,9 @@ env: ${task.env}
 
 total_frames: 15_000_000
 max_iters: -1
-eval_interval: 50
-render_interval: 300 # must be divisible by eval_interval
-save_interval: 200
+eval_interval: 1000
+render_interval: -1 # must be divisible by eval_interval
+save_interval: 1000
 early_stop_threshold: 0.95 # if for early_stop_patience evaluations the success rate is above this threshold, training is stopped
 early_stop_patience: 3
 seed: 0
@@ -116,8 +116,8 @@ wandb:
   group: ${oc.select:..task.name}
   run_name: train_pursuer 
   job_type: train
-  entity: 
-  project: 
+  entity: khairul-makirin-team
+  project: AMSPB Drone Interceptor
   mode: online # set to 'disabled' when debugging locally
   run_id:
   monitor_gym: True

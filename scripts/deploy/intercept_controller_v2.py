@@ -19,9 +19,9 @@ from typing import Optional
 import numpy as np
 import torch
 
-import scripts.deploy.intercept_common as ic
-from scripts.deploy.drone import CrazyflieDrone, ScriptedDrone, DronePosePublisher
-from scripts.deploy.mocap import MocapReceiver, MocapTfPublisher
+import intercept_common as ic
+from drone import CrazyflieDrone, ScriptedDrone, DronePosePublisher
+from mocap import MocapReceiver, MocapTfPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -94,11 +94,18 @@ def _build_command(policy: torch.nn.Module, metadata: ic.PolicyMetadata,
                    previous_action: Optional[torch.Tensor] = None,
                    device: torch.device = torch.device('cpu')) -> tuple[torch.Tensor, ic.CTBRCommand]:
     """Run the policy to produce a CTBR command for the pursuer and return the tanh-scaled action and the decoded CTBR command."""
+    pursuer_quat = torch.as_tensor(
+        pursuer.quat_wxyz, dtype=torch.float32, device=device
+    )
+    pursuer_lin_vel_body = ic.quat_rotate_inverse(
+        pursuer_quat,
+        torch.as_tensor(pursuer.lin_vel, dtype=torch.float32, device=device),
+    )
     obs = ic.build_observation(
         metadata.obs,
         pursuer_pos=torch.as_tensor(pursuer.pos, dtype=torch.float32, device=device),
-        pursuer_quat_wxyz=torch.as_tensor(pursuer.quat_wxyz, dtype=torch.float32, device=device),
-        pursuer_lin_vel=torch.as_tensor(pursuer.lin_vel, dtype=torch.float32, device=device),
+        pursuer_quat_wxyz=pursuer_quat,
+        pursuer_lin_vel=pursuer_lin_vel_body,
         evader_pos=torch.as_tensor(evader.pos, dtype=torch.float32, device=device),
         previous_action=torch.as_tensor(previous_action, dtype=torch.float32, device=device),
         pursuer_ang_vel=torch.as_tensor(pursuer.ang_vel, dtype=torch.float32, device=device),
@@ -152,12 +159,28 @@ class InterceptController:
             name='controller.evader_motion.anchor',
         )
 
+        linear_cfg = evader_motion.get('linear', {}) or {}
+        if not isinstance(linear_cfg, dict):
+            raise ValueError("Config key 'controller.evader_motion.linear' must be a mapping.")
+        self.evader_linear_speed = float(linear_cfg.get('speed', 0.25))
+        self.evader_linear_direction = self._unit_vec3_from_config(
+            linear_cfg.get('direction', [1.0, 0.0, 0.0]),
+            name='controller.evader_motion.linear.direction',
+        )
+
         random_cfg = evader_motion.get('random', {}) or {}
         if not isinstance(random_cfg, dict):
             raise ValueError("Config key 'controller.evader_motion.random' must be a mapping.")
         self.evader_random_speed = float(random_cfg.get('speed', 0.25))
-        self.evader_random_radius = float(random_cfg.get('radius_xy', 1.0))
-        self.evader_random_update_interval = float(random_cfg.get('update_interval', 2.0))
+        self.evader_random_turn_interval_range = list(
+            random_cfg.get('turn_interval_range', [20, 80])
+        )
+        self.evader_random_vertical_component_range = list(
+            random_cfg.get('vertical_component_range', [-0.2, 0.2])
+        )
+        self.evader_random_target_lookahead = float(
+            random_cfg.get('target_lookahead', 0.5)
+        )
         random_seed = random_cfg.get('seed', None)
         self._evader_rng = np.random.default_rng(random_seed)
 
@@ -169,8 +192,11 @@ class InterceptController:
 
         self._evader_motion_start_time = 0.0
         self._evader_random_pos = self.evader_motion_anchor.copy()
-        self._evader_random_target = self.evader_motion_anchor.copy()
-        self._evader_random_last_update = 0.0
+        self._evader_random_dir = np.array([1.0, 0.0, 0.0], dtype=np.float64)
+        self._evader_random_next_turn_step = 0
+        self._evader_motion_step = 0
+        self._evader_motion_last_update = 0.0
+        self._evader_position_setpoint = self.evader_motion_anchor.copy()
 
         self._validate_evader_motion_config()
         self._load_evader_trajectory_if_needed()
@@ -202,20 +228,52 @@ class InterceptController:
             raise ValueError(f"Config key '{name}' must have exactly 3 elements.")
         return arr.copy()
 
+    @staticmethod
+    def _unit_vec3_from_config(value, name: str) -> np.ndarray:
+        arr = np.asarray(value, dtype=np.float64).reshape(-1)
+        if arr.size != 3:
+            raise ValueError(f"Config key '{name}' must have exactly 3 elements.")
+        norm = float(np.linalg.norm(arr))
+        if norm <= 1e-6:
+            raise ValueError(f"Config key '{name}' must be nonzero.")
+        return arr / norm
+
     def _validate_evader_motion_config(self) -> None:
-        supported = {'hover', 'random', 'trajectory'}
+        supported = {'hover', 'linear', 'random', 'trajectory'}
         if self.evader_motion_type not in supported:
             raise ValueError(
                 f"Config key 'controller.evader_motion.type' must be one of "
                 f"{sorted(supported)}, got '{self.evader_motion_type}'."
             )
+        if self.evader_linear_speed < 0.0:
+            raise ValueError("Config key 'controller.evader_motion.linear.speed' must be >= 0.")
         if self.evader_random_speed < 0.0:
             raise ValueError("Config key 'controller.evader_motion.random.speed' must be >= 0.")
-        if self.evader_random_radius < 0.0:
-            raise ValueError("Config key 'controller.evader_motion.random.radius_xy' must be >= 0.")
-        if self.evader_random_update_interval <= 0.0:
+        if len(self.evader_random_turn_interval_range) != 2:
             raise ValueError(
-                "Config key 'controller.evader_motion.random.update_interval' must be > 0."
+                "Config key 'controller.evader_motion.random.turn_interval_range' "
+                "must contain exactly two step counts."
+            )
+        min_turn, max_turn = self.evader_random_turn_interval_range
+        if int(min_turn) < 1 or int(max_turn) < int(min_turn):
+            raise ValueError(
+                "Config key 'controller.evader_motion.random.turn_interval_range' "
+                "must satisfy 1 <= min <= max."
+            )
+        if len(self.evader_random_vertical_component_range) != 2:
+            raise ValueError(
+                "Config key 'controller.evader_motion.random.vertical_component_range' "
+                "must contain exactly two values."
+            )
+        min_vertical, max_vertical = self.evader_random_vertical_component_range
+        if min_vertical > max_vertical:
+            raise ValueError(
+                "Config key 'controller.evader_motion.random.vertical_component_range' "
+                "must satisfy min <= max."
+            )
+        if self.evader_random_target_lookahead < 0.0:
+            raise ValueError(
+                "Config key 'controller.evader_motion.random.target_lookahead' must be >= 0."
             )
 
     def _load_evader_trajectory_if_needed(self) -> None:
@@ -360,20 +418,29 @@ class InterceptController:
         vel = (1.0 - alpha) * traj_vel[idx - 1] + alpha * traj_vel[idx]
         return pos, vel
 
-    def _sample_random_target(self) -> np.ndarray:
-        angle = float(self._evader_rng.uniform(0.0, 2.0 * np.pi))
-        radius = float(self.evader_random_radius * np.sqrt(self._evader_rng.uniform(0.0, 1.0)))
-        target_xy = self.evader_motion_anchor[:2] + radius * np.array(
-            [np.cos(angle), np.sin(angle)], dtype=np.float64
+    def _sample_random_evader_direction(self) -> np.ndarray:
+        direction = self._evader_rng.normal(size=3)
+        direction /= max(float(np.linalg.norm(direction)), 1e-6)
+        direction[2] = self._evader_rng.uniform(
+            float(self.evader_random_vertical_component_range[0]),
+            float(self.evader_random_vertical_component_range[1]),
         )
-        return np.array([target_xy[0], target_xy[1], self.evader_motion_anchor[2]], dtype=np.float64)
+        return direction / max(float(np.linalg.norm(direction)), 1e-6)
 
-    def _compute_evader_motion_state(self) -> ic.DroneState:
+    def _sample_random_turn_steps(self) -> int:
+        min_turn, max_turn = self.evader_random_turn_interval_range
+        return int(self._evader_rng.integers(int(min_turn), int(max_turn) + 1))
+
+    def _compute_evader_motion_state(
+        self, measured_state: Optional[ic.DroneState] = None,
+    ) -> ic.DroneState:
         now = time.time()
         t = now - self._evader_motion_start_time
         quat = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
 
         if self.evader_motion_type == 'hover':
+            self._evader_position_setpoint = self.evader_motion_anchor.copy()
+            self._evader_motion_step += 1
             return ic.DroneState(
                 pos=self.evader_motion_anchor.copy(),
                 quat_wxyz=quat,
@@ -382,8 +449,26 @@ class InterceptController:
                 stamp=now,
             )
 
+        if self.evader_motion_type == 'linear':
+            pos = self.evader_motion_anchor + self.evader_linear_direction * (
+                self.evader_linear_speed * t
+            )
+            pos[2] = max(pos[2], self.min_altitude + 0.1)
+            self._evader_position_setpoint = pos.copy()
+            self._evader_motion_step += 1
+            return ic.DroneState(
+                pos=pos,
+                quat_wxyz=quat,
+                lin_vel=self.evader_linear_direction * self.evader_linear_speed,
+                ang_vel=np.zeros(3, dtype=np.float64),
+                stamp=now,
+            )
+
         if self.evader_motion_type == 'trajectory':
             pos, vel = self._interpolate_trajectory(t)
+            pos[2] = max(pos[2], self.min_altitude + 0.1)
+            self._evader_position_setpoint = pos.copy()
+            self._evader_motion_step += 1
             return ic.DroneState(
                 pos=pos,
                 quat_wxyz=quat,
@@ -392,35 +477,50 @@ class InterceptController:
                 stamp=now,
             )
 
-        dt = max(0.0, now - self._evader_random_last_update)
-        to_target = self._evader_random_target - self._evader_random_pos
-        dist = float(np.linalg.norm(to_target))
-        if dist < 0.05 or (now - self._evader_random_last_update) >= self.evader_random_update_interval:
-            self._evader_random_target = self._sample_random_target()
-            to_target = self._evader_random_target - self._evader_random_pos
-            dist = float(np.linalg.norm(to_target))
+        if self._evader_motion_step >= self._evader_random_next_turn_step:
+            self._evader_random_dir = self._sample_random_evader_direction()
+            self._evader_random_next_turn_step = (
+                self._evader_motion_step + self._sample_random_turn_steps()
+            )
 
-        vel = np.zeros(3, dtype=np.float64)
-        if dist > 1e-6 and dt > 0.0:
-            direction = to_target / dist
-            step = min(dist, self.evader_random_speed * dt)
-            self._evader_random_pos = self._evader_random_pos + direction * step
-            vel = direction * self.evader_random_speed
+        if measured_state is not None:
+            reference_pos = measured_state.pos.copy()
+        else:
+            dt = max(0.0, now - self._evader_motion_last_update)
+            self._evader_random_pos += (
+                self._evader_random_dir * self.evader_random_speed * dt
+            )
+            self._evader_random_pos[2] = max(
+                self._evader_random_pos[2], self.min_altitude + 0.1
+            )
+            reference_pos = self._evader_random_pos.copy()
 
-        self._evader_random_last_update = now
+        self._evader_position_setpoint = reference_pos + (
+            self._evader_random_dir
+            * self.evader_random_speed
+            * self.evader_random_target_lookahead
+        )
+        self._evader_position_setpoint[2] = max(
+            self._evader_position_setpoint[2], self.min_altitude + 0.1
+        )
+        self._evader_motion_last_update = now
+        self._evader_motion_step += 1
         return ic.DroneState(
-            pos=self._evader_random_pos.copy(),
+            pos=reference_pos,
             quat_wxyz=quat,
-            lin_vel=vel,
+            lin_vel=self._evader_random_dir * self.evader_random_speed,
             ang_vel=np.zeros(3, dtype=np.float64),
             stamp=now,
         )
 
-    def _get_evader_state(self, commanded_state: ic.DroneState) -> Optional[ic.DroneState]:
+    def _get_evader_state(
+        self,
+        commanded_state: ic.DroneState,
+        measured_state: Optional[ic.DroneState],
+    ) -> ic.DroneState:
         if self.evader_source == 'scripted':
             return commanded_state
-        state = self.evader.get_state()
-        return state if state is not None else commanded_state
+        return measured_state if measured_state is not None else commanded_state
 
     def run(self) -> None:
         cflib_crtp = importlib.import_module('cflib.crtp')
@@ -433,25 +533,35 @@ class InterceptController:
             self._initialize_evader_motion_anchor()
             self._evader_motion_start_time = time.time()
             self._evader_random_pos = self.evader_motion_anchor.copy()
-            self._evader_random_target = self.evader_motion_anchor.copy()
-            self._evader_random_last_update = self._evader_motion_start_time
+            self._evader_random_dir = self._sample_random_evader_direction()
+            self._evader_random_next_turn_step = self._sample_random_turn_steps()
+            self._evader_motion_step = 0
+            self._evader_motion_last_update = self._evader_motion_start_time
+            self._evader_position_setpoint = self.evader_motion_anchor.copy()
 
             logger.info(
                 '[intercept] Running policy at %.1f Hz. '
                 'Ctrl+C to stop. evader_motion=%s', 1.0 / self.control_dt, self.evader_motion_type
             )
             while self.pursuer.connected and self.evader.connected:
-                commanded_evader_state = self._compute_evader_motion_state()
+                measured_evader_state = (
+                    self.evader.get_state() if self.evader_source == 'cf' else None
+                )
+                commanded_evader_state = self._compute_evader_motion_state(
+                    measured_evader_state
+                )
                 self.evader.send_position_setpoint(
-                    commanded_evader_state.pos[0],
-                    commanded_evader_state.pos[1],
-                    commanded_evader_state.pos[2],
+                    self._evader_position_setpoint[0],
+                    self._evader_position_setpoint[1],
+                    self._evader_position_setpoint[2],
                     yaw_deg=self.evader_motion_yaw_deg,
                 )
 
                 pursuer_state = self.pursuer.get_state()
-                evader_state = self.evader.get_state()
-                if pursuer_state is None or evader_state is None:
+                evader_state = self._get_evader_state(
+                    commanded_evader_state, measured_evader_state
+                )
+                if pursuer_state is None:
                     time.sleep(self.control_dt)
                     continue
 

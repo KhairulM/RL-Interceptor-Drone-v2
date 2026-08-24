@@ -14,7 +14,7 @@ from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.log import LogConfig
 from cflib.crazyflie.syncLogger import SyncLogger
 
-import scripts.deploy.intercept_common as ic
+import intercept_common as ic
 
 logger = logging.getLogger(__name__)
 

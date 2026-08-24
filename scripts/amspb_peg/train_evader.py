@@ -22,7 +22,7 @@ from omni_drones.utils.torchrl.transforms import (
     FromDiscreteAction,
     ravel_composite,
     AttitudeController,
-    RateController,
+    AMSPBRateController,
     VelController
 )
 from omni_drones.utils.wandb import init_wandb
@@ -71,9 +71,9 @@ def main(cfg):
             transforms.append(transform)
 
         elif action_transform.startswith("rate"):
-            transform = RateController(controller=base_env.cont_evader,
-                                       in_keys_inv=("agents", "evader_state"),
-                                       )
+            transform = AMSPBRateController(controller=base_env.cont_evader,
+                                            in_keys_inv=("agents", "evader_state"),
+                                            )
             transforms.append(transform)
 
         elif action_transform.startswith("thrust"):
@@ -81,7 +81,7 @@ def main(cfg):
 
         else:
             raise NotImplementedError(f"Unknown action transform: {action_transform}")
-
+    print(f"Using action transform: {action_transform}")
     env = TransformedEnv(base_env, Compose(*transforms)).train()
     env.set_seed(cfg.seed)
 

@@ -2,7 +2,7 @@
 hydra:
   searchpath:
     # see https://hydra.cc/docs/advanced/search_path/
-    # - file://../../cfg
+    - file://../../cfg
     - file://cfg
 
 headless: true
@@ -13,9 +13,9 @@ env: ${task.env}
 
 total_frames: 20_000_000
 max_iters: -1
-eval_interval: 50
-render_interval: 300 # must be divisible by eval_interval, -1 if not rendering
-save_interval: 100 # multiple of eval_interval
+eval_interval: 1000
+render_interval: -1 # must be divisible by eval_interval, -1 if not rendering
+save_interval: 1000 # multiple of eval_interval
 early_stop_threshold: 0.95 # if for early_stop_patience evaluations the success rate is above this threshold, training is stopped
 early_stop_patience: 3
 seed: 0
@@ -47,7 +47,7 @@ task:
     z_stop: -1.0 # below z_stop, we assume the drone has crashed
 
   pursuer_model: 
-    name: Hummingbird
+    name: Crazyflie
     policy: [
       # "fixed_path:hover",
       # "fixed_path:circular",
@@ -62,8 +62,8 @@ task:
       ]
 
   evader_model:
-    name: Hummingbird
-    policy: rate # {velocity, rate, thrust}
+    name: Crazyflie
+    policy: amspbrate # {velocity, rate, thrust}
     source_policy: 
       None
       # evader_baseline
@@ -112,8 +112,8 @@ wandb:
   group: ${oc.select:..task.name}
   run_name: train_evader # train_evader
   job_type: train
-  entity: 
-  project: 
+  entity: khairul-makirin-team
+  project: AMSPB Drone Interceptor
   mode: online # set to 'disabled' when debugging locally
   run_id:
   monitor_gym: True

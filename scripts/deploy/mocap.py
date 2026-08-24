@@ -7,9 +7,9 @@ import rclpy
 from tf2_msgs.msg import TFMessage
 from geometry_msgs.msg import TransformStamped
 
-from scripts.deploy.NatNetClient import NatNetClient
-import scripts.deploy.intercept_common as ic
-from scripts.deploy.drone import Drone
+from NatNetClient import NatNetClient
+import intercept_common as ic
+from drone import Drone
 
 
 def _detect_local_ip_for_server(server_ip: str) -> str:

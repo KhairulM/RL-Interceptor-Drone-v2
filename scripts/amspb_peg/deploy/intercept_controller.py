@@ -16,7 +16,10 @@ import numpy as np
 import torch
 
 import scripts.deploy.intercept_common as ic
-import scripts.deploy.intercept_controller_v2 as base_controller
+
+# NOTE: scripts.deploy.intercept_controller_v2 (and its cflib/mocap/ROS deps) is
+# imported lazily inside main() so that the pure-torch observation/command logic
+# in this module can be imported and unit-tested outside the Crazyswarm runtime.
 
 
 class PursuitObservationBuilder:
@@ -79,7 +82,27 @@ class PursuitObservationBuilder:
         pursuer_lin_vel = torch.as_tensor(pursuer.lin_vel, dtype=torch.float32, device=self.device).view(1, 3)
         pursuer_ang_vel = torch.as_tensor(pursuer.ang_vel, dtype=torch.float32, device=self.device).view(1, 3)
         evader_pos = torch.as_tensor(evader.pos, dtype=torch.float32, device=self.device).view(1, 3)
+        evader_quat = torch.as_tensor(evader.quat_wxyz, dtype=torch.float32, device=self.device).view(1, 4)
         evader_lin_vel = torch.as_tensor(evader.lin_vel, dtype=torch.float32, device=self.device).view(1, 3)
+
+        # -- Reference-frame alignment with Pursuit training --------------------
+        # `DroneState.lin_vel` is the Crazyflie kalman.statePX/PY/PZ estimate, which
+        # is expressed in the *body* frame (same convention the Intercept task feeds
+        # to the network as `drone.vel_b`). Pursuit, however, observes *world*-frame
+        # linear velocity (`drone.vel_w`, via `split_state`) and a world-frame
+        # closing velocity, so we rotate body->world with the body-to-world rotation
+        # matrix R (columns = body axes in world). `DroneState.ang_vel` comes from
+        # the gyro and is already body-frame, matching Pursuit's
+        # `body_rates = quat_rotate_inverse(rot, ang_vel_world)`.
+        #
+        # NOTE: we deliberately do *not* use `ic.quat_rotate_inverse` here for the
+        # body<->world mapping. The rotation matrix R from
+        # `quaternion_to_rotation_matrix` is verified body->world, keeping this path
+        # independent of any frame convention in the shared helper.
+        pursuer_rot_bw = ic.quaternion_to_rotation_matrix(pursuer_quat).reshape(3, 3)
+        evader_rot_bw = ic.quaternion_to_rotation_matrix(evader_quat).reshape(3, 3)
+        pursuer_lin_vel_world = (pursuer_rot_bw @ pursuer_lin_vel.view(3, 1)).view(1, 3)
+        evader_lin_vel_world = (evader_rot_bw @ evader_lin_vel.view(3, 1)).view(1, 3)
 
         rel_pos = evader_pos - pursuer_pos
         self._seed_histories(rel_pos, pursuer_pos)
@@ -111,7 +134,8 @@ class PursuitObservationBuilder:
             obs.append(torch.norm(rel_norm, dim=-1, keepdim=True))
 
         if self.include_closing_velocity:
-            closing_velocity = -(pursuer_lin_vel - evader_lin_vel) / self.k_v
+            # Training: -(self.lin_vel - v_evader) / K_V, both in the world frame.
+            closing_velocity = -(pursuer_lin_vel_world - evader_lin_vel_world) / self.k_v
             obs.append(closing_velocity)
 
         error_pos_unit = rel_pos / (torch.norm(rel_pos, dim=-1, keepdim=True) + 1e-6)
@@ -128,20 +152,32 @@ class PursuitObservationBuilder:
         pos_norm = (pursuer_pos - self.arena_center) / self.k_p
         obs.append(pos_norm[..., 2:3])
 
-        rot_matrix = ic.quaternion_to_rotation_matrix(pursuer_quat).reshape(1, 9)
-        obs.append(rot_matrix)
-        obs.append(pursuer_lin_vel / self.k_v)
+        obs.append(pursuer_rot_bw.reshape(1, 9))
+        # Training observes world-frame linear velocity (drone.vel_w / K_V).
+        obs.append(pursuer_lin_vel_world / self.k_v)
 
         if self.use_body_rates:
-            body_rates = ic.quat_rotate_inverse(pursuer_quat, pursuer_ang_vel)
-            obs.append(body_rates / self.k_omega)
-        else:
+            # The gyro already reports body-frame rates, which is exactly the
+            # training body_rates = quat_rotate_inverse(rot, ang_vel_world).
             obs.append(pursuer_ang_vel / self.k_omega)
+        else:
+            # Training's use_body_rates=False branch observes world-frame angular
+            # velocity (the raw drone.vel_w angular component).
+            ang_vel_world = (pursuer_rot_bw @ pursuer_ang_vel.view(3, 1)).view(1, 3)
+            obs.append(ang_vel_world / self.k_omega)
 
         if self.include_last_action:
-            if previous_action is None:
-                previous_action = torch.zeros(4, dtype=torch.float32, device=self.device)
-            obs.append(previous_action.view(1, -1).to(self.device, dtype=torch.float32))
+            # Under the AMSPBRateController transform, Pursuit stores the
+            # *post-transform rotor commands* as prev_action (the transform
+            # replaces ("agents","action") before _pre_sim_step). The deploy only
+            # has the 4D CTBR action, so feeding it here would silently mismatch
+            # training. Refuse rather than fly on a wrong observation.
+            raise NotImplementedError(
+                "include_last_action is not supported for AMSPB rate deployment: "
+                "training observes post-transform rotor commands, which are not "
+                "reconstructable from the CTBR action. Retrain with "
+                "include_last_action=false or extend the builder."
+            )
 
         if self.include_effort:
             obs.append(torch.zeros(1, 1, dtype=torch.float32, device=self.device))
@@ -229,6 +265,8 @@ def main(argv=None) -> None:
         help="Artifact directory containing policy_ts.pt and metadata.json. If omitted, reads artifact_dir from config.",
     )
     args = parser.parse_args(argv)
+
+    import scripts.deploy.intercept_controller_v2 as base_controller
 
     config_path = os.path.abspath(os.path.expanduser(args.config))
     artifact_dir = args.artifact_dir

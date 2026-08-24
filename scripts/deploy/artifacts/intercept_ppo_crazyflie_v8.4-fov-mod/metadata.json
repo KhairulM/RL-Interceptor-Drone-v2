@@ -10,16 +10,16 @@
   },
   "notes": {
     "action_transform": "PIDrate",
-    "checkpoint": "../wandb/Intercept-PPO-Crazyflie-v7.10-rot-vel-rel-lin-vel-obs/files/checkpoint_final.pt",
+    "checkpoint": "../wandb/latest-run/files/checkpoint_final.pt",
     "pursuer_model": "Crazyflie",
     "task": "Intercept"
   },
   "obs": {
     "action_dim": 4,
-    "obs_dim": 26,
+    "obs_dim": 23,
     "use_ab_world_frame": false,
     "use_previous_action": true,
-    "use_relative_velocity": true
+    "use_relative_velocity": false
   },
   "sim_dt": 0.01
 }

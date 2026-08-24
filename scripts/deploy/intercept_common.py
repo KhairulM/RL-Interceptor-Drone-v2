@@ -44,7 +44,8 @@ import torch
 # Format identifier written into ``metadata.json`` so the controller can refuse
 # to load artifacts produced by an incompatible exporter.
 # v2: observation reordered and body-rate component made unconditional.
-ARTIFACT_VERSION = 2
+# v3: relative heading is expressed in the pursuer body frame.
+ARTIFACT_VERSION = 3
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +62,8 @@ class ObsConfig:
 
     The component order is fixed by ``Intercept._compute_state_and_obs``:
     altitude/position, rotation matrix, body linear velocity, body angular
-    velocity, relative heading, [relative linear velocity], [previous action].
+    velocity, body-frame relative heading, [relative linear velocity],
+    [previous action].
     """
 
     use_ab_world_frame: bool = False
@@ -265,7 +267,9 @@ def build_observation(
     already expressed in the **body** frame (as returned by
     ``drone.get_state()``), so no further rotation is applied for those.
 
-    Evader velocity (when provided via ``use_relative_velocity``) is expected
+    The relative heading and evader velocity (when provided via
+    ``use_relative_velocity``) are expressed in the pursuer body frame, matching
+    :meth:`Intercept._compute_state_and_obs`. Evader velocity is expected
     in the world frame and *is* rotated into the pursuer body frame before
     computing the relative difference, so that the observation matches what
     training sees (see :meth:`Intercept._compute_state_and_obs`).
@@ -285,7 +289,9 @@ def build_observation(
     Returns:
         ``[..., obs_dim]`` observation tensor.
     """
-    evader_rel_hdg = normalize(evader_pos - pursuer_pos)  # (3)
+    evader_rel_hdg = normalize(quat_rotate_inverse(
+        pursuer_quat_wxyz, evader_pos - pursuer_pos
+    ))  # (3), pursuer body frame
     pursuer_rot = quaternion_to_rotation_matrix(pursuer_quat_wxyz)
     pursuer_rot = pursuer_rot.reshape(*pursuer_rot.shape[:-2], 9)  # (9)
 
@@ -554,10 +560,10 @@ def load_drone_config_from_yaml(path: str, drone_name: str) -> DroneConfig:
 
 @dataclass
 class DroneState:
-    """World-frame drone state with an Isaac-style ``(w, x, y, z)`` quaternion."""
+    """Live drone state with an Isaac-style ``(w, x, y, z)`` quaternion."""
 
     pos: np.ndarray                 # (3,)
     quat_wxyz: np.ndarray           # (4,)
-    lin_vel: np.ndarray             # (3,) body frame
+    lin_vel: np.ndarray             # (3,) world frame
     ang_vel: np.ndarray             # (3,) body frame (rad/s)
     stamp: float                    # seconds (wall clock)

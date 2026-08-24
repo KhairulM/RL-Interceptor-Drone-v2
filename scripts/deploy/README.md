@@ -9,7 +9,7 @@ Because the training stack (Isaac Sim, Python 3.11) and the Crazyswarm2 stack
 
 ```
  ┌─────────────────────────┐        artifact         ┌──────────────────────────┐
- │ export_policy.py         │   policy_ts.pt +        │ intercept_controller.py   │
+ │ export_policy.py         │   policy_ts.pt +        │ intercept_controller_v2.py │
  │ (.venv, Python 3.11,     │──►  metadata.json    ──►│ (.venv-crazyswarm, 3.10,  │
  │  Isaac Sim + torchrl)    │                         │  ROS 2 + torch, no Isaac) │
  └─────────────────────────┘                         └──────────────────────────┘
@@ -19,7 +19,7 @@ Because the training stack (Isaac Sim, Python 3.11) and the Crazyswarm2 stack
    `scripts/play.py` (so it works for *any* RL algorithm — ppo, mappo, happo,
    sac, td3), extract the deterministic actor, and serialise it to a
    self-contained **TorchScript** module plus a small `metadata.json`.
-2. **Deploy** (Crazyswarm2 env): a lightweight ROS 2 node loads that artifact
+2. **Deploy** (Crazyswarm2 env): the lightweight cflib controller loads that artifact
    (only `torch` + `numpy` needed), rebuilds the Intercept observation from live
    drone state, runs the policy, decodes the action into a
    collective-thrust + body-rate (CTBR) command, and streams it to the drone.
@@ -30,7 +30,7 @@ Because the training stack (Isaac Sim, Python 3.11) and the Crazyswarm2 stack
 |---|---|---|
 | [intercept_common.py](intercept_common.py) | both | Pure `torch`/stdlib core: observation construction + CTBR decoding + metadata IO. Mirrors the training code so the two stay in sync. |
 | [export_policy.py](export_policy.py) | `.venv` (3.11) | Load checkpoint, extract deterministic actor, export TorchScript + metadata. |
-| [intercept_controller.py](intercept_controller.py) | `.venv-crazyswarm` (3.10) | ROS 2 node that flies the policy on the Crazyflie. |
+| [intercept_controller_v2.py](intercept_controller_v2.py) | `.venv-crazyswarm` (3.10) | cflib controller that flies the policy on the Crazyflie. |
 | [test_intercept_common.py](test_intercept_common.py) | any env with `torch` | Unit tests for the observation/CTBR math. |
 
 ## Step 1 — Export the policy (Isaac `.venv`)
@@ -54,6 +54,9 @@ Notes:
   `task.observation.include_evader_rel_lin_vel`,
   `task.observation.include_previous_action`). The exporter records these in
   `metadata.json` and the controller enforces them.
+- Re-export after changing the relative-heading frame. Current Intercept
+  artifacts use metadata version 3, where the target heading is in the
+  pursuer body frame; older artifacts are intentionally rejected.
 - The exporter numerically validates the TorchScript trace against the eager
   policy before writing it; a mismatch aborts the export.
 
@@ -79,37 +82,32 @@ export PYTHONPATH="$VIRTUAL_ENV/lib/python3.10/site-packages:$PYTHONPATH"
 # torch + numpy must be available in .venv-crazyswarm:
 #   pip install torch numpy   # CPU wheels are sufficient
 
-python deploy/intercept_controller.py --ros-args \
-    -p artifact_dir:=deploy/artifacts/intercept_ppo \
-    -p pursuer_name:=cf1 \
-    -p evader_source:=scripted
+python scripts/deploy/intercept_controller_v2.py \
+  --config scripts/deploy/config_v2.yaml
 ```
 
-**Take off first.** The policy assumes the pursuer is already airborne (it was
-trained spawning at ~1.6 m). Take off with your usual Crazyswarm2 tooling before
-starting this node, or extend the node to call the `takeoff` service.
+The controller connects, arms, and takes off both configured drones. Set the
+artifact directory, radio URIs, mocap settings, and evader behavior in the YAML
+configuration before running it.
 
 ### Key parameters
 
 | Parameter | Default | Meaning |
 |---|---|---|
 | `artifact_dir` | *(required)* | Folder with `policy_ts.pt` + `metadata.json`. |
-| `pursuer_name` | `cf1` | Crazyflie name (topic namespace) of the interceptor. |
-| `evader_name` | `cf2` | Name of the target Crazyflie (when `evader_source=cf`). |
-| `evader_source` | `scripted` | `scripted` (internal trajectory) or `cf` (read `/<evader>/pose`). |
-| `command_mode` | `attitude` | `attitude` (`cmd_vel_legacy`) or `fullstate` (experimental). |
-| `pursuer_pose_topic` | `/<pursuer>/pose` | Source of pursuer pose (`geometry_msgs/PoseStamped`). |
-| `evader_pose_topic` | `/<evader>/pose` | Source of evader pose. |
-| `evader_speed` / `evader_start` / `evader_dir` | `3.0` / `[3,0,1.6]` / `[1,0,0]` | Scripted evader motion. |
-| `max_tilt_deg` | `30` | Attitude-setpoint clamp (attitude backend). |
+| `controller.evader_source` | `cf` | `cf` for a tracked target or `scripted` for generated motion. |
+| `controller.evader_motion.type` | `hover` | `hover`, `linear`, or Intercept-aligned turning `random`; CSV `trajectory` remains available for legacy use. |
+| `controller.control_dt` | `0.02` | Policy and evader-motion period in seconds. |
+| `controller.takeoff_height` | `1.0` | Takeoff height for both drones in metres. |
+| `pursuer.uri` / `evader.uri` | *(config)* | cflib radio or CrazySim UDP URI. |
 | `min_altitude` | `0.15` | Safety cutoff (mirrors the training "misbehave" floor). |
 | `state_timeout` | `0.5` | Stop the drone if pose is stale for this long (s). |
-| `vel_lpf` | `0.4` | Low-pass factor for finite-difference velocity. |
 
-The pursuer's **body-frame linear velocity** comes from the on-board Kalman
-filter (`kalman.statePX/Y/Z`) and its **body rates** from the gyro; both are
-always part of the observation. The evader's world-frame velocity is only
-needed when the policy's `metadata.json` enables `use_relative_velocity`.
+The controller rotates the on-board Kalman **world-frame** velocity
+(`kalman.statePX/Y/Z`) into the pursuer body frame before building the policy
+observation. Its body rates come directly from the gyro; both are always part
+of the observation. The evader's world-frame velocity is only needed when the
+policy's `metadata.json` enables `use_relative_velocity`.
 
 ## Command fidelity (important)
 
@@ -118,28 +116,10 @@ rates `[roll_rate, pitch_rate, yaw_rate]` (deg/s). The decoding in
 `decode_action_to_ctbr` reproduces the training-time `PIDRateController`
 transform exactly.
 
-However, Crazyswarm2's cflib backend does **not** expose a native body-rate
-setpoint. The available streaming topics are:
-
-- `cmd_vel_legacy` (`geometry_msgs/Twist`) → attitude (roll/pitch **angles**),
-  yaw-rate, thrust;
-- `cmd_full_state`, `cmd_hover`, `cmd_position`, `cmd_velocity_world`.
-
-So the last-mile command is an **approximation**:
-
-- `attitude` (default): integrates the roll/pitch **rate** commands one control
-  step ahead of the measured attitude and sends the result as an attitude
-  setpoint via `cmd_vel_legacy`; yaw-rate and thrust pass through natively. This
-  works with a stock Crazyswarm2 + CrazySim install but is not a perfect
-  reproduction of the trained rate-control interface.
-- `fullstate` (experimental): forwards the body rates as the `omega`
-  feed-forward of `cmd_full_state` while holding position — for experimentation
-  only.
-
-For a **faithful** deployment, use a CrazySim / firmware build that accepts CTBR
-directly and add a `CommandBackend` that publishes to it. The `CommandBackend`
-abstraction in [intercept_controller.py](intercept_controller.py) is the single
-place to plug this in — no other code needs to change.
+The v2 controller uses cflib's low-level `send_setpoint` command directly. Its
+setup selects Crazyflie rate mode for roll and pitch, then sends the decoded
+roll, pitch, yaw rates and collective thrust. Confirm `rate_sign` and firmware
+rate-mode behavior on a restrained test before flight.
 
 ## Testing the core
 

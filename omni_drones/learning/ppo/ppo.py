@@ -41,6 +41,7 @@ from ..utils.valuenorm import ValueNorm1
 from ..modules.distributions import IndependentNormal
 from .common import GAE
 
+
 @dataclass
 class PPOConfig:
     name: str = "ppo"
@@ -57,6 +58,7 @@ class PPOConfig:
     priv_critic: bool = False
 
     checkpoint_path: Union[str, None] = None
+
 
 cs = ConfigStore.instance()
 cs.store("ppo", node=PPOConfig, group="algo")
@@ -88,12 +90,12 @@ class Actor(nn.Module):
 class PPOPolicy(TensorDictModuleBase):
 
     def __init__(
-        self,
-        cfg: PPOConfig,
-        observation_spec: Composite,
-        action_spec: Composite,
-        reward_spec: TensorSpec,
-        device):
+            self,
+            cfg: PPOConfig,
+            observation_spec: Composite,
+            action_spec: Composite,
+            reward_spec: TensorSpec,
+            device):
         super().__init__()
         self.cfg = cfg
         self.device = device
@@ -121,7 +123,7 @@ class PPOPolicy(TensorDictModuleBase):
                 )
             )
         else:
-            actor_module=TensorDictModule(
+            actor_module = TensorDictModule(
                 nn.Sequential(make_mlp([256, 256, 256]), Actor(self.action_dim)),
                 [("agents", "observation")], ["loc", "scale"]
             )

@@ -88,10 +88,16 @@ def _build_metadata(cfg, base_env, obs_dim: int, action_dim: int, role: str) -> 
     if controller is None:
         raise RuntimeError("Failed to find base_env.cont_pursuer while building metadata.")
 
+    # AMSPBRateController maps the policy's 4D action as
+    #   body_rate = target_rate * pi         (rad/s, i.e. *180 deg/s -> target_clip=1.0)
+    #   thrust    = ((target_thrust + 1)/2).clip(0.) * max_thrust   (no upper clip)
+    # so the faithful decode uses target_clip=1.0, min_thrust_ratio=0.0 and
+    # max_thrust_ratio=1.0. Operators may lower max_thrust_ratio in metadata.json
+    # as a hardware safety cap (thrust is the primary sim-to-real scaling knob).
     ctbr_cfg = ic.CTBRConfig(
         target_clip=float(getattr(controller, "target_clip", 1.0)),
         min_thrust_ratio=float(getattr(controller, "min_thrust_ratio", 0.0)),
-        max_thrust_ratio=float(getattr(controller, "max_thrust_ratio", 0.9)),
+        max_thrust_ratio=float(getattr(controller, "max_thrust_ratio", 1.0)),
         lpf_coef=float(getattr(controller, "LPF_coef", 1.0)),
         dt=float(cfg.sim.dt),
     )

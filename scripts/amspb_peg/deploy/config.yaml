@@ -1,0 +1,87 @@
+# AMSPB Pursuit (pursuer) deploy configuration.
+#
+# Runtime settings for scripts/amspb_peg/deploy/intercept_controller.py.
+# The observation layout, normalization constants (K_P/K_V/K_OMEGA/K_RP),
+# arena_center, and the CTBR decode parameters all live in the exported
+# artifact's metadata.json (produced by export_policy.py) -- NOT here.
+#
+# Run (from this directory, so the relative artifact_dir resolves):
+#   python -m scripts.amspb_peg.deploy.intercept_controller --config scripts/amspb_peg/deploy/config.yaml
+# or from repo root with an explicit --artifact-dir.
+
+# Folder with policy_ts.pt + metadata.json. Default export path from
+# export_policy.py is artifacts/pursuit_ppo_pursuer (task_algo_role, lowercased).
+artifact_dir: scripts/amspb_peg/deploy/artifacts/pursuit_ppo_pursuer
+
+# -- Controller runtime -----------------------------------------------------
+controller:
+  evader_source: cf            # cf (real tracked target) | scripted (commanded motion only).
+  control_dt: 0.02             # Policy step period (s). 0 = use pursuer/policy dt. Pursuit trains at sim.dt.
+  takeoff_height: 1.0          # Takeoff height for both drones (m). See README re: arena scale.
+  takeoff_duration: 3.0        # Takeoff duration for both drones (s).
+  state_timeout: 0.5           # Stop if pursuer state is stale this long (s).
+  min_altitude: 0.15           # Safety cutoff altitude (m).
+  log_commands: true           # Print decoded CTBR commands + pursuer/evader distance.
+  publish_tf: false            # Also publish mocap poses on the ROS 2 /tf tree.
+  mocap_world_frame: world     # Parent frame id for published TF transforms.
+  evader_motion:
+    type: hover                # hover | linear | random | trajectory (legacy CSV). Start with hover for first flights.
+    yaw_deg: 0.0               # Yaw command for evader position setpoints (deg).
+    anchor: [1.0, 0.0, 1.0]    # Initial position / hover point [x, y, z] (m).
+    trajectory_file: 'trajectories/linear_y.csv'  # CSV path (absolute or relative to this config).
+    trajectory_loop: true      # Loop the trajectory when reaching the end.
+    linear:
+      speed: 0.25              # Constant speed (m/s).
+      direction: [1.0, 0.0, 0.0]  # World-frame travel direction; normalized at load.
+    random:
+      speed: 0.25              # Random-motion speed (m/s).
+      turn_interval_range: [20, 80]  # Controller ticks between heading changes.
+      vertical_component_range: [-0.5, 0.5]  # Sampled z component before normalization.
+      target_lookahead: 0.5    # Position-controller target lead distance (s).
+      seed: null               # Optional RNG seed for repeatable random motion.
+
+# -- Pursuer drone config ----------------------------------------------------
+pursuer:
+  name: pursuer
+  # uri: radio://0/40/2M/E7E7E7E701      # Crazyflie URI of the pursuer.
+  uri: udp://127.0.0.1:19850
+  cache_dir: ./cache-pursuer            # cflib read/write cache directory.
+  control_dt: 0.02                      # 0 = use the policy's training dt.
+  log_period_ms: 20                     # Log body rates + thrust every N ms (0 = disable).
+  max_thrust_pwm: 65535.0               # Upper clamp on commanded thrust (0..65535).
+  rate_sign: [1.0, 1.0, 1.0]            # Per-axis sign flips: [roll, pitch, yaw].
+  state_timeout: 0.1                    # Stop if state is stale this long (s).
+  min_altitude: 0.1                     # Safety cutoff altitude (m).
+
+# -- Evader drone config -----------------------------------------------------
+evader:
+  name: evader
+  # uri: radio://1/80/2M/E7E7E7E702      # Evader Crazyflie URI (when source == cf).
+  uri: udp://127.0.0.1:19851
+  cache_dir: ./cache-evader             # cflib read/write cache directory.
+  control_dt: 0.02
+  log_period_ms: 20
+  max_thrust_pwm: 65535.0
+  rate_sign: [1.0, 1.0, 1.0]
+
+# -- Trajectory logging ------------------------------------------------------
+trajectory:
+  save: true
+  dir: ./trajectory_logs
+  prefix: pursuit
+
+# -- Motion capture (OptiTrack / NatNet) -------------------------------------
+mocap:
+  enabled: true
+  server_ip: 192.168.0.210              # Motive/NatNet server IP.
+  local_ip: ""                          # Local NIC IP for multicast ("" = auto-detect).
+  multicast_address: 239.255.42.99      # NatNet multicast group address.
+  command_port: 1510
+  data_port: 1511
+  # Body-frame correction quaternion [qx, qy, qz, qw] mapping Motive -> ROS FLU.
+  body_to_flu_quat_xyzw: [0.0, 0.0, -0.7071067811865476, 0.7071067811865476]
+  pursuer_rigid_body_id: 31
+  evader_rigid_body_id: 32
+  mocap_send_rate_hz: 60.0
+  world_frame: world
+  orientation_align_time: 2.0           # Time to align mocap orientation with EKF (s).

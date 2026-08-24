@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from .single import Hover, Track, FlyThrough, Intercept
+from .single import Hover, Track, FlyThrough, Intercept, Pursuit, Evasion
 from .multi import InterceptCompetitive
 from .payload import PayloadHover, PayloadTrack, PayloadFlyThrough
 from .inv_pendulum import InvPendulumHover, InvPendulumTrack, InvPendulumFlyThrough

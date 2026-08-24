@@ -14,6 +14,18 @@ max_iters: -1
 eval_interval: -1
 save_interval: -1
 seed: 0
+frames_per_batch: 32
+
+camera_record:
+  enabled: false
+  # Requires headless=false because camera annotators update while rendering.
+  output_dir: outputs/play
+  filename: null
+  env_index: 0
+  # 0 derives playback FPS from the collector batch cadence and simulation dt.
+  fps: 0
+  # 0 records every available frame; set a positive limit for short clips.
+  max_frames: 0
 
 # Optional path to a checkpoint (state_dict) to load before rollout in play.py.
 # Override on the CLI with `checkpoint=/path/to/checkpoint_final.pt`.

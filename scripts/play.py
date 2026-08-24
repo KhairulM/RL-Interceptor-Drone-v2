@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 import re
+from typing import List
 
 import hydra
 import torch
@@ -40,6 +41,25 @@ class _NoOpRun:
 
     def log(self, *args, **kwargs):
         return None
+
+
+def _write_camera_video(frames: List[torch.Tensor], output_path: str, fps: float) -> None:
+    if not frames:
+        raise RuntimeError(
+            "Camera recording was enabled but no RGB frames were captured. "
+            "Run with headless=false and task.pursuer.camera.enabled=true."
+        )
+
+    try:
+        from torchvision.io import write_video
+    except ModuleNotFoundError as err:
+        raise ModuleNotFoundError(
+            "Camera video recording requires torchvision with video support."
+        ) from err
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    video = torch.stack(frames)
+    write_video(output_path, video, fps=max(1, int(round(fps))))
 
 
 def _resolve_existing_path(path: str, expect: str):
@@ -344,6 +364,41 @@ def main(cfg):
     total_frames = int(cfg.get("total_frames", -1))
     max_iters = int(cfg.get("max_iters", -1))
 
+    camera_record_cfg = cfg.get("camera_record", {})
+    record_camera = bool(camera_record_cfg.get("enabled", False))
+    camera_frames: List[torch.Tensor] = []
+    camera_env_index = int(camera_record_cfg.get("env_index", 0))
+    camera_max_frames = int(camera_record_cfg.get("max_frames", 0))
+    camera_video_path = None
+    camera_video_fps = 0.0
+    if record_camera:
+        if bool(cfg.headless):
+            raise ValueError(
+                "camera_record.enabled=true requires headless=false so the camera renders."
+            )
+        if not getattr(base_env, "use_camera", False):
+            raise ValueError(
+                "camera_record.enabled=true requires task.pursuer.camera.enabled=true."
+            )
+        if not 0 <= camera_env_index < base_env.num_envs:
+            raise ValueError(
+                f"camera_record.env_index must be in [0, {base_env.num_envs}), "
+                f"got {camera_env_index}."
+            )
+
+        output_dir = os.path.expanduser(str(camera_record_cfg.get("output_dir", "outputs/play")))
+        if not os.path.isabs(output_dir):
+            output_dir = os.path.join(FILE_PATH, output_dir)
+        filename = camera_record_cfg.get("filename", None)
+        if not filename:
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"pursuer_camera_{timestamp}.mp4"
+        camera_video_path = os.path.join(output_dir, str(filename))
+
+        steps_per_capture = max(frames_per_batch / base_env.num_envs, 1)
+        inferred_fps = 1.0 / (steps_per_capture * float(cfg.sim.dt) * int(cfg.sim.substeps))
+        camera_video_fps = float(camera_record_cfg.get("fps", 0.0)) or inferred_fps
+
     if total_frames <= 0 and max_iters <= 0:
         logging.warning(
             "Both total_frames and max_iters are unset/non-positive; defaulting max_iters=1 for a finite play run."
@@ -391,6 +446,16 @@ def main(cfg):
             info = {}
             episode_stats.add(data.to_tensordict())
 
+            if record_camera and (camera_max_frames <= 0 or len(camera_frames) < camera_max_frames):
+                images = base_env.get_pursuer_images()
+                if images is not None:
+                    frame = images["rgb"][camera_env_index][:3].permute(1, 2, 0)
+                    if frame.is_floating_point():
+                        frame = (frame.clamp(0.0, 1.0) * 255.0).to(torch.uint8)
+                    else:
+                        frame = frame.to(torch.uint8)
+                    camera_frames.append(frame.cpu())
+
             if len(episode_stats) >= base_env.num_envs:
                 stats = {
                     "play/" + (".".join(k) if isinstance(k, tuple) else k): torch.mean(v.float()).item()
@@ -414,6 +479,14 @@ def main(cfg):
 
             if max_iters > 0 and i >= max_iters - 1:
                 break
+
+    if record_camera:
+        assert camera_video_path is not None
+        _write_camera_video(camera_frames, camera_video_path, camera_video_fps)
+        logging.info(
+            "Wrote %d pursuer-camera frames to %s at %.2f FPS.",
+            len(camera_frames), camera_video_path, camera_video_fps,
+        )
 
     avg_info = {
         f"play/avg.{k[5:]}": running_sum[k] / max(running_count[k], 1)

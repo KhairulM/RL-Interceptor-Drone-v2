@@ -11,8 +11,8 @@ env: ${task.env}
 
 total_frames: 1_048_576_000 # if possible, divisible by num_envs * algo.train_every
 max_iters: -1
-eval_interval: -1
-save_interval: -1
+eval_interval: 1000
+save_interval: 1000
 seed: 0
 
 # Optional path to a checkpoint (state_dict) to load before rollout in play.py.

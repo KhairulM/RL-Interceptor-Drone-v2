@@ -81,7 +81,7 @@ def main(cfg, simulation_app=None):
 
         else:
             raise NotImplementedError(f"Unknown action transform: {action_transform}")
-
+    print(f"Using action transform: {action_transform}")
     env = TransformedEnv(base_env, Compose(*transforms)).train()
     env.set_seed(cfg.seed)
 

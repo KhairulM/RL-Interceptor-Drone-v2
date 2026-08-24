@@ -1,0 +1,8 @@
+# FRPN pursuit controller parameters for Crazyflie 2.x
+# Adapted from hummingbird - G/W are proportional-navigation gains, so they
+# transfer directly. max_speed reduced for Crazyflie's lower thrust-to-weight
+# ratio (~1.4x vs ~2-3x for larger drones), matching the repel_evade_crazyflie
+# scaling (8.0 -> 3.0).
+G: 5.0
+W: 0.20
+max_speed: 3.0
