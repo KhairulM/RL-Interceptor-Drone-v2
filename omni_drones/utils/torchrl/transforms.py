@@ -267,7 +267,7 @@ class RateController(Transform):
     def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
         drone_state = tensordict[("info", "drone_state")][..., :13]
         action = tensordict[self.action_key]
-
+        action = torch.tanh(action)  # action: [-1, 1]
         # First-order action error (norm of action delta), mirroring
         # PIDRateController so downstream tasks (e.g. Intercept) can read the
         # ("stats", "action_error_order1") and ("info", "prev_action") keys.
@@ -383,7 +383,7 @@ class PIDRateController(Transform):
         prev_ctbr_action = tensordict[("info", "prev_action")]
 
         # LPF
-        ctbr_action = self.LPF_coef * ctbr_action + (1.0 - self.LPF_coef) * prev_ctbr_action
+        # ctbr_action = self.LPF_coef * ctbr_action + (1.0 - self.LPF_coef) * prev_ctbr_action
 
         # action error
         action_error = torch.norm(ctbr_action - prev_ctbr_action, dim=-1)

@@ -263,9 +263,9 @@ def _build_rl_policy(cfg, env, base_env):
             raise RuntimeError(
                 f"Checkpoint observation dim does not match the current env config.\n"
                 f"This usually means the checkpoint was trained with a different\n"
-                f"observation layout (e.g., include_previous_action=true vs false).\n\n"
+                f"observation layout (e.g., use_previous_action=true vs false).\n\n"
                 f"Try overriding the flag to match the checkpoint:\n"
-                f"  evaluate.py ... task.observation.include_previous_action=false\n"
+                f"  evaluate.py ... task.observation.use_previous_action=false\n"
             ) from e
         policy.load_state_dict(state, strict=False)
 

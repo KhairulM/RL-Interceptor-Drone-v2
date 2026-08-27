@@ -184,8 +184,8 @@ def build_metadata(cfg, base_env, obs_dim: int, action_dim: int) -> ic.PolicyMet
 
     obs_cfg = ic.ObsConfig(
         use_ab_world_frame=bool(obs_cfg.get("use_world_frame_pos", False)),
-        use_relative_velocity=bool(obs_cfg.get("include_evader_rel_lin_vel", False)),
-        use_previous_action=bool(obs_cfg.get("include_previous_action", True)),
+        use_relative_velocity=bool(obs_cfg.get("use_evader_rel_lin_vel", False)),
+        use_previous_action=bool(obs_cfg.get("use_previous_action", True)),
         obs_dim=obs_dim,
         action_dim=action_dim,
     )

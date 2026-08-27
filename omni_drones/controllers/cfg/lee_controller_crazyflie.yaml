@@ -5,7 +5,13 @@
 # controller, so they act as torque gains and are scaled by the Crazyflie's tiny
 # inertia (Ixx=Iyy=1.4e-5, Izz=2.17e-5) to keep the same closed-loop attitude
 # bandwidth as the (proven-stable) Hummingbird tuning.
-position_gain: [6, 6, 6]
-velocity_gain: [4, 4, 4]
-attitude_gain: [0.0014, 0.0014, 0.000063]
-angular_rate_gain: [0.0002, 0.0002, 0.000045]
+# Tuned for the real CF2 actuator lag (rotor time_constant ~0.145 s, pole
+# ~6.9 rad/s). The cascade needs timescale separation the original tuning
+# lacked: attitude loop ~3.5 rad/s (below the actuator pole), position loop
+# ~1 rad/s (well below attitude). Gains = omega_n^2 (P) and 2*zeta*omega_n (D),
+# with the attitude/rate gains pre-multiplied by inertia (Ixx=Iyy=1.68e-5,
+# Izz=2.98e-5) since the controller divides them back out.
+position_gain: [2.0, 2.0, 5.0]
+velocity_gain: [3.0, 3.0, 5.0]
+attitude_gain: [0.00034, 0.00034, 0.0006]
+angular_rate_gain: [0.00016, 0.00016, 0.00027]

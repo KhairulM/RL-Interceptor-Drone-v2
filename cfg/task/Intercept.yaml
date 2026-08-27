@@ -22,23 +22,20 @@ success_radius_eval: 0.1
 reset_thres: 9.0
 minimum_altitude: 0.1
 
+reward_delta_distance_weight: 10.0
+reward_action_smoothness_weight: 0.2
+reward_precision_weight: 10.0
+reward_precision_scale: 5.0
+reward_fov_weight: 0.5
+reward_action_body_rate_weight: 0.2
+reward_terminal_weight: 100.0
+
+reward_action_norm_weight: 0.5
 reward_distance_scale: 0.8
 reward_approach_velocity_weight: 1.0
 reward_heading_alignment_weight: 1.0
-reward_delta_distance_weight: 10.0
-reward_terminal_weight: 100.0
-reward_action_smoothness_weight: 0.2
-reward_action_norm_weight: 0.5
-# Potential-difference precision reward: pays for closing distance, zero when orbiting.
-reward_precision_weight: 10.0
-reward_precision_scale: 5.0
-# Terminal precision reward: pays for being close to the target at the end of the episode.
 reward_terminal_precision_weight: 150.0
 reward_terminal_precision_scale: 5.0
-# FOV reward: +weight when the evader is inside the pursuer camera's field of
-# view, -weight when outside (symmetric magnitude; set to 0 to disable).
-reward_fov_weight: 0.5
-reward_action_body_rate_weight: 0.5
 
 observation:
   include_noise: false
@@ -53,6 +50,10 @@ reward:
   use_precision: true
   use_action_smoothness: true
   use_action_body_rate: true
+  use_action_norm: false
+  use_approach_velocity: false
+  use_heading_alignment: false
+  use_terminal_precision: false
   use_fov: false
 
 action_transform: PIDrate
@@ -61,19 +62,16 @@ action_transform: PIDrate
 pursuer:
   model: Crazyflie
   controller: PIDRateController
-  # model: Hummingbird
-  # controller: RateController
   spawn_pos_range:
     min: [-0.5, -0.5, 0.5]
     max: [0.5, 0.5, 5.0]
   spawn_rpy_range:
     min: [-0.33, -0.33, -1.0]
     max: [0.33, 0.33, 1.0]
-  target_speed: 3.0
-  initial_velocity:
-    enabled: true
-    min: [-2.0, -2.0, -2.0, -0.4, -0.4, -0.4]
-    max: [2.0, 2.0, 2.0, 0.4, 0.4, 0.4]
+  spawn_vel_range:
+    min: [-1.0, -1.0, -1.0, -0.2, -0.2, -0.2]
+    max: [1.0, 1.0, 1.0, 0.2, 0.2, 0.2]
+  target_speed: 3.0 # only used for approach velocity reward
   # Forward-facing RGB camera rigidly mounted on the pursuer's base_link.
   # Disabled by default: spawning one render camera per env is expensive, so
   # only enable it for a small num_envs (visualization / data collection).
@@ -87,34 +85,42 @@ pursuer:
 
 evader:
   model: Crazyflie
-  # model: Hummingbird
   controller: LeePositionController
-  speed_range: [0.0, 6.0]
-  spawn_distance_range: [0.5, 7.0]
   trajectory_types: [hover, linear, random] # for training
   # trajectory_types: [random] # for evaluation
+  speed_range: [0.0, 6.0]
+  # Evader spawns in a random direction from the pursuer at a uniform distance.
+  spawn_distance_range: [0.5, 7.0]
+  spawn_rpy_range:
+    min: [-0.05, -0.05, -1.0]
+    max: [0.05, 0.05, 1.0]
+  # spawn_rpy_range:
+  #   min: [0.0, 0.0, -1.0]
+  #   max: [0.0, 0.0, 1.0]
+  spawn_vel_range:
+    min: [-0.3, -0.3, -0.3, -0.1, -0.1, -0.1]
+    max: [0.3, 0.3, 0.3, 0.1, 0.1, 0.1]
+  # spawn_vel_range:
+  #   min: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  #   max: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
   random:
     turn_interval_range: [20, 80]
     vertical_component_range: [-0.5, 0.5]
     target_lookahead: 0.5
-  frpn:
-    gain: 5.0
-    position_blend: 0.2
-    min_relative_speed: 0.1
-    max_time_to_go: 2.0
-    target_lookahead: 0.5
-    max_speed: 3.0
-  apf:
-    pursuer_gain: 1.0
-    pursuer_power: 3.0
-    containment_radius: 3.5
-    containment_gain: 1.0
-    target_lookahead: 0.5
-    max_speed: 3.0
-  initial_velocity:
-    enabled: true
-    min: [-2.0, -2.0, -2.0, -0.4, -0.4, -0.4]
-    max: [2.0, 2.0, 2.0, 0.4, 0.4, 0.4]
+  # frpn:
+  #   gain: 5.0
+  #   position_blend: 0.2
+  #   min_relative_speed: 0.1
+  #   max_time_to_go: 2.0
+  #   target_lookahead: 0.5
+  #   max_speed: 3.0
+  # apf:
+  #   pursuer_gain: 1.0
+  #   pursuer_power: 3.0
+  #   containment_radius: 3.5
+  #   containment_gain: 1.0
+  #   target_lookahead: 0.5
+  #   max_speed: 3.0
 
 # Domain randomization for the RL-controlled pursuer.
 randomization:

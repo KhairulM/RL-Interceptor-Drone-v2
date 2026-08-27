@@ -220,6 +220,24 @@ class MultirotorBase(RobotBase):
         # self.jerk = torch.zeros(*self.shape, 6, device=self.device)
         self.alpha = 0.9
 
+        # Force the simulated body mass/inertia to the model yaml's values so the
+        # physics matches what the controllers are tuned for (and the real
+        # hardware we deploy on), instead of whatever the USD happens to bake in.
+        yaml_mass = self.params.get("mass", None)
+        if yaml_mass is not None:
+            self.base_link.set_masses(
+                torch.full_like(self.base_link.get_masses(), float(yaml_mass))
+            )
+
+        yaml_inertia = self.params.get("inertia", None)
+        if yaml_inertia is not None:
+            diag = torch.tensor(
+                [yaml_inertia["xx"], yaml_inertia["yy"], yaml_inertia["zz"]],
+                device=self.device,
+            )
+            inertias = diag.expand(*self.shape, 3)
+            self.base_link.set_inertias(torch.diag_embed(inertias).flatten(-2))
+
         self.masses = self.base_link.get_masses().clone()
         self.gravity = self.masses * 9.81
         self.inertias = self.base_link.get_inertias().reshape(

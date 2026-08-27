@@ -51,8 +51,8 @@ Notes:
   extraction: `ppo`, `mappo`, `happo`, `sac`, `td3` (and their aliases).
 - Use the **same** task overrides you trained/evaluated with if they change the
   observation layout (`task.observation.use_world_frame_pos`,
-  `task.observation.include_evader_rel_lin_vel`,
-  `task.observation.include_previous_action`). The exporter records these in
+  `task.observation.use_evader_rel_lin_vel`,
+  `task.observation.use_previous_action`). The exporter records these in
   `metadata.json` and the controller enforces them.
 - Re-export after changing the relative-heading frame. Current Intercept
   artifacts use metadata version 3, where the target heading is in the

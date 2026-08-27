@@ -30,11 +30,16 @@ use_drag: true
 drag_coef: 0.461
 rotor_configuration:
   # original arm lengths: [0.043, 0.043, 0.043, 0.043]
+  # Standard Crazyflie X-quad, index order 45/135/225/315 deg (matches the
+  # cf2x_isaac.usd rotor prims after the primOrder fix). arm_lengths is the
+  # radial hub->rotor distance = sqrt(.031^2 + .031^2) from the USD.
   arm_lengths:
-  - 0.03253
-  - 0.03253
-  - 0.03253
-  - 0.03253
+  - 0.0438
+  - 0.0438
+  - 0.0438
+  - 0.0438
+  # Diagonal same-spin pairs (45/225 and 135/315) -> valid quad, decoupled
+  # roll/yaw. This is the real-CF layout the deployed controller expects.
   directions:
   - -1.0
   - 1.0
@@ -76,11 +81,11 @@ rotor_configuration:
   - 1.386e-10
   num_rotors: 4
   rotor_angles:
-  - 0.78539816
-  - 2.35619449
-  - 3.92699082
-  - 5.49778714
-  time_constant: 0.1452 # CrazySim tau_up/down = 0.1452 s; per-step lag = 1 - exp(-dt/time_constant)
+  - 0.78539816   # 45 deg
+  - 2.35619449   # 135 deg
+  - 3.92699082   # 225 deg
+  - 5.49778714   # 315 deg
+  time_constant: 0.1452 # CrazySim cf2x_L250 tau_up/down; per-step lag = 1 - exp(-dt/time_constant)
   noise_scale: 0.0 # default: 2% noise for rotor speed
 controller_configuration: # invalid
   gain:

@@ -66,15 +66,8 @@ class Intercept(IsaacEnv):
         self.success_radius = self.success_radius_init
         self._update_success_radius()
 
-        self.reward_distance_scale = cfg.task.reward_distance_scale
         self.reset_thres = cfg.task.get("reset_thres", 9.0)
-        self.minimum_altitude = cfg.task.get("minimum_altitude", 0.15)
-
-        self.time_encoding_dim = (
-            cfg.task.observation.get("time_encoding_dim", 0)
-            if cfg.task.observation.get("use_time_encoding", False)
-            else 0
-        )
+        self.minimum_altitude = cfg.task.get("minimum_altitude", 0.1)
 
         self.reward_action_smoothness_weight = cfg.task.get(
             "reward_action_smoothness_weight", 1.0)
@@ -99,6 +92,7 @@ class Intercept(IsaacEnv):
         self.reward_terminal_precision_scale = cfg.task.get(
             "reward_terminal_precision_scale", 5.0)
         self.reward_fov_weight = cfg.task.get("reward_fov_weight", 1.0)
+        self.reward_distance_scale = cfg.task.get("reward_distance_scale", 0.8)
 
         self.pursuer_cfg = cfg.task.pursuer
         self.evader_cfg = cfg.task.evader
@@ -108,22 +102,10 @@ class Intercept(IsaacEnv):
         self.pursuer_model_name = self.pursuer_cfg.get("model", "Hummingbird")
         self.pursuer_controller_name = self.pursuer_cfg.get(
             "controller", "RateController")
-        self.pursuer_target_speed = self.pursuer_cfg.get("target_speed", 3.0)
 
         self.evader_model_name = self.evader_cfg.get("model", "Hummingbird")
         self.evader_controller_name = self.evader_cfg.get(
             "controller", "LeePositionController"
-        )
-        self.evader_spawn_distance_range = self.evader_cfg.get(
-            "spawn_distance_range",
-            [4.0, 7.0],
-        )
-        self.evader_speed_range = self.evader_cfg.get(
-            "speed_range",
-            [2, 15],
-        )
-        self.pursuer_initial_velocity_cfg = self.pursuer_cfg.get(
-            "initial_velocity", {}
         )
 
         # Optional forward-facing RGB camera on the pursuer (see _design_scene).
@@ -131,9 +113,6 @@ class Intercept(IsaacEnv):
         self.use_camera = bool(self.camera_cfg.get("enabled", False))
         self.pursuer_camera = None
         self.pursuer_camera_frames = None
-        self.evader_initial_velocity_cfg = self.evader_cfg.get(
-            "initial_velocity", {}
-        )
 
         # Per-component Gaussian noise stds (sensor-matched defaults).
         noise_cfg = self.obs_cfg.get("noise", {})
@@ -150,7 +129,7 @@ class Intercept(IsaacEnv):
             "random": 2,
         }
 
-        enabled = list(self.evader_cfg.get("trajectory_types", ["linear"]))
+        enabled = list(self.evader_cfg.get("trajectory_types", ["hover"]))
         unknown = [t for t in enabled if t not in self._traj_type_codes]
         if unknown:
             raise ValueError(
@@ -196,43 +175,26 @@ class Intercept(IsaacEnv):
             torch.tensor(self.pursuer_cfg.spawn_rpy_range.min, device=self.device) * torch.pi,
             torch.tensor(self.pursuer_cfg.spawn_rpy_range.max, device=self.device) * torch.pi,
         )
+        self.pursuer_init_vel_dist = D.Uniform(
+            torch.tensor(self.pursuer_cfg.spawn_vel_range.min, device=self.device),
+            torch.tensor(self.pursuer_cfg.spawn_vel_range.max, device=self.device),
+        )
+
         self.evader_speed_dist = D.Uniform(
-            torch.tensor(self.evader_speed_range[0], device=self.device),
-            torch.tensor(self.evader_speed_range[1], device=self.device),
+            torch.tensor(self.evader_cfg.speed_range[0], device=self.device),
+            torch.tensor(self.evader_cfg.speed_range[1], device=self.device),
         )
         self.evader_spawn_distance_dist = D.Uniform(
-            torch.tensor(
-                self.evader_spawn_distance_range[0], device=self.device),
-            torch.tensor(
-                self.evader_spawn_distance_range[1], device=self.device),
+            torch.tensor(self.evader_cfg.spawn_distance_range[0], device=self.device),
+            torch.tensor(self.evader_cfg.spawn_distance_range[1], device=self.device),
         )
-        self.pursuer_initial_velocity_dist = D.Uniform(
-            torch.tensor(
-                self.pursuer_initial_velocity_cfg.get(
-                    "min", [-0.5, -0.5, -0.5, -0.2, -0.2, -0.2]
-                ),
-                device=self.device,
-            ),
-            torch.tensor(
-                self.pursuer_initial_velocity_cfg.get(
-                    "max", [0.5, 0.5, 0.5, 0.2, 0.2, 0.2]
-                ),
-                device=self.device,
-            ),
+        self.evader_init_rpy_dist = D.Uniform(
+            torch.tensor(self.evader_cfg.spawn_rpy_range.min, device=self.device) * torch.pi,
+            torch.tensor(self.evader_cfg.spawn_rpy_range.max, device=self.device) * torch.pi,
         )
-        self.evader_initial_velocity_dist = D.Uniform(
-            torch.tensor(
-                self.evader_initial_velocity_cfg.get(
-                    "min", [-0.5, -0.5, -0.5, -0.2, -0.2, -0.2]
-                ),
-                device=self.device,
-            ),
-            torch.tensor(
-                self.evader_initial_velocity_cfg.get(
-                    "max", [0.5, 0.5, 0.5, 0.2, 0.2, 0.2]
-                ),
-                device=self.device,
-            ),
+        self.evader_init_vel_dist = D.Uniform(
+            torch.tensor(self.evader_cfg.spawn_vel_range.min, device=self.device),
+            torch.tensor(self.evader_cfg.spawn_vel_range.max, device=self.device),
         )
         self._evader_enabled_codes_tensor = torch.tensor(
             self.evader_enabled_traj_codes, device=self.device, dtype=torch.long)
@@ -263,6 +225,7 @@ class Intercept(IsaacEnv):
             self.num_envs, 1, 3, device=self.device)
         self.evader_random_next_turn_step = torch.zeros(
             self.num_envs, 1, device=self.device, dtype=torch.long)
+
         self.prev_distance = torch.zeros(
             self.num_envs, 1, device=self.device)  # for delta-distance reward
 
@@ -285,10 +248,6 @@ class Intercept(IsaacEnv):
 
         # Buffers for action rewards
         self.current_action = torch.zeros(
-            self.num_envs, 1, self.pursuer.action_spec.shape[-1],
-            device=self.device,
-        )
-        self.prev_action = torch.zeros(
             self.num_envs, 1, self.pursuer.action_spec.shape[-1],
             device=self.device,
         )
@@ -318,7 +277,7 @@ class Intercept(IsaacEnv):
         )
 
         self.pursuer.spawn(translations=[(0.0, 0.0, 1.0)])
-        self.evader.spawn(translations=[(5.0, 0.0, 1.0)])
+        self.evader.spawn(translations=[(1.0, 0.0, 1.0)])
 
         if self.use_camera:
             self._spawn_pursuer_camera()
@@ -519,15 +478,18 @@ class Intercept(IsaacEnv):
         pursuer_pos = self.pursuer_init_pos_dist.sample(torch.Size([num_env, 1]))
         pursuer_rpy = self.pursuer_init_rpy_dist.sample(torch.Size([num_env, 1]))
         pursuer_rot = euler_to_quaternion(pursuer_rpy)
+        pursuer_vel = self.pursuer_init_vel_dist.sample(torch.Size([num_env, 1]))
 
-        # Evader spawn location
+        # Evader spawn location: a random direction from the pursuer at a
+        # uniform distance (spawn_distance_range), with a floor above the ground.
         spawn_direction = normalize(torch.randn(num_env, 1, 3, device=self.device))
         spawn_distance = self.evader_spawn_distance_dist.sample(torch.Size([num_env, 1, 1]))
-        evader_pos = pursuer_pos + spawn_direction * spawn_distance  # [len(env_ids), 3]
+        evader_pos = pursuer_pos + spawn_direction * spawn_distance
         evader_pos[..., 2] = torch.clamp(
-            evader_pos[..., 2],
-            min=self.minimum_altitude,
-        )
+            evader_pos[..., 2], min=self.minimum_altitude + 0.5)
+        evader_rpy = self.evader_init_rpy_dist.sample(torch.Size([num_env, 1]))
+        evader_rot = euler_to_quaternion(evader_rpy)
+        evader_vel = self.evader_init_vel_dist.sample(torch.Size([num_env, 1]))
 
         # Select a random trajectory type for each env from the enabled set.
         sel = torch.randint(0, len(self._evader_enabled_codes_tensor), (num_env, 1), device=self.device)
@@ -551,36 +513,13 @@ class Intercept(IsaacEnv):
             self.progress_buf[env_ids].unsqueeze(-1).long() + turn_steps
         )
 
-        evader_heading = normalize(torch.randn(num_env, 1, 3, device=self.device))
-        evader_heading[..., 2] = 0.0
-        evader_heading = normalize(evader_heading)
-        evader_yaw = torch.atan2(
-            evader_heading[..., 1], evader_heading[..., 0])
-        evader_rot = euler_to_quaternion(torch.stack([
-            torch.zeros_like(evader_yaw),
-            torch.zeros_like(evader_yaw),
-            evader_yaw,
-        ], dim=-1))  # [len(env_ids), 1, 4]
-
         self.pursuer_local_pos[env_ids] = pursuer_pos
         self.pursuer_local_rot[env_ids] = pursuer_rot
-        if self.pursuer_initial_velocity_cfg.get("enabled", False):
-            self.pursuer_local_vel[env_ids] = self.pursuer_initial_velocity_dist.sample(
-                torch.Size([num_env, 1])
-            )
-        else:
-            self.pursuer_local_vel[env_ids] = torch.zeros(
-                num_env, 1, 6, device=self.device)
+        self.pursuer_local_vel[env_ids] = pursuer_vel
 
         self.evader_local_pos[env_ids] = evader_pos
         self.evader_local_rot[env_ids] = evader_rot
-        if self.evader_initial_velocity_cfg.get("enabled", False):
-            self.evader_local_vel[env_ids] = self.evader_initial_velocity_dist.sample(
-                torch.Size([num_env, 1])
-            )
-        else:
-            self.evader_local_vel[env_ids] = torch.zeros(
-                num_env, 1, 6, device=self.device)
+        self.evader_local_vel[env_ids] = evader_vel
 
         self.pursuer.set_world_poses(
             self.envs_positions[env_ids].unsqueeze(
@@ -597,8 +536,6 @@ class Intercept(IsaacEnv):
         self.pursuer.set_velocities(self.pursuer_local_vel[env_ids], env_ids)
         self.evader.set_velocities(self.evader_local_vel[env_ids], env_ids)
 
-        self.prev_action[env_ids] = torch.zeros_like(self.prev_action[env_ids])  # reset for smoothness reward
-
         spawn_distance_vec = torch.norm(
             self.evader_local_pos[env_ids] - self.pursuer_local_pos[env_ids], dim=-1,
         )  # [n, 1]
@@ -606,16 +543,15 @@ class Intercept(IsaacEnv):
 
     def _pre_sim_step(self, tensordict: TensorDictBase):
         """Apply the pursuer policy action and update the evader trajectory before stepping the simulation."""
-        self.current_action = tensordict[("info", "policy_action")]
-        self.prev_action = tensordict[("info", "prev_action")]
-        self.action_error_order1 = tensordict[("stats", "action_error_order1")]  # these are set on the PIDRateController
-
-        pursuer_action = self._format_action(tensordict[("agents", "action")])  # this action is the motor commands, not the policy action
+        pursuer_action = self._format_action(tensordict[("agents", "action")])  # this action is the motor commands, not the policy action. set in transforms.py
         self.pursuer_effort = self.pursuer.apply_action(pursuer_action)
 
         evader_action = self._compute_evader_action(tensordict)  # this action is the motor commands, not ctbr or target position
         evader_action = self._format_action(evader_action)
         self.evader.apply_action(evader_action)
+
+        self.current_action = tensordict[("info", "policy_action")]
+        self.action_error_order1 = tensordict[("stats", "action_error_order1")]  # these are set on the PIDRateController
 
     def _post_sim_step(self, tensordict: TensorDictBase):
         """Latch the latest RGB frames from the pursuer camera, if enabled.
@@ -628,7 +564,7 @@ class Intercept(IsaacEnv):
             # TensorDict of shape [num_cameras] with an "rgb" entry per camera.
             self.pursuer_camera_frames = self.pursuer_camera.get_images()
 
-    def get_pursuer_images(self):
+    def _get_pursuer_images(self):
         """Return the most recent pursuer camera frames (None if disabled)."""
         return self.pursuer_camera_frames
 
@@ -652,7 +588,7 @@ class Intercept(IsaacEnv):
 
         # Linear trajectory is the default. The position is clamped above the
         # floor before any mode-specific overrides are applied.
-        pos[..., 2] = torch.clamp(pos[..., 2], min=self.minimum_altitude + 0.1)
+        pos[..., 2] = torch.clamp(pos[..., 2], min=self.minimum_altitude + 0.5)
 
         is_random = traj_type == self._traj_type_codes["random"]
         is_hover = traj_type == self._traj_type_codes["hover"]
@@ -680,7 +616,7 @@ class Intercept(IsaacEnv):
                 * random_speed
                 * self.evader_random_target_lookahead
             )
-            random_target[..., 2] = random_target[..., 2].clamp(min=self.minimum_altitude + 0.1)
+            random_target[..., 2] = random_target[..., 2].clamp(min=self.minimum_altitude + 0.5)
             random_yaw = torch.atan2(random_dir[..., 1], random_dir[..., 0])
 
             pos = torch.where(is_random.unsqueeze(-1), random_target, pos)
@@ -689,7 +625,7 @@ class Intercept(IsaacEnv):
         # Hover trajectory: evader stays in place.
         if bool(is_hover.any()):
             target_pos = self.evader_local_pos.clone().squeeze(1)
-            target_pos[..., 2] = torch.clamp(target_pos[..., 2], min=self.minimum_altitude + 0.1)
+            target_pos[..., 2] = torch.clamp(target_pos[..., 2], min=self.minimum_altitude + 0.5)
             target_yaw = torch.atan2(direction[..., 1], direction[..., 0])
             pos = torch.where(is_hover.unsqueeze(-1), target_pos, pos)
             yaw = torch.where(is_hover, target_yaw, yaw)
@@ -784,9 +720,9 @@ class Intercept(IsaacEnv):
 
         state = obs.copy()
 
-        if self.time_encoding_dim:
+        if self.obs_cfg.use_time_encoding:
             t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
-            state.append(t.expand(-1, self.time_encoding_dim).unsqueeze(1))
+            state.append(t.expand(-1, self.obs_cfg.time_encoding_dim).unsqueeze(1))
 
         obs = torch.cat(obs, dim=-1)
         state = torch.cat(state, dim=-1)
@@ -806,18 +742,19 @@ class Intercept(IsaacEnv):
         # it is nonzero only on the terminal step, whose snapshot is cloned
         # below (before _compute_reward_and_done runs).
         failed_to_reach_target = (
-            (pursuer_pos[..., 2:3].reshape(self.num_envs, 1) < self.minimum_altitude)
+            (pursuer_pos[..., 2:3].reshape(self.num_envs, 1) <= self.minimum_altitude)
             | (distance > self.reset_thres)
         ).float()  # [num_envs, 1]
         self.stats["reward_terminal"][:] = (
             self.reward_terminal_weight * reached_target
             - self.reward_terminal_weight * failed_to_reach_target
         )
-        self.stats["reward_terminal_precision"][:] = torch.where(
-            reached_target.bool(),
-            self._reward_terminal_precision(distance).reshape(self.num_envs, 1),
-            torch.zeros_like(reached_target),
-        )
+        if self.reward_cfg.use_terminal_precision:
+            self.stats["reward_terminal_precision"][:] = torch.where(
+                reached_target.bool(),
+                self._reward_terminal_precision(distance).reshape(self.num_envs, 1),
+                torch.zeros_like(reached_target),
+            )
 
         intrinsics_dict = self.pursuer.intrinsics
         intrinsics_flat = torch.cat([
@@ -846,19 +783,22 @@ class Intercept(IsaacEnv):
 
     def _compute_reward_and_done(self):
         """Compute reward terms and episode termination flags."""
-        pursuer_pos, _ = self.pursuer.get_world_poses(True)
-        evader_pos, _ = self.evader.get_world_poses(True)
+        pursuer_pos, pursuer_rot = self.pursuer.get_world_poses(True)
+        evader_pos, evader_rot = self.evader.get_world_poses(True)
         pursuer_vel = self.pursuer.get_velocities(True)
-        pursuer_rot = self.pursuer.get_world_poses(True)[1]
+        evader_vel = self.evader.get_velocities(True)
 
-        evader_velocity = self.evader.get_velocities(True)
         pursuer_pos = self._squeeze_batch(pursuer_pos)
-        evader_pos = self._squeeze_batch(evader_pos)
-        pursuer_vel = self._squeeze_batch(pursuer_vel)
         pursuer_rot = self._squeeze_batch(pursuer_rot)
-        evader_velocity = self._squeeze_batch(evader_velocity)
+        pursuer_vel = self._squeeze_batch(pursuer_vel)
+        evader_pos = self._squeeze_batch(evader_pos)
+        evader_rot = self._squeeze_batch(evader_rot)
+        evader_vel = self._squeeze_batch(evader_vel)
         pursuer_state = torch.cat(
             [pursuer_pos, pursuer_rot, pursuer_vel], dim=-1)
+        evader_state = torch.cat(
+            [evader_pos, evader_rot, evader_vel], dim=-1
+        )
 
         distance = torch.norm(evader_pos - pursuer_pos, dim=-1, keepdim=True)
         approach_speed = (pursuer_vel[..., :3] * normalize(evader_pos - pursuer_pos)).sum(
@@ -868,20 +808,15 @@ class Intercept(IsaacEnv):
 
         reward = torch.zeros(self.num_envs, 1, device=self.device)
 
-        # Dense rewards.
+        # Unused legacy reward terms (no reward_cfg flag wired to them):
         # reward_distance = self._reward_distance_to_evader(
         #     pursuer_pos, evader_pos)
         # reward_alignment = self._reward_align_velocity_to_heading(
         #     pursuer_vel[..., :3], evader_pos - pursuer_pos
         # )
-        # reward_approach_velocity = self._reward_approach_velocity_to_evader(
-        #     pursuer_vel[..., :3], evader_pos - pursuer_pos
-        # )
         # reward_time_to_intercept = self._reward_intercept_time(
         #     pursuer_pos, pursuer_vel, evader_pos, evader_velocity
         # )
-        # reward_heading_alignment = self._reward_heading_alignment()
-        # reward_action_norm = self._reward_action_norm()
 
         if self.reward_cfg.use_delta_distance:
             reward_delta_distance = self._reward_delta_distance(distance)
@@ -913,6 +848,26 @@ class Intercept(IsaacEnv):
         else:
             reward_fov = torch.zeros_like(reward)
 
+        if self.reward_cfg.use_action_norm:
+            reward_action_norm = self._reward_action_norm()
+            reward += reward_action_norm
+        else:
+            reward_action_norm = torch.zeros_like(reward)
+
+        if self.reward_cfg.use_approach_velocity:
+            reward_approach_velocity = self._reward_approach_velocity_to_evader(
+                pursuer_vel[..., :3], evader_pos - pursuer_pos
+            )
+            reward += reward_approach_velocity
+        else:
+            reward_approach_velocity = torch.zeros_like(reward)
+
+        if self.reward_cfg.use_heading_alignment:
+            reward_heading_alignment = self._reward_heading_alignment()
+            reward += reward_heading_alignment
+        else:
+            reward_heading_alignment = torch.zeros_like(reward)
+
         self.prev_distance = distance.detach().clone()
 
         # Terminal rewards.
@@ -920,9 +875,13 @@ class Intercept(IsaacEnv):
             self.num_envs, 1)
         failed_to_reach_target = (
             (distance > self.reset_thres)
-            | (pursuer_state[..., 2:3] < self.minimum_altitude)
+            | (pursuer_state[..., 2:3] <= self.minimum_altitude)
         ).reshape(self.num_envs, 1)
-        misbehave = torch.isnan(pursuer_state).any(-1, keepdim=True).reshape(self.num_envs, 1)
+        misbehave = (
+            torch.isnan(pursuer_state).any(-1, keepdim=True)
+            | torch.isnan(evader_state).any(-1, keepdim=True)
+            | (evader_pos[..., 2:3] <= self.minimum_altitude)
+        ).reshape(self.num_envs, 1)
 
         terminated = misbehave | reached_target | failed_to_reach_target
         truncated = (self.progress_buf >= self.max_episode_length - 1)
@@ -944,21 +903,23 @@ class Intercept(IsaacEnv):
             self._reward_terminal_precision(distance).reshape_as(reward),
             torch.zeros_like(reward),
         )
-        # terminal_reward = terminal_success_reward + terminal_failure_reward + terminal_precision_reward
-        terminal_reward = terminal_success_reward + terminal_failure_reward
+        if self.reward_cfg.use_terminal_precision:
+            terminal_reward = terminal_success_reward + terminal_failure_reward + terminal_precision_reward
+        else:
+            terminal_reward = terminal_success_reward + terminal_failure_reward
 
         reward += terminal_reward
 
         # self.stats["reward_closing"].lerp_(reward_distance, 1 - self.alpha)
-        # self.stats["reward_approach_speed"].lerp_(reward_approach_velocity, 1 - self.alpha)
+        self.stats["reward_approach_speed"].lerp_(reward_approach_velocity, 1 - self.alpha)
         self.stats["reward_action_smoothness"].lerp_(
             reward_action_smoothness, 1 - self.alpha)
-        # self.stats["reward_action_norm"].lerp_(
-        #     reward_action_norm, 1 - self.alpha)
+        self.stats["reward_action_norm"].lerp_(
+            reward_action_norm, 1 - self.alpha)
         self.stats["reward_action_body_rate"].lerp_(
             reward_action_body_rate, 1 - self.alpha)
-        # self.stats["reward_heading_alignment"].lerp_(
-        #     reward_heading_alignment, 1 - self.alpha)
+        self.stats["reward_heading_alignment"].lerp_(
+            reward_heading_alignment, 1 - self.alpha)
         self.stats["reward_delta_distance"].lerp_(
             reward_delta_distance, 1 - self.alpha)
         self.stats["reward_precision"].lerp_(
@@ -1058,7 +1019,7 @@ class Intercept(IsaacEnv):
         approach_speed = (pursuer_velocity * normalize(pursuer_to_evader_heading)).sum(
             dim=-1, keepdim=True
         )
-        normalized_speed = approach_speed / self.pursuer_target_speed
+        normalized_speed = approach_speed / self.pursuer_cfg.get("target_speed", 3.0)
         reward = self.reward_approach_velocity_weight * normalized_speed.clamp(-1.0, 1.0)
         return reward
 
