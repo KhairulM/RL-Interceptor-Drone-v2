@@ -161,3 +161,7 @@ crazyswarm2_ws/log/
 
 # Exported policy deployment artifacts (deploy/export_policy.py)
 deploy/artifacts/
+
+# Keep exported PyTorch policy weights under scripts/deploy/artifacts/
+!scripts/deploy/artifacts/**/*.pt
+!scripts/deploy/artifacts/**/*.pth
