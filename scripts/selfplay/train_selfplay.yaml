@@ -1,0 +1,42 @@
+# Orchestrator config for population-based self-play pursuit-evasion.
+# Plain OmegaConf (not Hydra); override on the CLI as key=value, e.g.
+#   python scripts/selfplay/train_selfplay.py n_stages=8 temperature=0.5
+
+# Where the JSON policy database and artifacts live (relative to repo root).
+db_dir: scripts/selfplay/outputs/selfplay/db
+ckpt_dir: scripts/selfplay/outputs/selfplay/checkpoints
+work_dir: scripts/selfplay/outputs/selfplay/stages
+
+# Fresh start: wipe db_dir/ckpt_dir/work_dir on launch and re-seed heuristics.
+# false (default) resumes the next incomplete stage and extends the population.
+fresh_start: false
+
+# Worker wiring.
+python: null                       # python executable; null -> sys.executable
+task: PursuitEvasion
+algo: ppo
+num_envs: 4096
+headless: true
+worker_retries: 2                  # relaunch a crashed worker (flaky Isaac SIGSEGV) this many times
+
+# Generational loop.
+n_stages: 12
+start_role: pursuer                # side trained first
+frames_per_stage: 500_000_000
+warm_start: true                   # init each policy from latest same-role policy
+seed: 0
+wandb_mode: online                 # per-stage wandb logging; set 'disabled' to turn off
+# Opponent sampling (this method's extension of the paper's win-rate Hedge):
+# temperature-scaled softmax over a multi-metric hardness score.
+temperature: 0.9
+metric_weights:
+  win_rate: 1.0
+  avg_time_to_capture: 0.5
+  avg_distance: 0.0          # distance weight zeroed (per request)
+  avg_motor_effort: 0.25
+  agent_error_rate: 1.0      # agent's own crash/OOB rate vs this opponent; higher => harder opponent => sampled more (both roles)
+
+# Heuristic seed populations (cold start). Names: hover, circular, pursue, flee.
+seed_heuristics:
+  pursuer: [pursue, hover]
+  evader: [hover, circular, flee]

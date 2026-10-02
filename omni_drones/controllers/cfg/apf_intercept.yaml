@@ -1,0 +1,14 @@
+# Artificial Potential Field pursuer parameters.
+# attract_gain [1/s]: strength of the attractive well (velocity per metre of
+# range before saturation). Higher = pulls harder / saturates sooner.
+attract_gain: 2.0
+# max_speed [m/s]: cap on the attractive-field velocity magnitude. Match the
+# pursuer's achievable speed; defaults to task.pursuer.target_speed if omitted.
+max_speed: 5.5
+# decel [m/s^2]: usable horizontal braking; approach speed is capped at
+# sqrt(2*decel*range) so the pursuer can always stop on the target instead of
+# overshooting and orbiting it. Keep at/below the true capability (~5 at 28 deg).
+decel: 2.0
+# vel_feedforward: add the evader velocity so the field tracks a moving target
+# instead of lagging behind it.
+vel_feedforward: true

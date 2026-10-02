@@ -54,6 +54,10 @@ from omni_drones import init_simulation_app  # noqa: E402
 # ``algo=ppo`` cannot be resolved. It does not require Isaac Sim.
 from omni_drones.learning import ALGOS  # noqa: E402
 
+# Pins the checkpoint's training config (obs layout, action_transform, sim)
+# so the exported policy matches how it was trained (shared with play/evaluate).
+from omni_drones.utils.checkpoint_config import apply_training_config  # noqa: E402
+
 _SCRIPTS_DIR = os.path.split(_THIS_DIR)[0]  # parent of deploy/
 _REPO_ROOT = os.path.dirname(_SCRIPTS_DIR)
 
@@ -184,6 +188,7 @@ def build_metadata(cfg, base_env, obs_dim: int, action_dim: int) -> ic.PolicyMet
 
     obs_cfg = ic.ObsConfig(
         use_ab_world_frame=bool(obs_cfg.get("use_world_frame_pos", False)),
+        use_relative_distance=bool(obs_cfg.get("use_evader_rel_dist", False)),
         use_relative_velocity=bool(obs_cfg.get("use_evader_rel_lin_vel", False)),
         use_previous_action=bool(obs_cfg.get("use_previous_action", True)),
         obs_dim=obs_dim,
@@ -236,6 +241,13 @@ def main(cfg):
     ckpt_path = os.path.abspath(os.path.expanduser(str(ckpt_path)))
     if not os.path.isfile(ckpt_path):
         raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
+
+    # The exported policy must be built with the checkpoint's training config
+    # (observation layout, action_transform, sim dt/substeps), not the current
+    # Intercept.yaml defaults (which can silently disagree). Pass e.g.
+    # task.env.num_envs=1 on the CLI to keep the export lightweight; CLI
+    # overrides still win over the trained config.
+    apply_training_config(cfg, ckpt_path)
 
     export_dir = cfg.get("export_dir", None) or os.path.join(
         _THIS_DIR, "artifacts", f"{cfg.task.name}_{str(cfg.algo.name).lower()}"

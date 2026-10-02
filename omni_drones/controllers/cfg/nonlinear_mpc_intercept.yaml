@@ -1,19 +1,55 @@
 # Sampling-based nonlinear MPC (MPPI) over the full quadrotor dynamics.
-# horizon x step_mult x sim_dt = lookahead time (e.g. 24 * 4 * 0.01 = 0.96 s).
-horizon: 24
-step_mult: 4
-# num_samples: rollouts scored per control step (higher = better, slower).
-num_samples: 256
+# horizon x step_mult x sim_dt = lookahead time (30 * 2 * 0.01 = 0.60 s).
+horizon: 30
+step_mult: 2
+# num_samples: rollouts scored per control step (higher = smoother/greedier).
+num_samples: 512
 # temperature: lower -> greedier averaging of the sampled rollouts.
-temperature: 0.15
+temperature: 0.05
 discount: 0.99
-# Sampling noise std: body-rate [rad/s] and thrust-accel [m/s^2].
-noise_rate: 1.5
-noise_thrust: 2.5
-# Cost weights.
+# Sampling noise std: body-rate [rad/s] and thrust-accel [m/s^2]. Kept tight so
+# samples stay near the (coherent) warm-started nominal instead of exploring the
+# whole saturated envelope, which is what made the command chatter.
+noise_rate: 0.5
+noise_thrust: 1.0
+# noise_smooth: moving-average window (horizon steps) that low-passes the
+# sampling noise so each sampled control is a smooth maneuver, not chatter.
+noise_smooth: 8
+# First-order actuator lag [s] modelled in the rollout so planned inputs are
+# executable on the motor-lagged pursuer (tau_up/down ~0.08-0.17 s). Without
+# this the lag-free rollout plans reorientations the real drone overshoots into
+# a lift-losing dive. Set both very small to recover the old lag-free behaviour.
+rate_tau: 0.10
+thrust_tau: 0.12
+# Cost weights. On this thrust-to-weight ~1.4 airframe a plain distance cost
+# drives the drone to dive at the target and hit the floor, so altitude keeping
+# is weighted heavily. w_rate + w_smooth keep the body-rate command gentle and
+# coherent (no chatter); w_ground is a stiff floor barrier; the tilt barrier
+# keeps the drone inside the lift-holding envelope.
 w_dist: 2.0
-w_terminal: 12.0
-w_rate: 0.01
-w_tilt: 1.0
-w_ground: 50.0
-min_altitude: 0.2
+w_terminal: 10.0
+# w_closing: reward for line-of-sight closing speed [m/s], capped at max_closing.
+# This is what makes the short-horizon planner actually commit to the chase.
+w_closing: 30.0
+max_closing: 6.0
+# closing_decel [m/s^2]: the closing-speed reward is also capped at
+# sqrt(2*closing_decel*range), so only in the last ~0.5 m does the planner stop
+# rewarding fast approach and brake onto the target. Kept high so it does not
+# blunt the chase of a fast crossing evader.
+closing_decel: 50.0
+w_rate: 0.3
+w_smooth: 2.0
+w_tilt: 3.0
+w_ground: 150.0
+min_altitude: 0.4
+# w_alt: penalise descending below the target's altitude anywhere in the rollout
+# (keeps the pursuer from bleeding height to chase horizontally).
+w_alt: 8.0
+# ta_min_frac: floor on commanded thrust-accel as a fraction of g, so no sample
+# commands a lift-collapsing throttle while banked (0.1 = old near-zero floor).
+ta_min_frac: 0.6
+# Near-hard barrier on the tilt angle [deg]: past this, altitude cannot be held
+# on the thrust-limited pursuer, so a steep ramp keeps trajectories inside the
+# feasible flight envelope (mirrors the CTBR baselines' hard tilt clamp).
+tilt_max: 32.0
+w_tilt_barrier: 3000.0

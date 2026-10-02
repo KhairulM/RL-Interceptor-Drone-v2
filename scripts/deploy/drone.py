@@ -354,10 +354,12 @@ class CrazyflieDrone(Drone):
         self.cf.param.set_value(STAB_ESTIMATOR_PARAM, STAB_ESTIMATOR_KALMAN)
 
     def _setup_loggers(self):
+        # stateEstimate.v{x,y,z} is the EKF velocity in the WORLD frame
+        # (kalman.stateP{X,Y,Z} is body-frame; DroneState.lin_vel is world-frame).
         self._start_log(
             'pos_vel',
             ('stateEstimate.x', 'stateEstimate.y', 'stateEstimate.z',
-             'kalman.statePX', 'kalman.statePY', 'kalman.statePZ'),
+             'stateEstimate.vx', 'stateEstimate.vy', 'stateEstimate.vz'),
             ('float', 'float', 'float', 'float', 'float', 'float'),
             self._pos_vel_cb,
         )
@@ -391,9 +393,9 @@ class CrazyflieDrone(Drone):
             data['stateEstimate.x'],
             data['stateEstimate.y'],
             data['stateEstimate.z'],
-            data['kalman.statePX'],
-            data['kalman.statePY'],
-            data['kalman.statePZ'],
+            data['stateEstimate.vx'],
+            data['stateEstimate.vy'],
+            data['stateEstimate.vz'],
         )
 
     def _att_cb(self, timestamp, data, logconf_name):

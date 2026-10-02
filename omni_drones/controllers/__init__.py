@@ -33,5 +33,6 @@ from .lee_position_controller import (
 from .pure_pursuit_controller import PurePursuitController
 from .proportional_navigation_controller import ProportionalNavigationController
 from .kinematic_mpc_controller import KinematicMPCController
+from .apf_controller import APFController
 from .evader_controller import Repel_Evade
 from .pursuit_controller import PID_Pursuit, FRPN_Pursuit

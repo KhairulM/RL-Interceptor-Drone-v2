@@ -29,5 +29,8 @@ from .forest import Forest
 from .pinball import Pinball
 
 # AMSPB PEG Tasks
-from .evasion import Evasion
-from .pursuit import Pursuit
+from .amspb_evasion import Evasion
+from .amspb_pursuit import Pursuit
+
+# Population-based self-play pursuit-evasion (shared task, role flag)
+from .pursuit_evasion import PursuitEvasion

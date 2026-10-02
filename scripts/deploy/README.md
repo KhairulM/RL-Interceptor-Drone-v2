@@ -49,11 +49,15 @@ Notes:
 
 - Set `algo=` to whatever algorithm produced the checkpoint. Supported for
   extraction: `ppo`, `mappo`, `happo`, `sac`, `td3` (and their aliases).
-- Use the **same** task overrides you trained/evaluated with if they change the
-  observation layout (`task.observation.use_world_frame_pos`,
-  `task.observation.use_evader_rel_lin_vel`,
-  `task.observation.use_previous_action`). The exporter records these in
-  `metadata.json` and the controller enforces them.
+- The exporter reads the observation layout (`use_world_frame_pos`,
+  `use_evader_rel_dist`, `use_evader_rel_lin_vel`, `use_previous_action`) from
+  the `config.yaml` saved next to the checkpoint (the wandb run folder), so the
+  artifact always matches how the policy was **trained** rather than the current
+  `cfg/task/Intercept.yaml` defaults. This matters because `use_evader_rel_dist`
+  swaps the evader direction slot (raw relative distance vs normalized heading)
+  *without changing `obs_dim`* — a stale default would be silently wrong. If no
+  `config.yaml` is found next to the checkpoint, it falls back to the current
+  config (and logs a warning).
 - Re-export after changing the relative-heading frame. Current Intercept
   artifacts use metadata version 3, where the target heading is in the
   pursuer body frame; older artifacts are intentionally rejected.
@@ -103,11 +107,13 @@ configuration before running it.
 | `min_altitude` | `0.15` | Safety cutoff (mirrors the training "misbehave" floor). |
 | `state_timeout` | `0.5` | Stop the drone if pose is stale for this long (s). |
 
-The controller rotates the on-board Kalman **world-frame** velocity
-(`kalman.statePX/Y/Z`) into the pursuer body frame before building the policy
-observation. Its body rates come directly from the gyro; both are always part
-of the observation. The evader's world-frame velocity is only needed when the
-policy's `metadata.json` enables `use_relative_velocity`.
+The controller logs the EKF **world-frame** velocity (`stateEstimate.vx/vy/vz`)
+and rotates it into the pursuer body frame before building the policy
+observation. (Note: `kalman.statePX/Y/Z` is the *body-frame* velocity — using it
+here would double-rotate and corrupt the observation.) Its body rates come
+directly from the gyro; both are always part of the observation. The evader's
+world-frame velocity is only needed when the policy's `metadata.json` enables
+`use_relative_velocity`.
 
 ## Command fidelity (important)
 

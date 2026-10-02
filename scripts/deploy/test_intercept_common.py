@@ -90,8 +90,25 @@ def test_relative_heading_is_in_pursuer_body_frame():
         pursuer_ang_vel=torch.zeros(3),
         evader_pos=torch.tensor([1.0, 0.0, 0.0]),
     )
-    # Under the project quaternion convention, this maps world +x to body +y.
-    assert torch.allclose(obs[16:19], torch.tensor([0.0, 1.0, 0.0]), atol=1e-5)
+    # A +90 deg yaw points the nose along world +y, so the world +x direction to
+    # the evader lies along body -y (world -> body is the inverse rotation).
+    assert torch.allclose(obs[16:19], torch.tensor([0.0, -1.0, 0.0]), atol=1e-5)
+
+
+def test_relative_distance_slot_is_raw_body_frame_vector():
+    # With use_relative_distance the evader slot carries the unnormalized
+    # body-frame relative position (encodes range), not just the heading.
+    cfg = ic.ObsConfig(use_relative_distance=True)
+    assert cfg.expected_obs_dim() == 19  # same dim as the heading slot
+    obs = ic.build_observation(
+        cfg,
+        pursuer_pos=torch.tensor([0.0, 0.0, 1.0]),
+        pursuer_quat_wxyz=torch.tensor([1.0, 0.0, 0.0, 0.0]),
+        pursuer_lin_vel=torch.zeros(3),
+        pursuer_ang_vel=torch.zeros(3),
+        evader_pos=torch.tensor([3.0, 0.0, 1.0]),
+    )
+    assert torch.allclose(obs[16:19], torch.tensor([3.0, 0.0, 0.0]), atol=1e-4)
 
 
 def test_world_velocity_rotates_to_pursuer_body_frame():
@@ -100,7 +117,7 @@ def test_world_velocity_rotates_to_pursuer_body_frame():
         math.cos(half_yaw), 0.0, 0.0, math.sin(half_yaw)
     ])
     body_velocity = ic.quat_rotate_inverse(quat, torch.tensor([1.0, 0.0, 0.0]))
-    assert torch.allclose(body_velocity, torch.tensor([0.0, 1.0, 0.0]), atol=1e-5)
+    assert torch.allclose(body_velocity, torch.tensor([0.0, -1.0, 0.0]), atol=1e-5)
 
 
 def test_observation_optional_components():

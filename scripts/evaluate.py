@@ -18,6 +18,7 @@ from tqdm import tqdm
 
 from omni_drones import init_simulation_app
 from omni_drones.learning import ALGOS
+from omni_drones.utils.checkpoint_config import apply_training_config
 from omni_drones.utils.torchrl import Collector, EpisodeStats
 from omni_drones.utils.torchrl.transforms import (
     FromDiscreteAction,
@@ -273,6 +274,7 @@ def _build_rl_policy(cfg, env, base_env):
 
 
 def _build_classical_policy(method: str, cfg, base_env):
+    from omni_drones.controllers.apf_controller import APFController
     from omni_drones.controllers.intercept_baseline_common import GeometricCTBR
     from omni_drones.controllers.kinematic_mpc_controller import KinematicMPCController
     from omni_drones.controllers.nonlinear_mpc_controller import NonlinearMPCController
@@ -290,6 +292,13 @@ def _build_classical_policy(method: str, cfg, base_env):
     g = 9.81
     per_rotor_max = float(pc.max_thrusts.reshape(-1)[0])
     hover_throttle = math.sqrt(mass * g / (4.0 * per_rotor_max))
+    # Gains tuned for the thrust-limited Crazyflie pursuer (thrust-to-weight
+    # ~1.4). The attitude loop is deliberately gentle (k_att, tilt) so the drone
+    # does not tumble on this low-authority, motor-lagged airframe, and the
+    # position loop is well damped (kv >= kp) for a clean, overshoot-free
+    # approach. Paired with the altitude-priority thrust allocation in
+    # GeometricCTBR, this keeps the pursuer airborne instead of trading its
+    # altitude away to chase horizontally (which cratered every baseline before).
     ctbr = GeometricCTBR(
         mass=mass,
         g=g,
@@ -298,10 +307,15 @@ def _build_classical_policy(method: str, cfg, base_env):
         min_ratio=float(pc.min_thrust_ratio),
         max_ratio=float(pc.max_thrust_ratio),
         kp=8.0,
-        kv=6.0,
-        k_att=12.0,
-        k_yaw=2.0,
-        max_tilt_deg=42.0,
+        kv=7.0,
+        k_att=6.0,
+        k_yaw=1.0,
+        max_tilt_deg=28.0,
+        # Integral action on altitude nulls the steady-state undershoot from the
+        # per-episode thrust-to-weight randomisation (otherwise the docking
+        # baselines hover ~0.2 m below the target, just outside the 0.1 m radius).
+        ki_z=10.0,
+        i_limit_z=1.0,
     )
 
     # Raw calibration shared with the sampling-based nonlinear MPC.
@@ -321,6 +335,8 @@ def _build_classical_policy(method: str, cfg, base_env):
         controller = KinematicMPCController(ctbr, cfg.task, dt=float(cfg.sim.dt))
     elif method == "nonlinear_mpc":
         controller = NonlinearMPCController(ctbr_params, cfg.task, dt=float(cfg.sim.dt))
+    elif method == "apf":
+        controller = APFController(ctbr, cfg.task)
     else:
         raise ValueError(f"Unknown classical method: {method}")
 
@@ -402,6 +418,17 @@ def _run_method_on_env(cfg, base_env, env, method: str, run_label: str) -> Dict[
 
     metrics_lists: Dict[str, List[float]] = defaultdict(list)
 
+    # Per-episode pursuer-speed accumulators (m/s). "travelling" speed is over the
+    # whole flight; "intercepting" speed is the instant of a successful catch, so
+    # it is collected only for episodes whose success_rate latched to 1.
+    travel_mean_vals: List[float] = []      # per-episode mean speeds
+    travel_peak = float("-inf")             # max over per-episode peak speeds
+    intercept_vals: List[float] = []        # per-successful-episode catch speeds
+
+    def _col(td, name: str) -> Optional[torch.Tensor]:
+        tensor = td.get(("stats", name), None)
+        return tensor.float().reshape(-1) if tensor is not None else None
+
     with set_exploration_type(ExplorationType.MODE):
         for i, data in enumerate(tqdm(collector, total=planned_iters, desc=run_label)):
             episode_stats.add(data.to_tensordict())
@@ -410,6 +437,19 @@ def _run_method_on_env(cfg, base_env, env, method: str, run_label: str) -> Dict[
                 for key, value in popped.items(True, True):
                     metric_name = _flatten_key(key)
                     metrics_lists[metric_name].append(float(value.float().mean().item()))
+
+                mean_travel = _col(popped, "mean_travel_v")
+                max_travel = _col(popped, "max_travel_v")
+                intercept = _col(popped, "intercept_v")
+                success = _col(popped, "success_rate")
+                if mean_travel is not None:
+                    travel_mean_vals.extend(mean_travel.tolist())
+                if max_travel is not None and max_travel.numel():
+                    travel_peak = max(travel_peak, float(max_travel.max().item()))
+                if intercept is not None and success is not None:
+                    caught = intercept[success > 0.5]
+                    if caught.numel():
+                        intercept_vals.extend(caught.tolist())
             if i + 1 >= planned_iters:
                 break
 
@@ -418,6 +458,18 @@ def _run_method_on_env(cfg, base_env, env, method: str, run_label: str) -> Dict[
         for metric, values in metrics_lists.items()
     }
     aggregated["rollout_steps"] = float(planned_iters * frames_per_batch_steps)
+    aggregated["mean_travel_velocity"] = (
+        sum(travel_mean_vals) / len(travel_mean_vals) if travel_mean_vals else float("nan")
+    )
+    aggregated["max_travel_velocity"] = (
+        travel_peak if travel_peak != float("-inf") else float("nan")
+    )
+    aggregated["mean_intercept_velocity"] = (
+        sum(intercept_vals) / len(intercept_vals) if intercept_vals else float("nan")
+    )
+    aggregated["max_intercept_velocity"] = (
+        max(intercept_vals) if intercept_vals else float("nan")
+    )
     return aggregated
 
 
@@ -425,14 +477,18 @@ def _derive_metrics(metrics: Dict[str, float], dt: float) -> Dict[str, float]:
     success_rate = float(metrics.get("stats.success_rate", float("nan")))
     episode_len = float(metrics.get("stats.episode_len", float("nan")))
     intercept_time_s = episode_len * dt if not math.isnan(episode_len) else float("nan")
-    interception_speed = success_rate / max(intercept_time_s, 1e-6) if not math.isnan(success_rate) else float("nan")
 
     return {
         "success_rate": success_rate,
         "intercept_time_s": intercept_time_s,
-        "interception_speed": interception_speed,
         "miss_distance": float(metrics.get("stats.distance", float("nan"))),
         "episode_return": float(metrics.get("stats.return", float("nan"))),
+        # Pursuer speed (m/s): travelling = over the flight, intercepting = at the
+        # instant of a successful catch. Computed per-run in _run_method_on_env.
+        "mean_travel_velocity": float(metrics.get("mean_travel_velocity", float("nan"))),
+        "max_travel_velocity": float(metrics.get("max_travel_velocity", float("nan"))),
+        "mean_intercept_velocity": float(metrics.get("mean_intercept_velocity", float("nan"))),
+        "max_intercept_velocity": float(metrics.get("max_intercept_velocity", float("nan"))),
     }
 
 
@@ -470,6 +526,17 @@ def main(cfg):
         inferred_run_id = _infer_wandb_run_id_from_run_dir(resolved_wandb_run_dir)
         if inferred_run_id and cfg.wandb.get("run_id", None) is None:
             cfg.wandb.run_id = inferred_run_id
+
+    # The RL policy must be evaluated with the config it was trained with
+    # (observation layout, action_transform, sim dynamics), not the current
+    # Intercept.yaml defaults. The benchmark scenarios below still override the
+    # evader trajectory/speed/spawn-distance and num_envs on top (see
+    # _apply_scenario). Classical baselines read the true env state and are
+    # unaffected by the observation layout.
+    ckpt_for_cfg = cfg.get("checkpoint", None)
+    if ckpt_for_cfg:
+        resolved_ckpt = _resolve_existing_path(ckpt_for_cfg, expect="file") or ckpt_for_cfg
+        apply_training_config(cfg, resolved_ckpt)
 
     simulation_app = init_simulation_app(cfg)
 
@@ -540,8 +607,18 @@ def main(cfg):
     for (scenario_name, method), records in summary_bucket.items():
         success_mean, success_std = _mean_std([r["success_rate"] for r in records])
         time_mean, time_std = _mean_std([r["intercept_time_s"] for r in records])
-        speed_mean, speed_std = _mean_std([r["interception_speed"] for r in records])
         miss_mean, miss_std = _mean_std([r["miss_distance"] for r in records])
+
+        # Velocity summaries (m/s): avg = mean across seeds, max = peak across
+        # seeds (max of the per-run peaks). NaN-only records (e.g. no successful
+        # interception) are dropped before aggregating.
+        def _avg(key: str) -> float:
+            vals = [r[key] for r in records if not math.isnan(r[key])]
+            return sum(vals) / len(vals) if vals else float("nan")
+
+        def _peak(key: str) -> float:
+            vals = [r[key] for r in records if not math.isnan(r[key])]
+            return max(vals) if vals else float("nan")
 
         summaries.append(
             {
@@ -552,10 +629,12 @@ def main(cfg):
                 "success_rate_std": success_std,
                 "intercept_time_s_mean": time_mean,
                 "intercept_time_s_std": time_std,
-                "interception_speed_mean": speed_mean,
-                "interception_speed_std": speed_std,
                 "miss_distance_mean": miss_mean,
                 "miss_distance_std": miss_std,
+                "avg_travel_velocity": _avg("mean_travel_velocity"),
+                "max_travel_velocity": _peak("max_travel_velocity"),
+                "avg_intercept_velocity": _avg("mean_intercept_velocity"),
+                "max_intercept_velocity": _peak("max_intercept_velocity"),
             }
         )
 
@@ -585,10 +664,12 @@ def main(cfg):
             "success_rate_std",
             "intercept_time_s_mean",
             "intercept_time_s_std",
-            "interception_speed_mean",
-            "interception_speed_std",
             "miss_distance_mean",
             "miss_distance_std",
+            "avg_travel_velocity",
+            "max_travel_velocity",
+            "avg_intercept_velocity",
+            "max_intercept_velocity",
         ]
         table_data = [[row[col] for col in columns] for row in summaries]
         table = wandb.Table(columns=columns, data=table_data)

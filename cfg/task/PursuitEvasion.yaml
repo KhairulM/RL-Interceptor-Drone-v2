@@ -1,0 +1,136 @@
+name: PursuitEvasion
+
+defaults:
+  - /base/env_base@_here_
+  - /base/sim_base@_here_
+
+env:
+  num_envs: 4096
+  max_episode_length: 2000
+  env_spacing: 12
+
+# Which side is trained with RL. The opponent is a frozen policy from the pool.
+# The generational driver overrides this per stage (task.role=pursuer|evader).
+role: pursuer
+
+# Confined 3D arena (env-local coordinates, ~10m x 10m x 4m).
+arena:
+  half_xy: 5.0
+  z_min: 0.1
+  z_max: 4.5
+  visualize: true          # draw the boundary box (only shown when not headless)
+
+# Capture-radius curriculum (shrinks the capture threshold during training,
+# like Intercept). Fixed at success_radius_eval outside training.
+success_radius_init: 0.1 # 0.3
+success_radius_end: 0.1
+# success_radius_lr: 2e-6
+success_radius_lr: 0.0
+success_radius_eval: 0.1
+minimum_altitude: 0.1
+min_spawn_separation: 2.0
+
+# Reward weights. Terminal outcomes (magnitude reward_terminal_weight = W):
+#   * FULL WIN  (+W):  pursuer -> capture;  evader -> survived to the timeout.
+#   * FULL LOSS (-W):  own crash to the ground (z < minimum_altitude) / NaN, own
+#     departure through a wall or the ceiling, and (pursuer only) the timeout.
+#   * FORCED ERROR (+reward_forced_error_scale * W): the OPPONENT crashed or left
+#     the arena. Partial credit, never a full win -- at full parity the pursuer
+#     just farmed it, standing off and waiting for a scripted evader to fall out
+#     of the sky for the same +W as a capture (93% of its "wins" were evader
+#     crashes and the capture rate collapsed to ~3%). Symmetric for both roles.
+#   The dense boundary penalty (reward_bounds_weight) still discourages
+#   approaching a wall, for both drones.
+#   pursuer: +approach +precision -body_rate -bounds  +W(capture)   +sW(evader crashed | left)   -W(own crash | own leave | timeout)
+#   evader:  +step                -body_rate -bounds  +W(survived)  +sW(pursuer crashed | left)  -W(captured | own crash | own leave)
+reward_approach_weight: 7.0        # dense distance-closing (delta distance)
+# reward_approach_weight: 0.0
+reward_precision_weight: 10.0      # potential exp(-scale*d); pulls through the last meter
+reward_precision_scale: 5.0
+reward_body_rate_weight: 0.12       # penalty on actual body angular velocity
+reward_action_smoothness_weight: 0.5   # penalty on step-to-step CTBR jerk
+reward_cmd_rate_weight: 0.2         # penalty on commanded body-rate MAGNITUDE (anti-tumble; see envs/single/pursuit_evasion.py). The other two miss sustained saturated commands that tumble the real firmware rate loop.
+reward_terminal_weight: 100.0      # magnitude of every full win/loss outcome
+reward_forced_error_scale: 0.25    # opponent crashed/left the arena, as a fraction of W
+reward_bounds_weight: 1.0          # dense penalty ramping up within bounds_margin of a wall
+bounds_margin: 1.0
+reward_step: 0.005                 # evader per-step survival crumb
+# Optional dense distance penalty (pursuer only), matching Intercept's
+# reward_distance = reward_distance_weight * distance. Negative weight penalizes
+# being far from the evader. Toggle with use_distance.
+use_distance: false
+reward_distance_weight: -0.1
+
+observation:
+  include_noise: false
+  use_previous_action: true
+  use_time_encoding: true
+  time_encoding_dim: 4
+  use_rel_dist: true
+  # Per-component Gaussian noise stds applied to the agent's observation when
+  # include_noise is true (sensor-matched defaults, from Intercept).
+  noise:
+    pos_std: 0.02
+    rot_std: 0.01
+    lin_vel_std: 0.05
+    rot_vel_std: 0.02
+    rel_dist_std: 0.02
+    rel_lin_vel_std: 0.08
+
+# Scripted opponent motion (used for heuristic seeds: hover/circular/pursue/flee).
+# `flee` runs horizontally away from the pursuer at a held altitude; it never
+# commands a descent, its target is clamped inside the arena shrunk by
+# safe_margin, and its outward speed fades to zero within brake_zone of the
+# keep-in edge so the drone coasts to a stop before the wall rather than
+# overshooting it (a pure position push could not brake the built-up momentum:
+# the drone punched through the wall AND dived as the hard braking tilt dumped
+# its lift). Interior flee speed ~1.3 m/s: slow enough for the Crazyflie
+# pursuer to run it down.
+heuristic:
+  circular_radius: 1.5
+  circular_omega: 1.0
+  speed: 2.0
+  lookahead: 0.5
+  wall_margin: 1.5       # flee starts turning away this far from a wall
+  safe_margin: 0.75      # every heuristic target is clamped this far inside the arena
+  brake_zone: 1.5        # flee speed fades to zero over this distance before the keep-in edge, so outward momentum cannot overshoot the wall
+  wall_gain: 0.75        # strength of the gentle, always-on inward push (fraction of full step)
+  max_tilt_deg: 22.0     # opponent CTBR tilt cap; low enough that reactive maneuvers cannot dump the lift the T/W~1.4 Crazyflie needs to hold altitude
+
+action_transform: pidrate
+
+pursuer:
+  model: Crazyflie
+  controller: PIDRateController
+
+evader:
+  model: Crazyflie
+  controller: PIDRateController
+
+# Frozen opponent pool. Populated by the self-play driver at runtime; the
+# default here lets the task run standalone (single hover opponent). When the
+# driver injects RL opponents it also sets opponent.algo_cfg for loading them.
+opponent:
+  policies:
+    - id: "evader:heuristic0"
+      kind: heuristic
+      checkpoint_path: null
+      metadata:
+        heuristic: hover
+  probs: null
+  algo_cfg: null
+
+# Domain randomization for the RL-controlled agent (optional).
+randomization:
+  train:
+    mass_scale: [0.95, 1.05]
+    t2w_scale: [0.85, 1.15]
+    inertia_scale: [0.90, 1.10]
+    tau_up: [0.08, 0.17]
+    tau_down: [0.08, 0.17]
+  eval:
+    mass_scale: [0.95, 1.05]
+    t2w_scale: [0.85, 1.15]
+    inertia_scale: [0.90, 1.10]
+    tau_up: [0.08, 0.17]
+    tau_down: [0.08, 0.17]

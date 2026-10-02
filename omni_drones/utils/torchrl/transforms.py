@@ -401,11 +401,20 @@ class PIDRateController(Transform):
         target_rate = target_rate * 180.0 * self.target_clip
         target_thrust = target_thrust * 2**16
 
+        # Reset the on-board rate-PID integral at the FIRST step of each episode.
+        # `is_init` (from InitTracker) is True on the first post-reset step, which
+        # is the correct signal; `done` is only ever True in the `next` td and is
+        # False throughout action processing, so the previous `reset_pid=done`
+        # never fired and the integral leaked across episode boundaries. Fall back
+        # to `done` when is_init is absent (pipelines without InitTracker).
+        reset_signal = tensordict.get("is_init", None)
+        if reset_signal is None:
+            reset_signal = tensordict["done"]
         cmds, ctbr = self.controller(
             drone_state,
             target_rate=target_rate,
             target_thrust=target_thrust,
-            reset_pid=tensordict['done'].expand(-1, drone_state.shape[1])  # num_drones: drone_state.shape[1]
+            reset_pid=reset_signal.expand(-1, drone_state.shape[1])  # num_drones: drone_state.shape[1]
         )
         # cmds[:] = 0.2656405 # init for hover: 2 * hover_throttle^2 - 1
 

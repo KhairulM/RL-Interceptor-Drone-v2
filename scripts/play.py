@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import os
 import re
@@ -21,6 +22,7 @@ from omni_drones.utils.torchrl.transforms import (
     PIDRateController,
 )
 from omni_drones.utils.torchrl import EpisodeStats
+from omni_drones.utils.checkpoint_config import apply_training_config
 from omni_drones.learning import ALGOS
 
 from setproctitle import setproctitle
@@ -174,8 +176,9 @@ def main(cfg):
     OmegaConf.register_new_resolver("eval", eval)
     OmegaConf.resolve(cfg)
     OmegaConf.set_struct(cfg, False)
-    simulation_app = init_simulation_app(cfg)
 
+    # Resolve the checkpoint/run BEFORE building the sim, so we can load the
+    # exact config the policy was trained with and build the env from it.
     wandb_run_dir = cfg.get("wandb_run_dir", None)
     if wandb_run_dir:
         resolved_wandb_run_dir = _resolve_existing_path(wandb_run_dir, expect="dir")
@@ -202,6 +205,32 @@ def main(cfg):
                 "Resuming W&B run id '%s' to append play metrics.",
                 inferred_run_id,
             )
+
+    # Pin the config to whatever the checkpoint was trained on, so editing
+    # cfg/task/*.yaml for a newer policy never silently changes how an older
+    # checkpoint is evaluated. `ignore_trained_config=true` restores the old
+    # behavior of composing purely from cfg/task/.
+    if cfg.get("checkpoint", None):
+        resolved_ckpt_path = _resolve_existing_path(cfg.checkpoint, expect="file")
+        if resolved_ckpt_path is not None:
+            cfg.checkpoint = resolved_ckpt_path
+            if not cfg.get("ignore_trained_config", False):
+                apply_training_config(cfg, resolved_ckpt_path)
+
+    opponent_spec_path = cfg.get("opponent_spec_path", None)
+    if opponent_spec_path:
+        resolved_opponent_spec = _resolve_existing_path(
+            opponent_spec_path, expect="file")
+        if resolved_opponent_spec is None:
+            raise FileNotFoundError(
+                f"Opponent spec not found: {opponent_spec_path}")
+        with open(resolved_opponent_spec, "r") as f:
+            opponent_spec = json.load(f)
+        cfg.task.opponent.policies = opponent_spec["policies"]
+        cfg.task.opponent.probs = opponent_spec.get("probs", None)
+        cfg.task.opponent.algo_cfg = cfg.algo
+
+    simulation_app = init_simulation_app(cfg)
 
     use_wandb = wandb is not None
     if use_wandb:

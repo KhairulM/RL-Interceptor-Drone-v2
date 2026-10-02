@@ -1,0 +1,29 @@
+{
+  "algo": "ppo",
+  "arena_half_xy": 5.0,
+  "arena_z_max": 4.5,
+  "arena_z_min": 0.1,
+  "artifact_version": 1,
+  "capture_radius": 0.1,
+  "ctbr": {
+    "dt": 0.02,
+    "lpf_coef": 1.0,
+    "max_thrust_ratio": 1.0,
+    "min_thrust_ratio": 0.0,
+    "target_clip": 1.0
+  },
+  "notes": {
+    "action_transform": "pidrate",
+    "checkpoint": "scripts/selfplay/outputs/selfplay_v2/checkpoints/evader_stage11.pt",
+    "drone_model": "Crazyflie",
+    "task": "PursuitEvasion",
+    "trained_against": "evader:heuristic0"
+  },
+  "obs": {
+    "action_dim": 4,
+    "obs_dim": 28,
+    "use_previous_action": true
+  },
+  "role": "evader",
+  "sim_dt": 0.01
+}

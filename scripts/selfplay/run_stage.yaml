@@ -1,0 +1,49 @@
+# hydra.job.chdir: false
+hydra:
+  searchpath:
+    - file://../../cfg
+
+headless: true
+
+sim: ${task.sim}
+env: ${task.env}
+
+# Viewer camera (used when headless=false; read by IsaacEnv).
+viewer:
+  resolution: [1920, 1080]
+  eye: [6.0, 0.0, 4.0]
+  lookat: [0.0, 0.0, 1.5]
+
+# One self-play stage: mode=train trains task.role against the injected frozen
+# opponent pool and saves a checkpoint; mode=eval rolls out a fixed policy
+# against the pool and writes per-opponent matchup metrics.
+mode: train
+
+total_frames: 500_000_000
+max_iters: -1
+seed: 0
+
+# Runtime wiring set by the orchestrator (scripts/selfplay/train_selfplay.py).
+stage: 0                   # generation index (used for wandb run naming)
+opponent_spec_path: null   # JSON: {"policies": [...], "probs": {...}}
+stage_out: null            # JSON output path for results
+stage_ckpt: null           # where to save the trained checkpoint (mode=train)
+init_policy: null          # optional warm-start checkpoint (mode=train)
+eval_policy: null          # checkpoint to evaluate (mode=eval)
+
+# WandB: one run per training stage, grouped by target policy (role).
+wandb:
+  group: ${task.name}-${task.role}
+  run_name: ${task.name}-${task.role}-stage${stage}
+  job_type: selfplay
+  entity: khairul-makirin-team
+  project: RL Pursuit Evasion
+  mode: online
+  run_id:
+  monitor_gym: True
+  tags:
+
+defaults:
+  - task: PursuitEvasion
+  - algo: ppo
+  - _self_

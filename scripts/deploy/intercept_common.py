@@ -44,7 +44,10 @@ import torch
 # Format identifier written into ``metadata.json`` so the controller can refuse
 # to load artifacts produced by an incompatible exporter.
 # v2: observation reordered and body-rate component made unconditional.
-# v3: relative heading is expressed in the pursuer body frame.
+# v3: relative heading is expressed in the pursuer body frame. The evader
+#     direction slot optionally carries the raw relative-distance vector
+#     (``use_relative_distance``) instead of the normalized heading; old v3
+#     metadata without that key defaults to the heading, so it stays readable.
 ARTIFACT_VERSION = 3
 
 
@@ -62,11 +65,13 @@ class ObsConfig:
 
     The component order is fixed by ``Intercept._compute_state_and_obs``:
     altitude/position, rotation matrix, body linear velocity, body angular
-    velocity, body-frame relative heading, [relative linear velocity],
-    [previous action].
+    velocity, evader direction slot (body-frame relative heading, or the raw
+    relative-distance vector when ``use_relative_distance`` is set),
+    [relative linear velocity], [previous action].
     """
 
     use_ab_world_frame: bool = False
+    use_relative_distance: bool = False
     use_relative_velocity: bool = False
     use_previous_action: bool = False
     obs_dim: int = 19
@@ -78,7 +83,8 @@ class ObsConfig:
         pursuer_state_dim = 9 + 3 + 3
         pursuer_state_dim += 3 if self.use_ab_world_frame else 1
 
-        evader_state_dim = 3  # relative heading
+        # Evader direction slot: heading or raw relative distance, both 3D.
+        evader_state_dim = 3
         if self.use_relative_velocity:
             evader_state_dim += 3
 
@@ -239,11 +245,13 @@ def quat_rotate_inverse(quat_wxyz: torch.Tensor, vec: torch.Tensor) -> torch.Ten
     q_vec = quat_wxyz[..., 1:]          # (x, y, z)
     q_imag_sq = (q_vec * q_vec).sum(-1, keepdim=True)
 
-    # v' = (w^2 - |v|^2) * v + 2 * (v . v_q) * v_q + 2 * w * (v_q x v)
+    # Inverse (world -> body) rotation: R^T v. The cross-product term is
+    # SUBTRACTED (the forward rotation adds it). This mirrors
+    # omni_drones/utils/torch.py::quat_rotate_inverse (a - b + c).
     factor0 = quat_wxyz[..., :1] ** 2 - q_imag_sq
     dot = (q_vec * vec).sum(-1, keepdim=True)
     cross = torch.cross(q_vec, vec, dim=-1)
-    return factor0 * vec + 2.0 * dot * q_vec + 2.0 * quat_wxyz[..., :1] * cross
+    return factor0 * vec + 2.0 * dot * q_vec - 2.0 * quat_wxyz[..., :1] * cross
 
 
 # ---------------------------------------------------------------------------
@@ -269,10 +277,13 @@ def build_observation(
 
     The relative heading and evader velocity (when provided via
     ``use_relative_velocity``) are expressed in the pursuer body frame, matching
-    :meth:`Intercept._compute_state_and_obs`. Evader velocity is expected
-    in the world frame and *is* rotated into the pursuer body frame before
-    computing the relative difference, so that the observation matches what
-    training sees (see :meth:`Intercept._compute_state_and_obs`).
+    :meth:`Intercept._compute_state_and_obs`. When ``cfg.use_relative_distance``
+    is set, the evader direction slot carries the *raw* (unnormalized)
+    body-frame relative-distance vector instead of the normalized heading, so
+    the policy can perceive range. Evader velocity is expected in the world
+    frame and *is* rotated into the pursuer body frame before computing the
+    relative difference, so that the observation matches what training sees
+    (see :meth:`Intercept._compute_state_and_obs`).
 
     Args:
         cfg: Observation layout flags (must match the trained policy).
@@ -289,9 +300,12 @@ def build_observation(
     Returns:
         ``[..., obs_dim]`` observation tensor.
     """
-    evader_rel_hdg = normalize(quat_rotate_inverse(
+    # Body-frame relative position; raw vector encodes range, normalized gives
+    # heading only. Mirrors Intercept._compute_state_and_obs' either/or slot.
+    evader_rel = quat_rotate_inverse(
         pursuer_quat_wxyz, evader_pos - pursuer_pos
-    ))  # (3), pursuer body frame
+    )  # (3), pursuer body frame
+    evader_slot = evader_rel if cfg.use_relative_distance else normalize(evader_rel)
     pursuer_rot = quaternion_to_rotation_matrix(pursuer_quat_wxyz)
     pursuer_rot = pursuer_rot.reshape(*pursuer_rot.shape[:-2], 9)  # (9)
 
@@ -304,7 +318,7 @@ def build_observation(
         pursuer_rot,      # (9)
         pursuer_lin_vel,  # (3)
         pursuer_ang_vel,  # (3)
-        evader_rel_hdg,   # (3)
+        evader_slot,      # (3) heading or raw relative distance
     ]
 
     if cfg.use_relative_velocity:

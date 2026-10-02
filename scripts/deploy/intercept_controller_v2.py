@@ -82,7 +82,12 @@ def _load_policy(artifact_dir: str):
             f'Run export_policy.py first.'
         )
     metadata = ic.load_metadata(meta_path)
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    # Deploy the policy on the CPU even when a GPU is present. The actor is a
+    # tiny MLP, so per-step host<->device transfer + CUDA sync would only add
+    # latency and (worse) jitter to the 50 Hz control loop. A deterministic,
+    # low-latency step is what keeps the body-rate command timing matched to
+    # training; see the fixed-rate loop in ``run``.
+    device = torch.device('cpu')
     policy = torch.jit.load(ts_path, map_location=device).eval()
     logger.info('[intercept] Loaded %s policy (obs_dim=%d) from %s on %s',
                 metadata.algo, metadata.obs.obs_dim, ts_path, device)
@@ -543,6 +548,18 @@ class InterceptController:
                 '[intercept] Running policy at %.1f Hz. '
                 'Ctrl+C to stop. evader_motion=%s', 1.0 / self.control_dt, self.evader_motion_type
             )
+            # Fixed-rate scheduling: the policy was trained with a fixed control
+            # period (metadata.ctbr.dt == control_dt). A plain ``sleep(dt)`` at
+            # the end of the loop would instead give a period of
+            # ``dt + compute_time`` that also jitters with GC / GPU / ROS, so the
+            # body-rate commands would be held ~10-30% longer than in training
+            # and at an uneven cadence -- exactly the kind of lag that turns a
+            # crisp Isaac chase into an oscillating one on hardware/CrazySim.
+            # Anchor each tick to an absolute deadline and only sleep the
+            # remainder, and count how often we cannot keep up.
+            next_tick = time.perf_counter()
+            overrun_count = 0
+            tick_count = 0
             while self.pursuer.connected and self.evader.connected:
                 measured_evader_state = (
                     self.evader.get_state() if self.evader_source == 'cf' else None
@@ -598,7 +615,30 @@ class InterceptController:
                 self.pursuer.publish_pose()
                 if self.evader_source == 'cf':
                     self.evader.publish_pose()
-                time.sleep(self.control_dt)
+
+                # Sleep until the next fixed deadline instead of ``dt`` after the
+                # work finished, so the effective control rate stays at the
+                # trained frequency. If a tick overran its budget (deadline
+                # already in the past), skip the sleep, resynchronise the
+                # deadline to now, and track it so a chronically slow machine is
+                # visible rather than silently degrading the policy.
+                next_tick += self.control_dt
+                tick_count += 1
+                slack = next_tick - time.perf_counter()
+                if slack > 0.0:
+                    time.sleep(slack)
+                else:
+                    overrun_count += 1
+                    next_tick = time.perf_counter()
+                    if overrun_count % 50 == 1:
+                        logger.warning(
+                            '[intercept] Control loop overran its %.1f ms budget '
+                            'by %.1f ms (%d/%d ticks late). The policy is running '
+                            'slower than its trained %.1f Hz, which can cause '
+                            'oscillation.',
+                            self.control_dt * 1e3, -slack * 1e3,
+                            overrun_count, tick_count, 1.0 / self.control_dt,
+                        )
         except KeyboardInterrupt:
             logger.info('[intercept] Stopping.')
         finally:

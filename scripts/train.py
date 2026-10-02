@@ -71,6 +71,19 @@ def main(cfg):
     setproctitle(run.name or "omnidrones-train")
     print(OmegaConf.to_yaml(cfg))
 
+    # Save the fully-resolved config next to the checkpoints so play.py can
+    # later evaluate this policy with the exact config it was trained on,
+    # regardless of subsequent edits to cfg/task/.
+    try:
+        os.makedirs(run.dir, exist_ok=True)
+        OmegaConf.save(cfg, os.path.join(run.dir, "train_config.yaml"))
+        logging.info(
+            "Saved resolved training config to %s",
+            os.path.join(run.dir, "train_config.yaml"),
+        )
+    except Exception as err:  # pragma: no cover - best-effort snapshot
+        logging.warning("Could not save resolved training config: %s", err)
+
     from omni_drones.envs.isaac_env import IsaacEnv
 
     env_class = IsaacEnv.REGISTRY[cfg.task.name]
