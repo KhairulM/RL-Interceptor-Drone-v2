@@ -126,7 +126,10 @@ class InterceptController:
     def __init__(self, args: argparse.Namespace) -> None:
         self.config_path = os.path.abspath(os.path.expanduser(args.config))
         self.artifact_dir = str(args.artifact_dir)
-        self.metadata, self.policy, self.device = _load_policy(self.artifact_dir)
+        # Hook: subclasses (see traditional_controller.py, which flies the
+        # classical guidance baselines through this same loop) replace the
+        # TorchScript actor with their own controller here.
+        self._setup_policy()
         self._start_time = time.time()
 
         self.pursuer_config = ic.load_drone_config_from_yaml(self.config_path, 'pursuer')
@@ -223,6 +226,20 @@ class InterceptController:
         self.mocap_receiver: Optional[MocapReceiver] = None
 
         self.previous_action: torch.Tensor = torch.zeros(4, dtype=torch.float32, device=self.device)
+
+    def _setup_policy(self) -> None:
+        """Load the exported actor. Overridden to fly a non-learned controller."""
+        self.metadata, self.policy, self.device = _load_policy(self.artifact_dir)
+
+    def _compute_action(self, pursuer_state: ic.DroneState,
+                        evader_state: ic.DroneState) -> ic.CTBRCommand:
+        """Produce one CTBR command from the current relative state."""
+        policy_action, command = _build_command(
+            self.policy, self.metadata, pursuer_state, evader_state,
+            self.previous_action, self.device,
+        )
+        self.previous_action = policy_action.detach()
+        return command
 
     @staticmethod
     def _vec3_from_config(value, default: np.ndarray, name: str) -> np.ndarray:
@@ -593,12 +610,9 @@ class InterceptController:
                     )
                     break
 
-                policy_action, command = _build_command(
-                    self.policy, self.metadata, pursuer_state, evader_state, self.previous_action, self.device
-                )
+                command = self._compute_action(pursuer_state, evader_state)
 
                 self.pursuer.send_ctbr(command)
-                self.previous_action = policy_action.detach()
 
                 if self.log_commands:
                     rates = command.body_rate_deg.detach().cpu().numpy().reshape(-1)

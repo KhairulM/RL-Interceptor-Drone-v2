@@ -18,7 +18,7 @@ controller:
   publish_tf: true            # Also publish mocap poses on the ROS 2 /tf tree.
   mocap_world_frame: world     # Parent frame id for published TF transforms.
   evader_motion:
-    type: random                # hover | linear | random | trajectory (legacy CSV).
+    type: linear                # hover | linear | random | trajectory (legacy CSV).
     yaw_deg: 0.0               # Yaw command for evader position setpoints (deg).
     anchor: [2.0, 0.0, 1.0]    # Initial position / hover point [x, y, z] (m).
     trajectory_file: 'trajectories/linear_y.csv'        # CSV path (absolute or relative to this config).
@@ -81,3 +81,71 @@ mocap:
   mocap_send_rate_hz: 60.0
   world_frame: world                 # Parent frame id for published TF transforms.
   orientation_align_time: 2.0     # Time to align mocap orientation with EKF (s). Mocap will publish position + orientation first before publishing only position.
+
+# -- Classical baselines (traditional_controller.py) -------------------------
+# Only read by traditional_controller.py; intercept_controller_v2.py ignores
+# this section. Run with:  python traditional_controller.py --method pn
+traditional:
+  method: pure_pursuit         # pure_pursuit | pn | apf | nonlinear_mpc.
+
+  # Shared CTBR calibration + geometric outer-loop gains.
+  ctbr:
+    # Normalised collective thrust (thrust_pwm / 65536) at which the pursuer
+    # holds altitude. THE one value to calibrate on a real airframe; the
+    # default is the sim Crazyflie rotor model (m=0.034 kg, 0.12 N/rotor,
+    # thrust-to-weight ~1.44).
+    hover_throttle: 0.8336
+    gravity: 9.81
+    # Command envelope. Omitted keys are inherited from the exported policy's
+    # metadata.json (when artifact_dir exists) so the baseline and the policy
+    # command through identical scaling.
+    # target_clip: 1.0
+    # min_thrust_ratio: 0.0
+    # max_thrust_ratio: 1.0
+    kp: 8.0                    # Outer position P gain.
+    kv: 7.0                    # Outer velocity P gain (kv >= kp = well damped).
+    k_att: 6.0                 # Thrust-vector alignment gain -> body rates.
+    k_yaw: 1.0                 # Yaw alignment gain.
+    max_tilt_deg: 28.0         # Tilt clamp; higher bleeds altitude on this T/W.
+    ki_z: 10.0                 # Altitude integral (nulls hover-throttle error).
+    i_limit_z: 1.0             # Anti-windup clamp on the altitude integral.
+    i_speed_gate: 1.5          # Only integrate below this speed (m/s).
+
+  pure_pursuit: {}             # No tunables: chases the evader's position.
+
+  pn:
+    pursuer_speed: 2.0         # Speed capability used to solve the collision triangle (m/s).
+    nav_gain: 1.0              # Lead multiplier; 1.0 = exact constant-bearing course.
+    max_tgo: 3.0               # Cap on the time-to-go lead (s).
+
+  apf:
+    attract_gain: 2.0          # Attractive-well strength (1/s).
+    max_speed: 2.0             # Cap on the field velocity magnitude (m/s).
+    decel: 2.0                 # Usable braking; caps speed at sqrt(2*decel*range).
+    vel_feedforward: true      # Add the evader velocity so the field tracks a mover.
+
+  nonlinear_mpc:               # Sampling-based MPPI over the full 6-DOF model.
+    horizon: 20                # Plan steps; lookahead = horizon*step_mult*control_dt.
+    step_mult: 2               # Plan step = step_mult * control_dt.
+    num_samples: 256           # Rollouts per solve; cut this first if the loop overruns.
+    temperature: 0.05          # Lower = greedier averaging of the rollouts.
+    discount: 0.99
+    noise_rate: 0.5            # Body-rate sampling noise std (rad/s).
+    noise_thrust: 1.0          # Thrust-accel sampling noise std (m/s^2).
+    noise_smooth: 8            # Moving-average window on the noise (smooth-MPPI).
+    rate_tau: 0.10             # Modelled body-rate actuator lag (s).
+    thrust_tau: 0.12           # Modelled thrust actuator lag (s).
+    w_dist: 2.0
+    w_terminal: 10.0
+    w_closing: 30.0            # Reward on line-of-sight closing speed.
+    max_closing: 6.0           # Cap on the rewarded closing speed (m/s).
+    closing_decel: 50.0        # Brake-limited cap: sqrt(2*closing_decel*range).
+    w_rate: 0.3
+    w_smooth: 2.0              # Penalty on step-to-step body-rate change.
+    w_tilt: 3.0
+    w_ground: 150.0            # Floor barrier weight.
+    min_altitude: 0.4          # Altitude the floor barrier defends (m).
+    w_alt: 8.0                 # Penalty for dropping below the target's altitude.
+    ta_min_frac: 0.6           # Thrust-accel floor as a fraction of g.
+    tilt_max: 32.0             # Near-hard tilt barrier (deg).
+    w_tilt_barrier: 3000.0
