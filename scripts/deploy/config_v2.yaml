@@ -18,9 +18,9 @@ controller:
   publish_tf: true            # Also publish mocap poses on the ROS 2 /tf tree.
   mocap_world_frame: world     # Parent frame id for published TF transforms.
   evader_motion:
-    type: linear                # hover | linear | random | trajectory (legacy CSV).
+    type: hover                # hover | linear | random | trajectory (legacy CSV).
     yaw_deg: 0.0               # Yaw command for evader position setpoints (deg).
-    anchor: [2.0, 0.0, 1.0]    # Initial position / hover point [x, y, z] (m).
+    anchor: [1.0, 0.0, 1.0]    # Initial position / hover point [x, y, z] (m).
     trajectory_file: 'trajectories/linear_y.csv'        # CSV path (absolute or relative to this config).
     trajectory_loop: true      # Loop the trajectory when reaching the end.
     linear:
@@ -36,8 +36,9 @@ controller:
 # -- Pursuer drone config ----------------------------------------------------
 pursuer:
   name: pursuer
-  # uri: radio://0/40/2M/E7E7E7E701      # Crazyflie URI of the pursuer.
-  uri: udp://127.0.0.1:19850
+  uri: radio://0/80/2M/E7E7E7E702      # Crazyflie URI of the pursuer.
+  # uri: radio://0/10/2M/E7E7E7E7E1
+  # uri: udp://127.0.0.1:19850
   cache_dir: ./cache-pursuer                    # cflib read/write cache directory.
   control_dt: 0.02                 # 0 = use the policy's training dt.
   log_period_ms: 20                 # Log decoded body rates + thrust every N ms (0 = disable).
@@ -50,19 +51,26 @@ pursuer:
 # -- Evader drone config -----------------------------------------------------
 evader:
   name: evader
-  # uri: radio://1/80/2M/E7E7E7E702    # Evader Crazyflie URI (when source == cf).
-  uri: udp://127.0.0.1:19851
+  uri: radio://1/5/2M/E7E7E7E7E3    # Evader Crazyflie URI (when source == cf)
+  # uri: udp://127.0.0.1:19851
   cache_dir: ./cache-evader                    # cflib read/write cache directory.
   control_dt: 0.02                 # 0 = use the policy's training dt.
   log_period_ms: 20                 # Log decoded body rates + thrust every N ms (0 = disable).
   max_thrust_pwm: 65535.0              # Upper clamp on commanded thrust (0..65535).
   rate_sign: [1.0, 1.0, 1.0]           # Per-axis sign flips: [roll, pitch, yaw].
 
-# -- Trajectory logging ------------------------------------------------------
-trajectory:
-  save: true
-  dir: ./trajectory_logs
-  prefix: intercept
+# -- Run logging -------------------------------------------------------------
+# Each run takes the first trial number N whose folders are still empty, per
+# controller name <name> (intercept | pure_pursuit | pn | apf | mpc), and writes:
+#   <dir>/trajectory_logs/<name>_trial_N/<name>_pursuer.csv + <name>_evader.csv
+#       one row per control tick: t_rel,state_stamp,x,y,z,vx,vy,vz (world frame)
+#   <dir>/time_to_intercept_logs/<name>_trial_N/<name>_time_to_intercept.csv
+#   <dir>/max_travel_speed_logs/<name>_trial_N/<name>_max_travel_speed.csv
+# Times are measured from the first logged control tick.
+logs:
+  save: true                   # Write the three logs above.
+  dir: ./logs                  # Output folder (absolute or relative to this config).
+  capture_radius: 0.10         # Interception = separation <= this (m); success_radius_eval in cfg/task/Intercept.yaml.
 
 # -- Motion capture (OptiTrack / NatNet) -------------------------------------
 mocap:

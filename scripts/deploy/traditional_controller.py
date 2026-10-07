@@ -718,6 +718,10 @@ class TraditionalController(InterceptController):
             cfg.target_clip, cfg.min_thrust_ratio, cfg.max_thrust_ratio,
         )
 
+    def _log_name(self) -> str:
+        # Matches the logs/<kind>/mpc_trial_<N> folders.
+        return 'mpc' if self.method == 'nonlinear_mpc' else self.method
+
     # -- per-step hook -------------------------------------------------------
     def _drone_state_tensor(self, state: ic.DroneState) -> torch.Tensor:
         """Pack a :class:`ic.DroneState` into the sim's ``drone_state`` layout.

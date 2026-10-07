@@ -106,6 +106,9 @@ configuration before running it.
 | `pursuer.uri` / `evader.uri` | *(config)* | cflib radio or CrazySim UDP URI. |
 | `min_altitude` | `0.15` | Safety cutoff (mirrors the training "misbehave" floor). |
 | `state_timeout` | `0.5` | Stop the drone if pose is stale for this long (s). |
+| `logs.save` | `false` | Log both drones' states each control tick, plus the run's time to intercept and pursuer max speed, as CSVs under `<dir>/{trajectory_logs,time_to_intercept_logs,max_travel_speed_logs}/<name>_trial_<N>/` (`<name>` = `intercept` or the baseline method, `N` = next unused trial). |
+| `logs.dir` | `./logs` | Output folder (relative to the config). |
+| `logs.capture_radius` | `0.1` | Separation (m) that counts as an interception. |
 
 The controller logs the EKF **world-frame** velocity (`stateEstimate.vx/vy/vz`)
 and rotates it into the pursuer body frame before building the policy

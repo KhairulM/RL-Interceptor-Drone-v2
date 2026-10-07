@@ -14,7 +14,7 @@ import logging
 import os
 import time
 import warnings
-from typing import Optional
+from typing import Any, Optional, TextIO
 
 import numpy as np
 import torch
@@ -48,6 +48,13 @@ DEFAULT_CONFIG_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), 'config_v2.yaml'
 )
 
+# Column layout of the per-drone trajectory CSVs (see logs/trajectory_logs/). Read
+# back by publish_trajectories_rviz.py and by evader_motion.type=trajectory.
+TRAJECTORY_COLUMNS = ('t_rel', 'state_stamp', 'x', 'y', 'z', 'vx', 'vy', 'vz')
+# One sub-folder per logged quantity under logs.dir; every run writes into
+# <kind>/<name>_trial_<N>/ of each, with the same N across the three.
+LOG_KINDS = ('trajectory_logs', 'time_to_intercept_logs', 'max_travel_speed_logs')
+
 
 def _read_yaml(path: str) -> dict:
     import yaml
@@ -70,6 +77,21 @@ def _load_controller_config(config_path: str) -> dict:
     if not isinstance(controller, dict):
         raise ValueError("Config section 'controller' must be a mapping.")
     return controller
+
+
+def _load_logs_config(config_path: str) -> dict:
+    config = _read_yaml(config_path)
+    logs = config.get('logs', {}) or {}
+    if not isinstance(logs, dict):
+        raise ValueError("Config section 'logs' must be a mapping.")
+    return logs
+
+
+def _write_csv_row(path: str, columns: tuple, values: list) -> None:
+    with open(path, 'w', encoding='utf-8', newline='') as handle:
+        writer = csv.writer(handle)
+        writer.writerow(columns)
+        writer.writerow(values)
 
 
 def _load_policy(artifact_dir: str):
@@ -208,6 +230,26 @@ class InterceptController:
 
         self._validate_evader_motion_config()
         self._load_evader_trajectory_if_needed()
+
+        logs_config = _load_logs_config(self.config_path)
+        self.save_logs = bool(logs_config.get('save', False))
+        self.capture_radius = float(logs_config.get('capture_radius', 0.1))
+        logs_dir = os.path.expanduser(str(logs_config.get('dir', './logs')))
+        if not os.path.isabs(logs_dir):
+            logs_dir = os.path.join(os.path.dirname(self.config_path), logs_dir)
+        self.logs_dir = os.path.abspath(logs_dir)
+        if self.save_logs:
+            # Fail on a bad output path here, before anything is airborne.
+            os.makedirs(self.logs_dir, exist_ok=True)
+        self._trial_dirs: dict[str, str] = {}
+        self._trajectory_handles: dict[str, TextIO] = {}
+        self._trajectory_writers: dict[str, Any] = {}
+        # Run metrics, timed from the first logged tick.
+        self._log_t0: Optional[float] = None
+        self._intercept_time: Optional[float] = None
+        self._min_distance = float('inf')
+        self._max_speed = 0.0
+        self._max_speed_time = 0.0
 
         self.drone_pose_pub = DronePosePublisher(world_frame='world')
         self.pursuer = CrazyflieDrone(
@@ -367,6 +409,106 @@ class InterceptController:
         self._evader_traj_pos = p_arr
         self._evader_traj_vel = v_arr
         logger.info('[intercept] Loaded evader trajectory from %s (%d points).', traj_path, len(times))
+
+    def _log_name(self) -> str:
+        """Controller name in the log folders and files. Overridden by subclasses."""
+        return 'intercept'
+
+    def _next_trial_dirs(self) -> dict[str, str]:
+        """Per-kind folders of the first trial number that holds no files yet."""
+        name = self._log_name()
+        trial = 1
+        while True:
+            dirs = {
+                kind: os.path.join(self.logs_dir, kind, f'{name}_trial_{trial}')
+                for kind in LOG_KINDS
+            }
+            if not any(os.path.isdir(d) and os.listdir(d) for d in dirs.values()):
+                return dirs
+            trial += 1
+
+    def _open_logs(self) -> None:
+        if not self.save_logs:
+            return
+        self._trial_dirs = self._next_trial_dirs()
+        for path in self._trial_dirs.values():
+            os.makedirs(path, exist_ok=True)
+        name = self._log_name()
+        for role in ('pursuer', 'evader'):
+            path = os.path.join(
+                self._trial_dirs['trajectory_logs'], f'{name}_{role}.csv'
+            )
+            handle = open(path, 'w', encoding='utf-8', newline='')
+            writer = csv.writer(handle)
+            writer.writerow(TRAJECTORY_COLUMNS)
+            self._trajectory_handles[role] = handle
+            self._trajectory_writers[role] = writer
+            logger.info('[intercept] Logging %s trajectory to %s', role, path)
+
+    def _log_tick(self, pursuer_state: ic.DroneState,
+                  evader_state: ic.DroneState) -> None:
+        if not self._trajectory_writers:
+            return
+        t_rel = time.time() - self._start_time
+        for role, state in (('pursuer', pursuer_state), ('evader', evader_state)):
+            values = [t_rel, state.stamp, *state.pos, *state.lin_vel]
+            self._trajectory_writers[role].writerow([f'{v:.6f}' for v in values])
+
+        if self._log_t0 is None:
+            self._log_t0 = t_rel
+        t = t_rel - self._log_t0
+        distance = float(np.linalg.norm(evader_state.pos - pursuer_state.pos))
+        self._min_distance = min(self._min_distance, distance)
+        if self._intercept_time is not None:
+            return  # max speed only counts up to (and including) the intercept tick
+        speed = float(np.linalg.norm(pursuer_state.lin_vel))
+        if speed > self._max_speed:
+            self._max_speed, self._max_speed_time = speed, t
+        # Same success rule as training: first tick inside the capture radius.
+        if distance <= self.capture_radius:
+            self._intercept_time = t
+            logger.info('[intercept] Interception at t=%.2f s (%.3f m <= %.2f m).',
+                        t, distance, self.capture_radius)
+
+    def _write_metric_logs(self) -> None:
+        name = self._log_name()
+        intercepted = self._intercept_time is not None
+        path = os.path.join(
+            self._trial_dirs['time_to_intercept_logs'], f'{name}_time_to_intercept.csv'
+        )
+        _write_csv_row(
+            path,
+            ('intercepted', 'time_to_intercept_s', 'capture_radius_m', 'min_distance_m'),
+            [intercepted,
+             f'{self._intercept_time:.6f}' if intercepted else '',
+             f'{self.capture_radius:.6f}', f'{self._min_distance:.6f}'],
+        )
+        logger.info('[intercept] Logged time to intercept to %s', path)
+        path = os.path.join(
+            self._trial_dirs['max_travel_speed_logs'], f'{name}_max_travel_speed.csv'
+        )
+        _write_csv_row(
+            path,
+            ('max_speed_mps', 't_max_speed_s'),
+            [f'{self._max_speed:.6f}', f'{self._max_speed_time:.6f}'],
+        )
+        logger.info('[intercept] Logged pursuer max travel speed to %s', path)
+
+    def _close_logs(self) -> None:
+        for handle in self._trajectory_handles.values():
+            try:
+                handle.close()
+            except Exception:
+                pass
+        self._trajectory_handles.clear()
+        self._trajectory_writers.clear()
+        if self._log_t0 is None:  # nothing logged (or already written)
+            return
+        try:
+            self._write_metric_logs()
+        except Exception:
+            logger.exception('[intercept] Failed to write the run metric logs.')
+        self._log_t0 = None
 
     def _setup_mocap(self) -> None:
         if not self.mocap_config.enabled:
@@ -560,6 +702,7 @@ class InterceptController:
             self._evader_motion_step = 0
             self._evader_motion_last_update = self._evader_motion_start_time
             self._evader_position_setpoint = self.evader_motion_anchor.copy()
+            self._open_logs()
 
             logger.info(
                 '[intercept] Running policy at %.1f Hz. '
@@ -613,6 +756,7 @@ class InterceptController:
                 command = self._compute_action(pursuer_state, evader_state)
 
                 self.pursuer.send_ctbr(command)
+                self._log_tick(pursuer_state, evader_state)
 
                 if self.log_commands:
                     rates = command.body_rate_deg.detach().cpu().numpy().reshape(-1)
@@ -659,6 +803,8 @@ class InterceptController:
             self.shutdown()
 
     def shutdown(self) -> None:
+        # Flush the logs first so a hang or error while landing cannot lose them.
+        self._close_logs()
         for drone in (self.pursuer, self.evader):
             try:
                 drone.land()
