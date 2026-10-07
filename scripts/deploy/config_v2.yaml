@@ -27,7 +27,7 @@ controller:
       speed: 2.0              # Constant speed (m/s).
       direction: [1.0, 0.0, 0.0]  # World-frame travel direction; normalized at load.
     random:
-      speed: 2.0              # Random-motion speed (m/s).
+      speed: 0.5              # Random-motion speed (m/s).
       turn_interval_range: [20, 80]  # Controller ticks between heading changes.
       vertical_component_range: [-0.5, 0.5]  # Sampled z component before normalization.
       target_lookahead: 0.5    # Position-controller target lead distance (s).
@@ -94,7 +94,7 @@ mocap:
 # Only read by traditional_controller.py; intercept_controller_v2.py ignores
 # this section. Run with:  python traditional_controller.py --method pn
 traditional:
-  method: pure_pursuit         # pure_pursuit | pn | apf | nonlinear_mpc.
+  method: nonlinear_mpc         # pure_pursuit | pn | apf | nonlinear_mpc.
 
   # Shared CTBR calibration + geometric outer-loop gains.
   ctbr:
