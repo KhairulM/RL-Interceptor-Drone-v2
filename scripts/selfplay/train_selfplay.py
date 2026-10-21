@@ -27,7 +27,7 @@ stage, alternates which side trains, samples a frozen opponent distribution from
 the database (temperature-scaled multi-metric softmax over win rate,
 time-to-capture, distance, and motor effort), then spawns two isolated worker
 processes (``run_stage.py``): one to train the new policy against the pool and
-one to evaluate it against every opponent to fill in the matchup metrics.
+one to evaluate it against the eligible opponents to fill in the matchup metrics.
 
 Usage:
     python scripts/selfplay/train_selfplay.py [key=value ...]
@@ -75,6 +75,17 @@ def _policy_stage(policy):
     return int(match.group(1)) if match else None
 
 
+def _previous_rl_policy(db, role, policy_id=None):
+    """Latest same-role RL policy preceding the policy being trained/retried."""
+    previous = None
+    for policy in db.list_policies(role):
+        if policy["id"] == policy_id:
+            break
+        if policy["kind"] == "rl":
+            previous = policy
+    return previous
+
+
 def _resume_point(db):
     """Find the next stage, role, and optional incomplete stage to run."""
     rl_policies = []
@@ -87,8 +98,11 @@ def _resume_point(db):
 
     stage, role, policy = max(rl_policies, key=lambda item: item[0])
     opponent_role = _other(role)
-    expected_opponents = db.policy_ids(opponent_role)
-    complete = all(
+    kind = "rl" if _previous_rl_policy(db, role, policy["id"]) else "heuristic"
+    expected_opponents = [
+        p["id"] for p in db.list_policies(opponent_role) if p["kind"] == kind
+    ]
+    complete = bool(expected_opponents) and all(
         (db.get_matchup(policy["id"], opponent_id) is not None)
         if role == PURSUER
         else (db.get_matchup(opponent_id, policy["id"]) is not None)
@@ -97,10 +111,6 @@ def _resume_point(db):
     if complete:
         return stage + 1, opponent_role, None
     return stage, role, policy
-
-
-def _abspath(path):
-    return path if os.path.isabs(path) else os.path.join(_REPO_ROOT, path)
 
 
 def _seed_pool(db, role, heuristics):
@@ -112,9 +122,11 @@ def _seed_pool(db, role, heuristics):
 
 
 def _pool_to_worker_spec(db, role, probs):
-    """Serialise a pool (+ probs) into the worker's opponent spec format."""
+    """Serialise only the selected opponents into the worker's spec format."""
     policies = []
     for p in db.list_policies(role):
+        if p["id"] not in probs:
+            continue
         policies.append({
             "id": p["id"],
             "kind": p["kind"],
@@ -153,13 +165,54 @@ def _run_worker(cfg, overrides):
         f"{result.returncode}): {' '.join(cmd)}")
 
 
+def _eval_heuristic_matchups(cfg, db, work_dir):
+    """Fill missing scripted-pursuer vs scripted-evader matchups (no RL side to evaluate them)."""
+    evaders = [p for p in db.list_policies(EVADER) if p["kind"] == "heuristic"]
+    for pursuer in db.list_policies(PURSUER):
+        if pursuer["kind"] != "heuristic":
+            continue
+        missing = [e for e in evaders if db.get_matchup(pursuer["id"], e["id"]) is None]
+        if not missing:
+            continue
+        name = pursuer["metadata"]["heuristic"]
+        tag = pursuer["id"].split(":", 1)[1]
+        spec_path = os.path.join(work_dir, f"{tag}_eval_opp.json")
+        _write_json(spec_path, {
+            "policies": [{k: e.get(k) for k in ("id", "kind", "checkpoint_path", "metadata")}
+                         for e in missing],
+            "probs": {e["id"]: 1.0 / len(missing) for e in missing},
+        })
+        out_path = os.path.join(work_dir, f"{tag}_eval_out.json")
+        overrides = [
+            "mode=eval",
+            f"task={cfg.task}",
+            f"algo={cfg.algo}",
+            f"task.role={PURSUER}",
+            f"task.env.num_envs={max(int(cfg.num_envs), len(missing) * 8)}",
+            f"headless={bool(cfg.headless)}",
+            f"seed={int(cfg.seed)}",
+            f"opponent_spec_path={spec_path}",
+            f"eval_heuristic={name}",
+            f"stage_out={out_path}",
+        ]
+        overrides += list(cfg.get("task_overrides", []) or [])
+        _run_worker(cfg, overrides)
+        with open(out_path, "r") as f:
+            matchups = json.load(f)["matchups"]
+        for opp_id, metrics in matchups.items():
+            db.record_matchup(pursuer["id"], opp_id, metrics)
+        print(f"[db] recorded {len(matchups)} heuristic matchups for {pursuer['id']}")
+
+
 def main():
     base = OmegaConf.load(os.path.join(_THIS_DIR, "train_selfplay.yaml"))
     cfg = OmegaConf.merge(base, OmegaConf.from_cli())
 
-    db_dir = _abspath(cfg.db_dir)
-    ckpt_dir = _abspath(cfg.ckpt_dir)
-    work_dir = _abspath(cfg.work_dir)
+    run_name = str(cfg.run_name)
+    out_dir = os.path.join(_THIS_DIR, "outputs", run_name)
+    db_dir = os.path.join(out_dir, "db")
+    ckpt_dir = os.path.join(out_dir, "checkpoints")
+    work_dir = os.path.join(out_dir, "stages")
 
     # Fresh start: wipe the persisted population so heuristics are re-seeded and
     # a brand-new generational campaign begins (opt-in; default keeps/extends it).
@@ -175,6 +228,7 @@ def main():
     db = PolicyDatabase(db_dir)
     _seed_pool(db, PURSUER, list(cfg.seed_heuristics.pursuer))
     _seed_pool(db, EVADER, list(cfg.seed_heuristics.evader))
+    _eval_heuristic_matchups(cfg, db, work_dir)
 
     metric_weights = OmegaConf.to_container(cfg.metric_weights, resolve=True)
     temperature = float(cfg.temperature)
@@ -195,9 +249,21 @@ def main():
         opp_role = _other(role)
         print(f"\n===== stage {current_stage}: train {role} vs {opp_role} pool =====")
 
-        # 1) Opponent sampling distribution from the database.
-        probs = db.compute_sampling_probs(
-            role, temperature=temperature, metric_weights=metric_weights)
+        # 1) Scripted opponents bootstrap each role's first RL policy only.
+        retry_id = incomplete_policy["id"] if incomplete_policy else None
+        reference = _previous_rl_policy(db, role, retry_id)
+        if reference:
+            probs = db.compute_sampling_probs(
+                role, temperature=temperature, metric_weights=metric_weights,
+                reference_policy_id=reference["id"], kind="rl")
+        else:
+            opp_ids = [p["id"] for p in db.list_policies(opp_role)
+                       if p["kind"] == "heuristic"]
+            probs = {pid: 1.0 / len(opp_ids) for pid in opp_ids}
+        if not probs:
+            kind = "rl" if reference else "heuristic"
+            raise ValueError(
+                f"no {kind} opponents available for {role} stage {current_stage}")
         print(f"[sample] opponent probs: {probs}")
 
         train_spec = _pool_to_worker_spec(db, opp_role, probs)
@@ -220,10 +286,12 @@ def main():
             f"seed={int(cfg.seed) + current_stage}",
             f"stage={current_stage}",
             f"wandb.mode={cfg.get('wandb_mode', 'online')}",
+            f"wandb.run_name={run_name}-{role}-stage{current_stage}",
             f"opponent_spec_path={train_spec_path}",
             f"stage_ckpt={stage_ckpt}",
             f"stage_out={train_out}",
         ]
+        overrides += list(cfg.get("task_overrides", []) or [])
         if bool(cfg.warm_start):
             latest = db.latest_policy_id(role)
             latest_entry = db.get_policy(role, latest) if latest else None
@@ -242,8 +310,8 @@ def main():
                 role, ckpt_path, kind="rl", metadata={"stage": current_stage})
         print(f"[db] added {new_id} -> {ckpt_path}")
 
-        # 3) Evaluate the new policy against every opponent (uniform assignment).
-        opp_ids = db.policy_ids(opp_role)
+        # 3) Evaluate against the same eligible pool (uniform assignment).
+        opp_ids = list(probs)
         uniform = {pid: 1.0 / len(opp_ids) for pid in opp_ids}
         eval_spec = _pool_to_worker_spec(db, opp_role, uniform)
         eval_spec_path = os.path.join(
@@ -264,6 +332,7 @@ def main():
             f"eval_policy={ckpt_path}",
             f"stage_out={eval_out}",
         ]
+        eval_overrides += list(cfg.get("task_overrides", []) or [])
         _run_worker(cfg, eval_overrides)
 
         with open(eval_out, "r") as f:

@@ -110,6 +110,8 @@ def _load_policy(artifact_dir: str):
     # low-latency step is what keeps the body-rate command timing matched to
     # training; see the fixed-rate loop in ``run``.
     device = torch.device('cpu')
+    # Batch-1 inference: extra intra-op threads only contend with the sim/radio (20 threads -> ~20 ms/tick).
+    torch.set_num_threads(1)
     policy = torch.jit.load(ts_path, map_location=device).eval()
     logger.info('[intercept] Loaded %s policy (obs_dim=%d) from %s on %s',
                 metadata.algo, metadata.obs.obs_dim, ts_path, device)
@@ -119,7 +121,8 @@ def _load_policy(artifact_dir: str):
 def _build_command(policy: torch.nn.Module, metadata: ic.PolicyMetadata,
                    pursuer: ic.DroneState, evader: ic.DroneState,
                    previous_action: Optional[torch.Tensor] = None,
-                   device: torch.device = torch.device('cpu')) -> tuple[torch.Tensor, ic.CTBRCommand]:
+                   device: torch.device = torch.device('cpu'),
+                   esn=None) -> tuple[torch.Tensor, ic.CTBRCommand]:
     """Run the policy to produce a CTBR command for the pursuer and return the tanh-scaled action and the decoded CTBR command."""
     pursuer_quat = torch.as_tensor(
         pursuer.quat_wxyz, dtype=torch.float32, device=device
@@ -137,7 +140,17 @@ def _build_command(policy: torch.nn.Module, metadata: ic.PolicyMetadata,
         previous_action=torch.as_tensor(previous_action, dtype=torch.float32, device=device),
         pursuer_ang_vel=torch.as_tensor(pursuer.ang_vel, dtype=torch.float32, device=device),
         evader_lin_vel_world=torch.as_tensor(evader.lin_vel, dtype=torch.float32, device=device),
-    ).reshape(1, metadata.obs.obs_dim)
+    )
+    if esn is not None:
+        target = ic.build_esn_target(
+            torch.as_tensor(pursuer.pos, dtype=torch.float32, device=device),
+            pursuer_quat,
+            pursuer_lin_vel_body,
+            torch.as_tensor(evader.pos, dtype=torch.float32, device=device),
+            torch.as_tensor(evader.lin_vel, dtype=torch.float32, device=device),
+        )
+        obs = ic.esn_augment(esn, obs, target)
+    obs = obs.reshape(1, metadata.obs.obs_dim)
 
     with torch.no_grad():
         raw_action = policy(obs)
@@ -272,13 +285,20 @@ class InterceptController:
     def _setup_policy(self) -> None:
         """Load the exported actor. Overridden to fly a non-learned controller."""
         self.metadata, self.policy, self.device = _load_policy(self.artifact_dir)
+        # Fresh ESN per run (deployment-faithful: W_out=0, P=delta*I at the first tick).
+        self.esn = (
+            ic.load_esn(os.path.abspath(os.path.expanduser(self.artifact_dir)), self.device)
+            if self.metadata.obs.use_esn else None
+        )
 
     def _compute_action(self, pursuer_state: ic.DroneState,
                         evader_state: ic.DroneState) -> ic.CTBRCommand:
         """Produce one CTBR command from the current relative state."""
+        # Only pass esn when set: amspb_peg monkeypatches _build_command without that kwarg.
+        esn_kwargs = {'esn': self.esn} if getattr(self, 'esn', None) is not None else {}
         policy_action, command = _build_command(
             self.policy, self.metadata, pursuer_state, evader_state,
-            self.previous_action, self.device,
+            self.previous_action, self.device, **esn_kwargs,
         )
         self.previous_action = policy_action.detach()
         return command

@@ -180,6 +180,7 @@ class PolicyDatabase:
         temperature: float = 1.0,
         metric_weights: Optional[Dict[str, float]] = None,
         reference_policy_id: Optional[str] = None,
+        kind: Optional[str] = None,
     ) -> Dict[str, float]:
         """Probabilities over opponents for training ``target_role``.
 
@@ -189,10 +190,12 @@ class PolicyDatabase:
         across the candidate opponents and oriented so a larger value means the
         opponent is currently *harder* for the training agent. Probabilities are
         ``softmax(score / temperature)``. Falls back to uniform when there is no
-        usable reference or no recorded metrics.
+        usable reference or no recorded metrics. ``kind`` restricts the
+        candidate opponents to that policy kind ("rl" or "heuristic").
         """
         opp_role = _opponent_role(target_role)
-        opponents = self.policy_ids(opp_role)
+        opponents = [p["id"] for p in self.list_policies(opp_role)
+                     if kind is None or p["kind"] == kind]
         if not opponents:
             return {}
         if len(opponents) == 1:

@@ -1,0 +1,42 @@
+{
+  "policies": [
+    {
+      "id": "evader:flee>circular@2.0",
+      "kind": "heuristic",
+      "checkpoint_path": null,
+      "metadata": {
+        "heuristic": "flee>circular@2.0"
+      }
+    },
+    {
+      "id": "evader:circular>hover@2.0",
+      "kind": "heuristic",
+      "checkpoint_path": null,
+      "metadata": {
+        "heuristic": "circular>hover@2.0"
+      }
+    },
+    {
+      "id": "evader:hover>flee@2.0",
+      "kind": "heuristic",
+      "checkpoint_path": null,
+      "metadata": {
+        "heuristic": "hover>flee@2.0"
+      }
+    },
+    {
+      "id": "evader:flee>weave@2.0",
+      "kind": "heuristic",
+      "checkpoint_path": null,
+      "metadata": {
+        "heuristic": "flee>weave@2.0"
+      }
+    }
+  ],
+  "probs": {
+    "evader:flee>circular@2.0": 0.25,
+    "evader:circular>hover@2.0": 0.25,
+    "evader:hover>flee@2.0": 0.25,
+    "evader:flee>weave@2.0": 0.25
+  }
+}

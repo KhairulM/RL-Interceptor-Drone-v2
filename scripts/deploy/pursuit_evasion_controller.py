@@ -13,8 +13,12 @@ can be driven three ways (``controller.opponent.mode``):
                  both learned policies compete on hardware (the real self-play
                  deployment);
 * ``cf``       - a real Crazyflie tracked by mocap but commanded elsewhere;
-* ``scripted`` - hover / linear / circular / flee position setpoints, mirroring
-                 the seed heuristics the population was trained against.
+* ``scripted`` - hover / linear / circular / pure_pursuit / flee position
+                 setpoints, mirroring the seed heuristics the population was
+                 trained against.
+
+Episode endings mirror training: capture, either drone crashing, the evader
+leaving the arena (the pursuer may leave freely), or the training timeout.
 
 Run with:  python pursuit_evasion_controller.py [--config config_pursuit_evasion.yaml]
 """
@@ -59,7 +63,9 @@ DEFAULT_CONFIG_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), 'config_pursuit_evasion.yaml'
 )
 
-SCRIPTED_MOTIONS = ('hover', 'linear', 'circular', 'flee')
+SCRIPTED_MOTIONS = ('hover', 'linear', 'circular', 'pure_pursuit', 'flee')
+# Legacy heuristic names (as in PursuitEvasion.HEURISTIC_ALIASES).
+MOTION_ALIASES = {'pursue': 'pure_pursuit'}
 
 
 def _read_yaml(path: str) -> dict:
@@ -85,12 +91,21 @@ def _load_policy(artifact_dir: str):
     # loop, and deterministic timing is what keeps the body-rate commands
     # matched to training.
     device = torch.device('cpu')
+    # Batch-1 inference: extra intra-op threads only contend with the sim/radio (20 threads -> ~20 ms/tick).
+    torch.set_num_threads(1)
     policy = torch.jit.load(ts_path, map_location=device).eval()
     logger.info(
         '[pe] Loaded %s %s policy (obs_dim=%d) from %s',
         metadata.algo, metadata.role, metadata.obs.obs_dim, ts_path,
     )
     return metadata, policy, device
+
+
+def _load_esn(artifact_dir: str, metadata: pec.PursuitEvasionMetadata, device: torch.device):
+    """Fresh per-run ESN (W_out=0, P=delta*I) for an ESN artifact, else None."""
+    if not metadata.obs.use_esn:
+        return None
+    return pec.load_esn(os.path.abspath(os.path.expanduser(artifact_dir)), device)
 
 
 def _build_command(
@@ -101,6 +116,7 @@ def _build_command(
     arena_origin: np.ndarray,
     previous_action: torch.Tensor,
     device: torch.device = torch.device('cpu'),
+    esn=None,
 ) -> 'tuple[torch.Tensor, pec.CTBRCommand, torch.Tensor]':
     """Run the policy and return the tanh-scaled action, the CTBR command, and
     the exact observation vector fed to the network (for debugging)."""
@@ -117,7 +133,14 @@ def _build_command(
         opponent_pos=_t(opponent.pos - arena_origin),
         opponent_lin_vel_world=_t(opponent.lin_vel),
         previous_action=_t(previous_action),
-    ).reshape(1, metadata.obs.obs_dim)
+    )
+    if esn is not None:
+        target = pec.build_esn_target(
+            _t(own.pos - arena_origin), _t(own.quat_wxyz), _t(own.lin_vel),
+            _t(opponent.pos - arena_origin), _t(opponent.lin_vel),
+        )
+        obs = pec.esn_augment(esn, obs, target)
+    obs = obs.reshape(1, metadata.obs.obs_dim)
 
     with torch.no_grad():
         raw_action = policy(obs)
@@ -156,13 +179,14 @@ def _log_obs_breakdown(
     """
     o = obs.detach().cpu().numpy().reshape(-1)
     # Component offsets mirror pec.build_observation's concat order.
+    r = pec.rotation_obs_dim(metadata.obs.rot_repr)
     self_pos = o[0:3]
-    rot = o[3:12]
-    lin_vel_b = o[12:15]
-    ang_vel_b = o[15:18]
-    rel_pos_b = o[18:21]
-    rel_vel_b = o[21:24]
-    prev_act = o[24:28] if metadata.obs.use_previous_action else np.zeros(4)
+    rot = o[3:3 + r]
+    lin_vel_b = o[3 + r:6 + r]
+    ang_vel_b = o[6 + r:9 + r]
+    rel_pos_b = o[9 + r:12 + r]
+    rel_vel_b = o[12 + r:15 + r]
+    prev_act = o[15 + r:19 + r] if metadata.obs.use_previous_action else np.zeros(4)
 
     own_rpy = _quat_to_rpy_deg(own.quat_wxyz)
     world_rel = (opponent.pos - arena_origin) - (own.pos - arena_origin)
@@ -175,10 +199,10 @@ def _log_obs_breakdown(
         '  rel_pos(world)=[%+.2f %+.2f %+.2f] |rel|=%.2fm\n'
         '[pe:dbg] --- observation components (network input) ---\n'
         '  self_pos      =[%+.2f %+.2f %+.2f]\n'
-        '  rot(diag)     =[%+.2f %+.2f %+.2f]  (all ~1 => level)\n'
+        '  rot(%s)%s=%s\n'
         '  lin_vel(body) =[%+.2f %+.2f %+.2f]\n'
         '  ang_vel(body) =[%+.2f %+.2f %+.2f]\n'
-        '  rel_pos(body) =[%+.2f %+.2f %+.2f]  <== should point at the opponent\n'
+        '  rel_%s(body) =[%+.2f %+.2f %+.2f]  <== should point at the opponent\n'
         '  rel_vel(body) =[%+.2f %+.2f %+.2f]\n'
         '  prev_action   =[%+.2f %+.2f %+.2f %+.2f]',
         own.pos[0], own.pos[1], own.pos[2], own_rpy[0], own_rpy[1], own_rpy[2],
@@ -188,9 +212,11 @@ def _log_obs_breakdown(
         opponent.lin_vel[0], opponent.lin_vel[1], opponent.lin_vel[2],
         world_rel[0], world_rel[1], world_rel[2], float(np.linalg.norm(world_rel)),
         self_pos[0], self_pos[1], self_pos[2],
-        rot[0], rot[4], rot[8],
+        metadata.obs.rot_repr, ' ' * max(0, 9 - len(metadata.obs.rot_repr)),
+        np.array2string(rot, precision=2, sign='+', suppress_small=True),
         lin_vel_b[0], lin_vel_b[1], lin_vel_b[2],
         ang_vel_b[0], ang_vel_b[1], ang_vel_b[2],
+        'pos' if metadata.obs.use_rel_dist else 'hdg',
         rel_pos_b[0], rel_pos_b[1], rel_pos_b[2],
         rel_vel_b[0], rel_vel_b[1], rel_vel_b[2],
         prev_act[0], prev_act[1], prev_act[2], prev_act[3],
@@ -206,6 +232,7 @@ class PursuitEvasionController:
         if not artifact_dir:
             raise ValueError(f"Config must set 'artifact_dir' in {self.config_path}.")
         self.metadata, self.policy, self.device = _load_policy(str(artifact_dir))
+        self.esn = _load_esn(str(artifact_dir), self.metadata, self.device)
 
         self.role = self.metadata.role
         self.opponent_role = pec.opponent_role(self.role)
@@ -236,14 +263,18 @@ class PursuitEvasionController:
         self.capture_radius = float(
             controller_config.get('capture_radius', self.metadata.capture_radius))
 
-        # Keep the vehicles inside the trained arena regardless of what the
-        # policy commands; outside it the observation is out of distribution.
+        # Training confines only the evader: its departure ends the episode,
+        # while the pursuer may leave and re-enter freely.
         self.enforce_arena = bool(controller_config.get('enforce_arena', True))
         self.arena_margin = float(controller_config.get('arena_margin', 0.3))
 
         self.control_dt = float(
             controller_config.get('control_dt', 0.0) or self.metadata.ctbr.dt
         )
+        # Training truncates at max_episode_length steps (an evader win).
+        self.stop_on_timeout = bool(controller_config.get('stop_on_timeout', True))
+        self.episode_duration = (
+            self.metadata.max_episode_length * self.metadata.ctbr.dt)
 
         # Optional first-order low-pass on the commanded body rates. The policy
         # was trained with the on-board rate loop stepped at the 50 Hz control
@@ -279,6 +310,7 @@ class PursuitEvasionController:
 
         self.opponent_metadata = None
         self.opponent_policy = None
+        self.opponent_esn = None
         if self.opponent_mode == 'policy':
             opponent_artifact = opponent_config.get('artifact_dir')
             if not opponent_artifact:
@@ -288,6 +320,8 @@ class PursuitEvasionController:
                 )
             self.opponent_metadata, self.opponent_policy, _ = _load_policy(
                 str(opponent_artifact))
+            self.opponent_esn = _load_esn(
+                str(opponent_artifact), self.opponent_metadata, self.device)
             if self.opponent_metadata.role != self.opponent_role:
                 raise ValueError(
                     f"Opponent artifact declares role "
@@ -300,6 +334,7 @@ class PursuitEvasionController:
         if not isinstance(motion, dict):
             raise ValueError("Config key 'controller.opponent.motion' must be a mapping.")
         self.motion_type = str(motion.get('type', 'hover')).strip().lower()
+        self.motion_type = MOTION_ALIASES.get(self.motion_type, self.motion_type)
         if self.motion_type not in SCRIPTED_MOTIONS:
             raise ValueError(
                 f"Config key 'controller.opponent.motion.type' must be one of "
@@ -436,15 +471,23 @@ class PursuitEvasionController:
                 self.motion_radius * np.sin(angle),
                 0.0,
             ])
+        elif self.motion_type == 'pure_pursuit':
+            # Fly at the agent's current position (no lead).
+            target = (own_state.pos.copy() if own_state is not None
+                      else self._position_setpoint.copy())
         else:  # flee
+            # Horizontal escape at the held anchor altitude, as in training:
+            # a 3D flee dives whenever the pursuer is above.
             current = self._position_setpoint
             if own_state is None:
                 target = current.copy()
             else:
                 away = current - own_state.pos
+                away[2] = 0.0
                 norm = float(np.linalg.norm(away))
                 away = away / norm if norm > 1e-6 else np.array([1.0, 0.0, 0.0])
                 target = current + away * (self.motion_speed * self.motion_lookahead)
+            target[2] = anchor[2]
 
         return self._clamp_to_arena(target)
 
@@ -533,11 +576,26 @@ class PursuitEvasionController:
                         self.role, own_state.pos[2],
                     )
                     break
-                if self.enforce_arena and self._outside_arena(own_state.pos):
+                if (self.opponent_mode != 'scripted'
+                        and opponent_state.pos[2] < self.min_altitude):
                     logger.warning(
-                        '[pe] %s left the trained arena at [%.2f, %.2f, %.2f]; '
-                        'stopping (observation would be out of distribution).',
-                        self.role, *own_state.pos,
+                        '[pe] %s below min altitude (%.2f m); stopping.',
+                        self.opponent_role, opponent_state.pos[2],
+                    )
+                    break
+                evader_state = own_state if self.role == 'evader' else opponent_state
+                if self.enforce_arena and self._outside_arena(evader_state.pos):
+                    logger.warning(
+                        '[pe] evader left the trained arena at [%.2f, %.2f, %.2f]; '
+                        'stopping (episode end in training).',
+                        *evader_state.pos,
+                    )
+                    break
+                if (self.stop_on_timeout and self.episode_duration > 0.0
+                        and now - self._motion_start_time >= self.episode_duration):
+                    logger.info(
+                        '[pe] Training episode length reached (%.1f s): evader '
+                        'survived; stopping.', self.episode_duration,
                     )
                     break
 
@@ -552,6 +610,7 @@ class PursuitEvasionController:
                 action, command, obs_vec = _build_command(
                     self.policy, self.metadata, own_state, opponent_state,
                     self.arena_origin, self.previous_action, self.device,
+                    esn=self.esn,
                 )
                 # previous_action feeds the observation, so store the raw
                 # (unfiltered) policy action; the low-pass only shapes the
@@ -574,6 +633,7 @@ class PursuitEvasionController:
                         self.opponent_policy, self.opponent_metadata,
                         opponent_state, own_state, self.arena_origin,
                         self.opponent_previous_action, self.device,
+                        esn=self.opponent_esn,
                     )
                     self.opponent_previous_action = opp_action.detach()
                     opp_command = self._smooth_command('opp', opp_command)

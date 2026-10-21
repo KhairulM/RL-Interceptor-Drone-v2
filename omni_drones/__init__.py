@@ -43,7 +43,13 @@ if not hasattr(torchrl_data, "BinaryDiscreteTensorSpec"):
 
 def init_simulation_app(cfg):
     # launch the simulator
-    config = {"headless": cfg["headless"], "anti_aliasing": 1}
+    width, height = cfg.viewer.resolution
+    config = {
+        "headless": cfg["headless"],
+        "anti_aliasing": 1,
+        "width": int(width),
+        "height": int(height),
+    }
     from isaacsim import SimulationApp
     simulation_app = SimulationApp(config)
     return simulation_app

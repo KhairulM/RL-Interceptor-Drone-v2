@@ -74,13 +74,22 @@ class ObsConfig:
     use_relative_distance: bool = False
     use_relative_velocity: bool = False
     use_previous_action: bool = False
+    # Attitude slot: 'matrix' (vec(R), 9-D), 'quat' (w >= 0, 4-D) or 'log' (log(R), 3-D).
+    rot_repr: str = 'matrix'
+    # ESN-OA: 6-D prediction (rel distance + rel lin vel) appended after the base obs.
+    use_esn: bool = False
+    esn_dim: int = 6
     obs_dim: int = 19
     action_dim: int = 4
 
+    def base_obs_dim(self) -> int:
+        """Observation dimension before the ESN prediction is appended."""
+        return self.obs_dim - (self.esn_dim if self.use_esn else 0)
+
     def expected_obs_dim(self) -> int:
         """Recompute the observation dimension from the layout flags."""
-        # rot matrix + body lin vel + body rot vel
-        pursuer_state_dim = 9 + 3 + 3
+        # rotation + body lin vel + body rot vel
+        pursuer_state_dim = rotation_obs_dim(self.rot_repr) + 3 + 3
         pursuer_state_dim += 3 if self.use_ab_world_frame else 1
 
         # Evader direction slot: heading or raw relative distance, both 3D.
@@ -91,6 +100,8 @@ class ObsConfig:
         result = pursuer_state_dim + evader_state_dim
         if self.use_previous_action:
             result += self.action_dim
+        if self.use_esn:
+            result += self.esn_dim
         return result
 
 
@@ -254,6 +265,28 @@ def quat_rotate_inverse(quat_wxyz: torch.Tensor, vec: torch.Tensor) -> torch.Ten
     return factor0 * vec + 2.0 * dot * q_vec - 2.0 * quat_wxyz[..., :1] * cross
 
 
+def rotation_obs_dim(rot_repr: str) -> int:
+    dims = {'matrix': 9, 'quat': 4, 'log': 3}
+    if rot_repr not in dims:
+        raise ValueError(f"rot_repr must be one of {list(dims)}, got {rot_repr!r}")
+    return dims[rot_repr]
+
+
+def rotation_obs(quat_wxyz: torch.Tensor, rot_repr: str, eps: float = 1e-6) -> torch.Tensor:
+    """Attitude observation slot, matching training (omni_drones/utils/torch.py quat_canonical/quat_log)."""
+    dim = rotation_obs_dim(rot_repr)
+    if dim == 9:
+        rot = quaternion_to_rotation_matrix(quat_wxyz)
+        return rot.reshape(*rot.shape[:-2], 9)
+    q = torch.where(quat_wxyz[..., :1] < 0, -quat_wxyz, quat_wxyz)
+    if dim == 4:
+        return q
+    w, v = q[..., :1], q[..., 1:]
+    n = v.norm(dim=-1, keepdim=True)
+    scale = torch.where(n > eps, 2.0 * torch.atan2(n, w) / n.clamp(min=eps), 2.0 / w.clamp(min=eps))
+    return scale * v
+
+
 # ---------------------------------------------------------------------------
 # Observation construction
 # ---------------------------------------------------------------------------
@@ -306,8 +339,7 @@ def build_observation(
         pursuer_quat_wxyz, evader_pos - pursuer_pos
     )  # (3), pursuer body frame
     evader_slot = evader_rel if cfg.use_relative_distance else normalize(evader_rel)
-    pursuer_rot = quaternion_to_rotation_matrix(pursuer_quat_wxyz)
-    pursuer_rot = pursuer_rot.reshape(*pursuer_rot.shape[:-2], 9)  # (9)
+    pursuer_rot = rotation_obs(pursuer_quat_wxyz, cfg.rot_repr)  # (9), (4) or (3)
 
     if cfg.use_ab_world_frame:
         components = [pursuer_pos]  # (3)
@@ -315,7 +347,7 @@ def build_observation(
         components = [pursuer_pos[..., 2:3]]  # altitude only (1)
 
     components += [
-        pursuer_rot,      # (9)
+        pursuer_rot,      # (9), (4) or (3)
         pursuer_lin_vel,  # (3)
         pursuer_ang_vel,  # (3)
         evader_slot,      # (3) heading or raw relative distance
@@ -339,12 +371,26 @@ def build_observation(
         components.append(previous_action)  # (4)
 
     obs = torch.cat(components, dim=-1)
-    if obs.shape[-1] != cfg.obs_dim:
+    if obs.shape[-1] != cfg.base_obs_dim():
         raise ValueError(
             f'Assembled observation has dim {obs.shape[-1]} but metadata '
-            f'declares obs_dim={cfg.obs_dim}. Check the ObsConfig flags.'
+            f'declares base obs_dim={cfg.base_obs_dim()}. Check the ObsConfig flags.'
         )
     return obs
+
+
+def build_esn_target(
+    pursuer_pos: torch.Tensor,
+    pursuer_quat_wxyz: torch.Tensor,
+    pursuer_lin_vel: torch.Tensor,
+    evader_pos: torch.Tensor,
+    evader_lin_vel_world: torch.Tensor,
+) -> torch.Tensor:
+    """ESN RLS target: body-frame evader rel distance (3) + rel lin vel (3),
+    matching ``Intercept._compute_state_and_obs`` (pursuer_lin_vel is body frame)."""
+    rel_dist = quat_rotate_inverse(pursuer_quat_wxyz, evader_pos - pursuer_pos)
+    rel_vel = quat_rotate_inverse(pursuer_quat_wxyz, evader_lin_vel_world) - pursuer_lin_vel
+    return torch.cat([rel_dist, rel_vel], dim=-1)
 
 
 # ---------------------------------------------------------------------------
@@ -536,6 +582,29 @@ def transform_mocap_pose(
 # Standard artifact file names, referenced by both scripts.
 POLICY_TS_FILENAME = 'policy_ts.pt'
 METADATA_FILENAME = 'metadata.json'
+ESN_FILENAME = 'esn.pt'
+_ESN_MODULE_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    'omni_drones', 'utils', 'esn.py',
+)
+
+
+def load_esn(artifact_dir: str, device: torch.device = torch.device('cpu')):
+    """Build a single-env ``BatchedESN`` from ``esn.pt`` (reservoir weights + hparams)."""
+    import importlib.util
+
+    # Loaded by file path: importing the omni_drones package would pull in Isaac Sim.
+    spec = importlib.util.spec_from_file_location('_omni_drones_esn', _ESN_MODULE_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    data = torch.load(os.path.join(artifact_dir, ESN_FILENAME), map_location='cpu')
+    return module.BatchedESN.from_export(data, num_envs=1, device=device)
+
+
+def esn_augment(esn, obs: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    """One ESN-OA tick: RLS update on ``target``, reservoir step on ``obs``, append prediction."""
+    pred = esn.step(obs.reshape(1, -1), target.reshape(1, -1))
+    return torch.cat([obs.reshape(1, -1), pred], dim=-1)
 
 
 def artifact_paths(output_dir: str) -> 'tuple[str, str]':

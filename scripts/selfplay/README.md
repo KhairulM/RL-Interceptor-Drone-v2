@@ -19,8 +19,10 @@ currently hardest.
 | Task config | `cfg/task/PursuitEvasion.yaml` |
 | Policy database (JSON) | `omni_drones/utils/selfplay/policy_db.py` |
 | Frozen opponent bank | `omni_drones/utils/selfplay/opponents.py` |
+| Optional ESN opponent predictor | `omni_drones/utils/esn.py` |
 | Generational driver (orchestrator) | `scripts/selfplay/train_selfplay.py` (+ `.yaml`) |
 | Per-stage worker (Isaac process) | `scripts/selfplay/run_stage.py` (+ `.yaml`) |
+| Win-rate matrix plot | `scripts/selfplay/plot_winrate_matrix.py` |
 
 The task is registered via `omni_drones/envs/single/__init__.py` and is available
 as `task=PursuitEvasion`.
@@ -41,7 +43,9 @@ Built in the drone's own body frame so a frozen policy trained as one role can b
 replayed as the other role's opponent:
 
 1. agent position (3)
-2. flattened rotation matrix (9)
+2. attitude, per `observation.rot_repr`: `matrix` — flattened rotation matrix
+  (9, default); `quat` — canonical quaternion with `w ≥ 0` (4); `log` — rotation
+  vector `log(R)` (3)
 3. body-frame linear velocity (3)
 4. body-frame angular velocity (3)
 5. opponent relative vector in the agent body frame (3) — the raw relative
@@ -49,13 +53,21 @@ replayed as the other role's opponent:
    `normalize(rel_dist)` when `false`
 6. opponent relative linear velocity in the agent body frame (3)
 7. previous action (4) — if `observation.use_previous_action`
+8. ESN prediction of the opponent's next relative position + velocity (6) — only
+  when `esn.enabled` and this side is listed in `esn.roles` (see
+  [ESN opponent predictor](#esn-opponent-predictor))
 
-Total: **24** (or **28** with previous action). A time encoding is appended to the
-critic `state` when `observation.use_time_encoding` is set.
+Total with the default matrix attitude: **24** (or **28** with previous action),
+plus 6 with ESN. A time encoding is appended to the critic `state` when
+`observation.use_time_encoding` is set.
+
+The frozen opponent uses its own role's observation layout. With the default
+`esn.roles: [pursuer]`, a frozen pursuer still receives its ESN prediction when
+playing against a training evader, so the roles can have different `obs_dim`.
 
 > Note: the deployment observation in `scripts/deploy/pursuit_evasion_common.py`
-> must match component 5's `use_rel_dist` setting bit-for-bit, or the exported
-> policy sees an out-of-distribution input on hardware.
+> must match `use_rel_dist`, `rot_repr`, and the ESN setting bit-for-bit, or the
+> exported policy sees an out-of-distribution input on hardware.
 
 Optional per-component Gaussian sensor noise is added to the **agent's**
 observation (never the frozen opponent's) when `observation.include_noise: true`;
@@ -68,40 +80,34 @@ the PID rate controller.
 
 ### Reward (asymmetric dense terms, symmetric terminal)
 
-Terminal outcomes use a single magnitude `W = reward_terminal_weight`, plus
-**partial credit** `s·W` (`s = reward_forced_error_scale`, default `0.25`) when
-the *opponent* destroys itself:
+Terminal outcomes use a single magnitude `W = reward_terminal_weight`:
 
 * **Full win (+W):** pursuer → capture; evader → survived to the timeout.
 * **Full loss (−W):** the agent's **own** crash to the ground
-  (`z < minimum_altitude`) / NaN state, its **own** departure through a wall or
-  ceiling, and (pursuer only) the timeout.
-* **Forced error (+s·W):** the **opponent** crashed or left the arena. This is
-  deliberately *not* a full win. At parity the pursuer simply farmed it —
-  standing off and waiting for a scripted evader to fall out of the sky paid the
-  same as a capture, so 93% of its "wins" were evader crashes and the capture
-  rate collapsed to ~3%. Partial credit keeps the "you forced the error" signal
-  while leaving capture strictly the best outcome. Symmetric for both roles.
+  (`z < minimum_altitude`) / NaN position, (evader only) its departure through
+  a wall or ceiling, and (pursuer only) the timeout.
+* **Neutral (0):** the opponent crashing ends the episode without terminal
+  reward for the agent. An evader leaving the arena is also neutral for the
+  pursuer; the pursuer may leave and re-enter freely.
 
 | outcome | pursuer | evader |
 |---|:--:|:--:|
 | capture | **+W** | −W |
 | timeout (evader survived) | −W | **+W** |
-| opponent crashes | +s·W | +s·W |
-| opponent leaves arena | +s·W | +s·W |
-| own crash | −W | −W |
-| own departure from arena | −W | −W |
+| pursuer crashes | −W | 0 |
+| evader crashes | 0 | −W |
+| evader leaves arena | 0 | −W |
+| pursuer leaves arena | 0 (episode continues) | 0 (episode continues) |
 
-A forced error is only credited when the episode was not already resolved as a
-win or a loss for the agent, so simultaneous events (both drones hitting the
-ground; a capture of an evader that is also below the crash altitude) resolve to
-a single clean value in `{−W, 0, +s·W, +W}`.
+A capture takes precedence over a simultaneous loss. Every terminal reward is
+therefore one of `{−W, 0, +W}`.
 
 Dense terms: the pursuer gets `approach` (distance-closing) + `precision`
 (potential `exp(-k·d)`) and, when `use_distance` is set, a per-step distance
-penalty (`reward_distance_weight · distance`); the evader gets a small per-step
-survival reward (`reward_step`). Both get a `bounds` penalty that ramps up within
-`bounds_margin` of a wall (so the boundary is learned before it is hit) and
+penalty (`reward_distance_weight · distance`); the evader gets a per-step
+survival reward (`reward_step`, default `0.1`) and an evader-only `bounds`
+penalty that ramps up within `bounds_margin` of a wall. The pursuer has no bounds
+penalty. Both get
 **three complementary smoothness penalties**:
 
 | penalty | on what | why it alone is not enough |
@@ -112,24 +118,25 @@ survival reward (`reward_step`). Both get a `bounds` penalty that ramps up withi
 
 The third term is the anti-tumble lever: without it a policy can hold ±180 deg/s
 setpoints essentially for free in training and then tumble on deployment.
+In the current task config, `reward_body_rate_weight` is `0.0` (disabled), while
+`reward_action_smoothness_weight` and `reward_cmd_rate_weight` are `0.5` and `0.2`.
 
 Weights: `reward_approach_weight`, `reward_precision_weight`/`_scale`,
 `reward_step`, `reward_body_rate_weight`, `reward_action_smoothness_weight`,
 `reward_cmd_rate_weight`, `use_distance`/`reward_distance_weight`,
-`reward_bounds_weight`, `bounds_margin`, `reward_terminal_weight`,
-`reward_forced_error_scale`.
+`reward_bounds_weight`, `bounds_margin`, `reward_terminal_weight`.
 
 ### Arena, capture, termination
 
 - Confined box (env-local): `arena.half_xy`, `arena.z_min`, `arena.z_max`
-  (default ≈ 10 m × 10 m × 4 m). Drawn as a boundary box when not headless
-  (`arena.visualize: true`).
+  (default 4 m × 4 m, `z ∈ [0.1, 3.0]` m). Drawn as a boundary box when not
+  headless (`arena.visualize: true`). Spawns are at least
+  `min_spawn_separation` (default 1 m) apart.
 - Capture when inter-drone distance ≤ the **curriculum capture radius**.
-- Terminate on capture, on **either** drone crashing to the ground
-  (`z < minimum_altitude`), on **either** drone leaving the arena through a
-  wall/ceiling, or on a NaN state; truncate at `env.max_episode_length` (an
-  evader escape). Crashing or leaving is a full loss for the drone responsible
-  and **partial credit** (`s·W`) for the other — never a full win (see Reward).
+- Terminate on capture, either drone crashing to the ground or having a NaN
+  position, or the evader leaving through a wall/ceiling. The pursuer may leave
+  without terminating the episode. Truncate at `env.max_episode_length` (default
+  1500 steps): a surviving evader wins and the pursuer loses.
 
 ### Capture-radius curriculum
 
@@ -142,7 +149,9 @@ radius(step) = max(success_radius_init − success_radius_lr · global_step,
 radius       = success_radius_eval              # eval / not training
 ```
 
-Logged as `stats.capture_radius`.
+Logged as `stats.capture_radius`. Current task defaults set the initial, final,
+and evaluation radii to `0.1` m and the learning rate to `0`, so it stays fixed
+unless overridden.
 
 ---
 
@@ -159,9 +168,18 @@ generation). Opponents are either:
   Crazyflie):
   - `hover` — hold spawn position
   - `circular` — orbit the spawn point (`heuristic.circular_radius`, `circular_omega`)
-  - `pursue` — chase the other drone
+  - `pure_pursuit` — fly at the other drone's current position (no lead); the
+    legacy name `pursue` is also accepted
+  - `apf` — artificial potential field: braking-limited attractive velocity
+    toward the other drone plus its velocity as feed-forward
+    (`omni_drones/controllers/apf_controller.py`,
+    `omni_drones/controllers/cfg/apf_intercept.yaml`)
   - `flee` — run **horizontally** away from the pursuer at a **held spawn
     altitude** (see below)
+  - `fast_flee` — flee at 1.5× speed; `weave` and `zigzag` add lateral
+    oscillations
+  - switch forms such as `hover>flee@2.0` switch from the first behavior to the
+    second after the specified episode time in seconds
 
 All heuristic targets are clamped into the arena shrunk by
 `heuristic.safe_margin`, and the opponent controller's tilt is capped at
@@ -193,6 +211,10 @@ opponent instead of one that removes itself. Interior flee speed is ~1.3 m/s.
 Per-env assignment uses `omni_drones/utils/sampling.py::policy_sampling` with the
 sampling probabilities from the policy database.
 
+Frozen RL opponents run only on the observations for environments assigned to
+them, using actor-only inference (the critic is not needed to produce actions).
+This avoids evaluating each policy across the full environment batch.
+
 ---
 
 ## Policy database
@@ -210,17 +232,17 @@ JSON files under the database directory (`policy_db.py`):
   | `avg_time_to_capture` | mean time-to-capture over captured episodes (falls back to the episode cap when there were none) |
   | `avg_distance` | mean inter-drone distance |
   | `avg_motor_effort` | mean accumulated motor effort |
-  | `agent_error_rate` | fraction of episodes in which the **training agent itself** crashed or left the arena |
+  | `agent_error_rate` | fraction of episodes in which the evaluated role's agent crashed or left the arena |
 
   plus diagnostics that do **not** feed sampling: `episodes`, `eval_role`,
-  `avg_episode_len`, `agent_terminal_win_rate`, `agent_forced_error_rate`, and an
+  `avg_episode_len`, `agent_terminal_win_rate`, and an
   `outcomes` block breaking every episode down by how it ended
   (`capture`, `pursuer_crash`, `evader_crash`, `pursuer_oob`, `evader_oob`,
-  `timeout`, `forced_error`).
+  `timeout`).
 
   The `outcomes` breakdown is what makes a bad matchup *diagnosable*: a zero
   capture rate reads identically whether the pursuer could not catch the evader
-  or the evader removed itself before it could be caught. The four numeric
+  or the evader removed itself before it could be caught. The five sampling
   metrics alone cannot tell those apart.
 
 ### Opponent sampling (multi-metric, temperature)
@@ -251,6 +273,15 @@ that evader wins by clean evasion rather than by forcing crashes.
 
 Low temperature → focus on the hardest opponents; high temperature → uniform.
 Cold start (no reference / no metrics) falls back to uniform.
+
+At startup, the orchestrator evaluates missing scripted-pursuer ×
+scripted-evader matchups. A role's first RL generation samples scripted
+opponents uniformly. Later generations sample only opposing RL policies using
+the multi-metric softmax; scripted opponents are excluded from both training and
+evaluation pools. Each new RL policy is evaluated uniformly against the same
+eligible pool used for its training. Scripted policies and historical matchups
+remain in the database for diagnostics. Resuming an interrupted first generation
+still uses scripted opponents; resuming later generations uses RL opponents only.
 
 Defaults (`scripts/selfplay/train_selfplay.yaml`):
 
@@ -294,25 +325,31 @@ Train the evader instead: `task.role=evader`. Note the num-envs override is
 ### Full generational self-play
 
 The orchestrator seeds both pools with heuristics, then alternates sides. Each
-stage spawns two isolated worker processes (train, then eval):
+stage trains one role in an isolated Isaac worker and evaluates the resulting
+policy in a second worker against the same eligible opposite-role pool (scripted
+for that role's first RL generation, RL-only afterward):
 
 ```bash
 python scripts/selfplay/train_selfplay.py \
-    n_stages=8 frames_per_stage=20_000_000 \
+    run_name=<campaign> n_stages=8 frames_per_stage=20_000_000 \
     num_envs=256 temperature=1.0
 ```
 
-  By default, rerunning the command resumes from the persisted policy database.
-  Completed stages are detected from their checkpoint names and matchup records;
-  with pursuer stage 4 and evader stage 5 present, the next run starts at stage 6
-  and trains the pursuer, warm-started from `pursuer_stage4.pt`, against the
-  persisted evader population. An incomplete stage is retried without adding a
-  duplicate policy entry. Use `fresh_start=true` to clear the pools and begin at
-  stage 0 again.
+By default, rerunning the command resumes from the persisted database. Completed
+stages are detected from policy metadata/checkpoint names and matchup records;
+with pursuer stage 4 and evader stage 5 present, the next run starts at stage 6
+and trains the pursuer, warm-started from `pursuer_stage4.pt`. An incomplete
+stage is retried without adding a duplicate policy entry. Use
+`fresh_start=true` to clear that campaign's pools, checkpoints, and stage files.
 
-Key orchestrator options (`scripts/selfplay/train_selfplay.yaml`): `db_dir`,
-`ckpt_dir`, `work_dir`, `start_role`, `warm_start`, `temperature`,
-`metric_weights`, `seed_heuristics`.
+Current defaults from `scripts/selfplay/train_selfplay.yaml`: `run_name` is
+`selfplay_v8_no_forced_error_reward`, `fresh_start=false`, `n_stages=26`,
+`num_envs=4096`, `frames_per_stage=500_000_000`, `start_role=pursuer`,
+`warm_start=true`, `wandb_mode=online`, and `temperature=0.9`. Outputs go to
+`scripts/selfplay/outputs/{run_name}/{db,checkpoints,stages}`; W&B runs are named
+`{run_name}-{role}-stage{n}`. `task_overrides` are forwarded to train and eval
+workers; use a separate campaign/database when changing observation dimensions,
+such as enabling ESN.
 
 ### Worker (invoked by the orchestrator; can be run directly)
 
@@ -326,7 +363,16 @@ python scripts/selfplay/run_stage.py mode=train task=PursuitEvasion algo=ppo \
 python scripts/selfplay/run_stage.py mode=eval task=PursuitEvasion algo=ppo \
     task.role=pursuer eval_policy=<policy.pt> \
     opponent_spec_path=<pool.json> stage_out=<eval_out.json>
+
+# Evaluate a scripted pursuer (pure_pursuit | apf) instead of a checkpoint
+python scripts/selfplay/run_stage.py mode=eval task=PursuitEvasion algo=ppo \
+    task.role=pursuer eval_heuristic=apf \
+    opponent_spec_path=<pool.json> stage_out=<eval_out.json>
 ```
+
+The worker builds the trainable policy from `algo`; frozen RL opponents are
+loaded as PPO policies. The training worker logs to W&B unless
+`wandb.mode=disabled`.
 
 ### Visualising the arena
 
@@ -340,8 +386,10 @@ the green boundary box drawn per env.
 ### Win-rate matrix (pursuer generation × evader generation)
 
 `plot_winrate_matrix.py` turns a run's `matchups.json` into a
-pursuer-generation × evader-generation heatmap of the pursuer capture rate. It
-always writes a PNG next to the database and can additionally log to W&B:
+pursuer-generation × evader-generation heatmap of pursuer capture rate for RL
+policies (scripted heuristics are excluded). It always writes a PNG next to the
+database and can additionally log an image, a `wandb.Table`, and an interactive
+W&B heatmap when supported:
 
 ```bash
 python scripts/selfplay/plot_winrate_matrix.py \
@@ -362,30 +410,57 @@ evaders (upper triangle). Cells for pairs that were never evaluated render as
 `-` — the table is sparse because each new policy is only evaluated against the
 pool that existed when it was added.
 
-> `wandb.plot.HeatMap` is not available in current wandb versions, so the heatmap
-> is logged as an image panel; the accompanying `wandb.Table` is there to build
-> custom charts from.
+> If the installed W&B version cannot create `wandb.plot.HeatMap`, the plotter
+> still logs the image and table.
 
 ---
 
 ## Logged stats
 
 `return`, `episode_len`, `distance`, `success_rate`, `capture`, `win_rate`,
-`forced_error`, `timeout`, `time_to_capture`, `motor_effort`, `crash`,
+`timeout`, `time_to_capture`, `motor_effort`, `crash`,
 `opp_crash`, `out_of_bounds`, `opp_out_of_bounds`, `capture_radius`, and the
 per-term reward components (`reward_approach`, `reward_precision`,
 `reward_distance`, `reward_body_rate`, `reward_action_smoothness`,
-`reward_cmd_rate`, `reward_terminal`).
+`reward_cmd_rate`, `reward_terminal`), plus `esn_pred_err` when ESN is enabled.
 
 `crash` / `out_of_bounds` are always the **training agent's**; the opponent's are
-under `opp_crash` / `opp_out_of_bounds`. `win_rate` counts only full wins, so a
-gap between `win_rate` and `capture` + `forced_error` shows how much of the
-agent's terminal income came from partial credit.
+under `opp_crash` / `opp_out_of_bounds`. `stats.win_rate` counts role-specific
+full wins: for pursuer training it matches capture; for evader training it
+counts episodes survived to timeout. The matchup database's `win_rate` is always
+the pursuer capture rate.
 
 All terminal stats are latched in `_compute_state_and_obs` (before the stats are
 cloned into the observation), otherwise the episode resets first and every
 terminal stat logs as zero. The eval worker aggregates these per opponent into
 the matchup metrics consumed by the sampler.
+
+---
+
+## ESN opponent predictor
+
+Optional ESN-OA support is controlled by `task.esn.enabled` (default `false`)
+and `task.esn.roles` (default `[pursuer]`). For each enabled role, a batched
+echo-state reservoir predicts the opponent's next relative position and
+velocity (6 values) and appends them to that role's observation. The frozen
+opponent uses the observation size for its own role, so ESN policies must only
+be mixed with checkpoints trained using the same role-specific observation
+layout.
+
+`task.esn.readout` supports `per_env` (episode-reset online RLS), `shared`
+(central ridge readout fit across environments during training), and
+`shared_adapt` (shared initialization followed by per-environment RLS). The
+default is `shared`. Shared readouts are saved beside each policy checkpoint as
+`<checkpoint>_esn.pt`; the worker warm-starts from the initial/evaluation
+checkpoint sidecar, and frozen RL opponents require their own sidecar.
+
+Enable ESN through the orchestrator override, using a separate campaign from
+non-ESN policies:
+
+```bash
+python scripts/selfplay/train_selfplay.py run_name=selfplay_esn \
+  'task_overrides=[task.esn.enabled=true]'
+```
 
 ---
 
@@ -403,3 +478,8 @@ the matchup metrics consumed by the sampler.
   the 50 Hz control period; real/CrazySim firmware runs it ~10× faster and tracks
   aggressive setpoints far more crisply. This is why `reward_cmd_rate_weight`
   exists, and why the deploy controller offers `command_rate_lpf_tau`.
+* **Time accounting uses `sim.dt` without substeps.** With current `sim.dt: 0.01`
+  and `sim.substeps: 2`, an environment step spans 0.02 s, but capture-time
+  stats, the no-capture matchup fallback, and circular heuristic phase use
+  `progress_buf * sim.dt`. Reported times are half wall-clock time, and the
+  circular heuristic runs at half its configured angular rate.

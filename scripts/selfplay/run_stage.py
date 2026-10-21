@@ -48,6 +48,7 @@ from torchrl.envs.transforms import Compose, InitTracker, TransformedEnv
 from torchrl.envs.utils import ExplorationType, set_exploration_type
 
 from omni_drones import init_simulation_app
+from omni_drones.utils.esn import save_readout_sidecar
 # Import at module top so the algo ConfigStore nodes (e.g. "ppo") are registered
 # before Hydra composes the config, mirroring scripts/train.py.
 from omni_drones.learning import ALGOS  # noqa: F401
@@ -80,7 +81,23 @@ def _load_opponent_spec(cfg):
     cfg.task.opponent.policies = spec["policies"]
     cfg.task.opponent.probs = spec.get("probs", None)
     # Frozen RL opponents are PPO policies; hand them this run's algo config.
-    cfg.task.opponent.algo_cfg = cfg.algo
+    if cfg.algo.name == "ppo":
+        cfg.task.opponent.algo_cfg = cfg.algo
+    else:
+        from omni_drones.learning.ppo.ppo import PPOConfig
+        cfg.task.opponent.algo_cfg = OmegaConf.structured(PPOConfig)
+
+
+def _select_esn_readout(cfg):
+    """Train: warm-start the shared ESN readout from init_policy. Eval: use eval_policy's."""
+    from omni_drones.utils.esn import readout_sidecar_path
+
+    esn_cfg = cfg.task.get("esn", None)
+    if esn_cfg is None or not esn_cfg.get("enabled", False) or esn_cfg.get("readout_path", None):
+        return
+    ckpt = cfg.get("eval_policy" if str(cfg.mode).lower() == "eval" else "init_policy", None)
+    if ckpt and os.path.isfile(readout_sidecar_path(ckpt)):
+        esn_cfg.readout_path = readout_sidecar_path(ckpt)
 
 
 def _build_transformed_env(cfg, base_env):
@@ -101,7 +118,7 @@ def _build_transformed_env(cfg, base_env):
 def _make_policy(cfg, env, base_env):
     from omni_drones.learning import ALGOS
 
-    policy = ALGOS["ppo"](
+    policy = ALGOS[cfg.algo.name.lower()](
         cfg.algo,
         env.observation_spec,
         env.action_spec,
@@ -176,6 +193,7 @@ def _run_train(cfg, env, base_env, policy):
     ckpt_path = os.path.abspath(cfg.stage_ckpt)
     os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
     torch.save(policy.state_dict(), ckpt_path)
+    save_readout_sidecar(base_env, ckpt_path)
     logging.info(f"saved checkpoint to {ckpt_path}")
     run.finish()
 
@@ -184,8 +202,15 @@ def _run_train(cfg, env, base_env, policy):
 
 @torch.no_grad()
 def _run_eval(cfg, env, base_env, policy):
-    _load_state_dict(policy, cfg.eval_policy, base_env.device)
-    policy.eval()
+    heuristic = cfg.get("eval_heuristic", None)
+    if heuristic:
+        def policy(td):
+            td.set(("agents", "action"),
+                   base_env.agent_heuristic_raw_action(heuristic, td.get("is_init")))
+            return td
+    else:
+        _load_state_dict(policy, cfg.eval_policy, base_env.device)
+        policy.eval()
 
     base_env.eval()
     env.eval()
@@ -231,7 +256,6 @@ def _run_eval(cfg, env, base_env, policy):
     }
     ep_len = stats.get("episode_len")
     terminal_win = stats.get("win_rate")
-    forced_error = stats.get("forced_error")
 
     matchups = {}
     for opp_id, idxs in base_env.opponent_bank.assignment.items():
@@ -276,12 +300,6 @@ def _run_eval(cfg, env, base_env, policy):
         # between "wins" and "captures" shows up directly in the table.
         if terminal_win is not None:
             record["agent_terminal_win_rate"] = float(terminal_win[idxs].mean().item())
-        if forced_error is not None:
-            # Episodes the agent only got partial credit for: it forced the
-            # opponent into the ground / out of the arena without finishing it.
-            record["agent_forced_error_rate"] = float(
-                forced_error[idxs].mean().item())
-            outcomes["forced_error"] = record["agent_forced_error_rate"]
         if ep_len is not None:
             record["avg_episode_len"] = float(ep_len[idxs].mean().item())
         matchups[opp_id] = record
@@ -307,6 +325,7 @@ def main(cfg):
     OmegaConf.set_struct(cfg, False)
 
     _load_opponent_spec(cfg)
+    _select_esn_readout(cfg)
 
     init_simulation_app(cfg)
 

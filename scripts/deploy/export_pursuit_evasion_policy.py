@@ -61,6 +61,7 @@ from omni_drones.utils.checkpoint_config import apply_training_config  # noqa: E
 from export_policy import (  # noqa: E402
     extract_deterministic_actor,
     load_checkpoint_into_policy,
+    use_checkpoint_esn_readout,
 )
 
 _SCRIPTS_DIR = os.path.split(_THIS_DIR)[0]  # parent of deploy/
@@ -79,6 +80,9 @@ def build_metadata(cfg, base_env, obs_dim: int, action_dim: int) -> pec.PursuitE
 
     obs_cfg = pec.PursuitEvasionObsConfig(
         use_previous_action=bool(task_obs_cfg.get("use_previous_action", True)),
+        use_rel_dist=bool(task_obs_cfg.get("use_rel_dist", True)),
+        rot_repr=str(task_obs_cfg.get("rot_repr", "matrix")),
+        use_esn=bool(getattr(base_env, "use_esn", False)),
         obs_dim=obs_dim,
         action_dim=action_dim,
     )
@@ -117,6 +121,7 @@ def build_metadata(cfg, base_env, obs_dim: int, action_dim: int) -> pec.PursuitE
         arena_z_max=float(arena.get("z_max", 4.5)),
         # Evaluation-time capture radius (the curriculum only applies in training).
         capture_radius=float(cfg.task.get("success_radius_eval", 0.1)),
+        max_episode_length=int(cfg.task.env.max_episode_length),
         notes={
             "task": str(cfg.task.name),
             "checkpoint": str(cfg.get("checkpoint", "")),
@@ -146,6 +151,7 @@ def main(cfg):
     # action_transform, sim dt/substeps) rather than current YAML defaults.
     # CLI overrides (including task.role) still win.
     apply_training_config(cfg, ckpt_path)
+    use_checkpoint_esn_readout(cfg, ckpt_path)
 
     role = str(cfg.task.get("role", "pursuer")).lower()
     export_dir = cfg.get("export_dir", None) or os.path.join(
@@ -230,6 +236,10 @@ def main(cfg):
         traced.save(ts_path)
         metadata = build_metadata(cfg, base_env, obs_dim, action_dim)
         pec.save_metadata(metadata, meta_path)
+        if metadata.obs.use_esn:
+            esn_path = os.path.join(export_dir, pec.ESN_FILENAME)
+            torch.save(base_env.esn.export(), esn_path)
+            logging.info("Exported ESN reservoir     -> %s", esn_path)
 
         logging.info("Exported TorchScript policy -> %s", ts_path)
         logging.info("Exported metadata          -> %s", meta_path)

@@ -7,7 +7,7 @@
 # The artifact's `role` (pursuer | evader) decides which drone the policy flies;
 # the drone sections below are keyed by role, so the same file serves both.
 
-artifact_dir: artifacts/pe_pursuer_v4_stage10   # v4 pursuer (anti-tumble cmd-rate penalty)
+artifact_dir: artifacts/pe_pursuer_v   # v4 pursuer (anti-tumble cmd-rate penalty)
 # ^ v3: retrained from scratch with anti-tumble smoothness reward (body-rate +
 #   action-jerk penalties, lower approach weight). On-trajectory commanded body
 #   rates dropped ~61% (mean 96->37 deg/s, 0% saturation) vs the aggressive

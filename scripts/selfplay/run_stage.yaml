@@ -11,7 +11,7 @@ env: ${task.env}
 # Viewer camera (used when headless=false; read by IsaacEnv).
 viewer:
   resolution: [1920, 1080]
-  eye: [6.0, 0.0, 4.0]
+  eye: [6.0, 0.0, 2.0]
   lookat: [0.0, 0.0, 1.5]
 
 # One self-play stage: mode=train trains task.role against the injected frozen
@@ -30,6 +30,7 @@ stage_out: null            # JSON output path for results
 stage_ckpt: null           # where to save the trained checkpoint (mode=train)
 init_policy: null          # optional warm-start checkpoint (mode=train)
 eval_policy: null          # checkpoint to evaluate (mode=eval)
+eval_heuristic: null       # evaluate a scripted agent instead of eval_policy (mode=eval)
 
 # WandB: one run per training stage, grouped by target policy (role).
 wandb:

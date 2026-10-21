@@ -2,7 +2,8 @@
 """Visualise the pursuer-vs-evader win-rate matrix from a self-play DB.
 
 Reads a run's matchups.json + pool files and builds a pursuer-generation x
-evader-generation matrix of the pursuer capture rate (win_rate). Saves a local
+evader-generation matrix of the pursuer capture rate (win_rate), RL policies
+only (scripted heuristics are excluded). Saves a local
 PNG heatmap and, with --wandb, logs it to Weights & Biases as (1) an image
 panel, (2) a wandb.Table, and (3) a native heatmap custom chart built from that
 table so it is interactive in the UI.
@@ -13,7 +14,9 @@ Usage:
         [--wandb] [--project "RL Pursuit Evasion"] [--entity khairul-makirin-team] \
         [--run-name winrate-matrix-v2] [--metric win_rate]
 """
-import argparse, json, os
+import argparse
+import json
+import os
 import numpy as np
 
 
@@ -29,8 +32,8 @@ def _gen_key(pid: str):
 
 def load_matrix(db, metric="win_rate"):
     M = json.load(open(f"{db}/matchups.json"))["matchups"]
-    purs = [p["id"] for p in json.load(open(f"{db}/pursuer_pool.json"))["policies"]]
-    evad = [p["id"] for p in json.load(open(f"{db}/evader_pool.json"))["policies"]]
+    purs = [p["id"] for p in json.load(open(f"{db}/pursuer_pool.json"))["policies"] if p["kind"] == "rl"]
+    evad = [p["id"] for p in json.load(open(f"{db}/evader_pool.json"))["policies"] if p["kind"] == "rl"]
     purs = sorted(purs, key=_gen_key)
     evad = sorted(evad, key=_gen_key)
     mat = np.full((len(purs), len(evad)), np.nan)
@@ -47,8 +50,8 @@ def load_matrix(db, metric="win_rate"):
 def short(label):  # "pursuer:s3" -> "s3", "evader:heuristic2" -> "h2(flee)"
     tag = label.split(":", 1)[1]
     names = {"heuristic0": "h0", "heuristic1": "h1", "heuristic2": "h2"}
-    hint = {"pursuer": {"heuristic0": "pursue", "heuristic1": "hover"},
-            "evader": {"heuristic0": "hover", "heuristic1": "circ", "heuristic2": "flee"}}
+    hint = {"pursuer": {"heuristic0": "pp", "heuristic1": "apf"},
+            "evader": {"heuristic0": "circ", "heuristic1": "flee", "heuristic2": "weave"}}
     role = label.split(":", 1)[0]
     if tag in names:
         h = hint.get(role, {}).get(tag, "")
@@ -62,9 +65,12 @@ def save_png(purs, evad, mat, eps, out_png, metric):
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(figsize=(1.1 * len(evad) + 3, 0.9 * len(purs) + 2))
     im = ax.imshow(mat, cmap="viridis", vmin=0, vmax=1, aspect="auto")
-    ax.set_xticks(range(len(evad))); ax.set_xticklabels([short(e) for e in evad], rotation=45, ha="right")
-    ax.set_yticks(range(len(purs))); ax.set_yticklabels([short(p) for p in purs])
-    ax.set_xlabel("evader generation"); ax.set_ylabel("pursuer generation")
+    ax.set_xticks(range(len(evad)))
+    ax.set_xticklabels([f's{i+1}' for i in range(len(evad))], rotation=45, ha="right")
+    ax.set_yticks(range(len(purs)))
+    ax.set_yticklabels([f's{i+1}' for i in range(len(purs))])
+    ax.set_xlabel("evader generation")
+    ax.set_ylabel("pursuer generation")
     ax.set_title(f"Pursuer capture rate ({metric})  —  pursuer vs evader")
     for i in range(len(purs)):
         for j in range(len(evad)):

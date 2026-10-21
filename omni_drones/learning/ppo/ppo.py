@@ -181,6 +181,11 @@ class PPOPolicy(TensorDictModuleBase):
         tensordict.exclude("loc", "scale", "feature", inplace=True)
         return tensordict
 
+    @torch.no_grad()
+    def act(self, tensordict: TensorDict) -> torch.Tensor:
+        self.actor(tensordict)
+        return tensordict[("agents", "action")]
+
     def train_op(self, tensordict: TensorDict):
         next_tensordict = tensordict["next"]
         with torch.no_grad():

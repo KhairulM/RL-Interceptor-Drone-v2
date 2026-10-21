@@ -55,15 +55,20 @@ from intercept_common import (  # noqa: F401  (re-exported for controllers)
     normalize,
     quat_rotate_inverse,
     quaternion_to_rotation_matrix,
+    rotation_obs,
+    rotation_obs_dim,
+    esn_augment,
+    load_esn,
+    ESN_FILENAME,
     METADATA_FILENAME,
     POLICY_TS_FILENAME,
 )
 
 # Format identifier written into ``metadata.json``. Separate from the Intercept
 # artifact version because the observation layout is a different contract.
-# v1: pos(3) rot(9) body lin vel(3) body ang vel(3) rel hdg(3) rel vel(3) [act(4)].
-#     "rel hdg" is the unit heading to the opponent (normalize(rel_dist)), matching
-#     PursuitEvasion._agent_observation, which observes rel_hdg and NOT raw rel_dist.
+# v1: pos(3) rot(9|4|3) body lin vel(3) body ang vel(3) rel dist|hdg(3) rel vel(3)
+#     [act(4)] [esn(6)]. The opponent slot is the raw body-frame relative position
+#     when obs.use_rel_dist (env default) else its unit heading.
 PE_ARTIFACT_VERSION = 1
 
 ROLES = ('pursuer', 'evader')
@@ -82,22 +87,35 @@ class PursuitEvasionObsConfig:
     opponent during self-play, and it lets a single controller fly either role.
 
     Component order is fixed by ``PursuitEvasion._agent_observation``:
-    position, rotation matrix, body linear velocity, body angular velocity,
-    opponent relative heading (unit vector, body frame), opponent relative
-    velocity (body frame), [previous action].
+    position, rotation (matrix / quat / log), body linear velocity, body angular
+    velocity, opponent relative position or heading (body frame), opponent
+    relative velocity (body frame), [previous action], [ESN prediction].
     """
 
     use_previous_action: bool = True
+    # Opponent slot: raw body-frame relative position (True) or its unit heading (False).
+    use_rel_dist: bool = True
+    # Attitude slot: 'matrix' (vec(R), 9-D), 'quat' (w >= 0, 4-D) or 'log' (log(R), 3-D).
+    rot_repr: str = 'matrix'
+    # ESN-OA: 6-D prediction (rel distance + rel lin vel) appended after the base obs.
+    use_esn: bool = False
+    esn_dim: int = 6
     obs_dim: int = 28
     action_dim: int = 4
 
+    def base_obs_dim(self) -> int:
+        """Observation dimension before the ESN prediction is appended."""
+        return self.obs_dim - (self.esn_dim if self.use_esn else 0)
+
     def expected_obs_dim(self) -> int:
         """Recompute the observation dimension from the layout flags."""
-        # pos(3) + rot matrix(9) + body lin vel(3) + body ang vel(3)
+        # pos(3) + rotation(9/4/3) + body lin vel(3) + body ang vel(3)
         # + opponent relative position(3) + opponent relative velocity(3)
-        result = 3 + 9 + 3 + 3 + 3 + 3
+        result = 3 + rotation_obs_dim(self.rot_repr) + 3 + 3 + 3 + 3
         if self.use_previous_action:
             result += self.action_dim
+        if self.use_esn:
+            result += self.esn_dim
         return result
 
 
@@ -116,6 +134,8 @@ class PursuitEvasionMetadata:
     arena_z_min: float = 0.5
     arena_z_max: float = 4.5
     capture_radius: float = 0.1
+    # Training episode length in control steps (timeout = evader win); 0 = unknown.
+    max_episode_length: int = 0
     # Free-form provenance (checkpoint path, task name, opponent pool, ...).
     notes: dict = field(default_factory=dict)
 
@@ -132,6 +152,7 @@ class PursuitEvasionMetadata:
             'arena_z_min': self.arena_z_min,
             'arena_z_max': self.arena_z_max,
             'capture_radius': self.capture_radius,
+            'max_episode_length': self.max_episode_length,
             'notes': self.notes,
         }
 
@@ -148,6 +169,7 @@ class PursuitEvasionMetadata:
             arena_z_min=float(data.get('arena_z_min', 0.5)),
             arena_z_max=float(data.get('arena_z_max', 4.5)),
             capture_radius=float(data.get('capture_radius', 0.1)),
+            max_episode_length=int(data.get('max_episode_length', 0)),
             notes=dict(data.get('notes', {})),
         )
 
@@ -216,29 +238,21 @@ def build_observation(
     Returns:
         ``[..., obs_dim]`` observation tensor.
     """
-    rot = quaternion_to_rotation_matrix(self_quat_wxyz)
-    rot = rot.reshape(*rot.shape[:-2], 9)  # (9)
+    rot = rotation_obs(self_quat_wxyz, cfg.rot_repr)  # (9), (4) or (3)
 
     # Own linear velocity in the body frame: R^T v_self.
     lin_vel_body = quat_rotate_inverse(self_quat_wxyz, self_lin_vel_world)
     # Opponent relative position / velocity, both in the agent body frame.
     rel_pos_body = quat_rotate_inverse(self_quat_wxyz, opponent_pos - self_pos)
-    # The env observes only the *heading* to the opponent (a unit vector), not
-    # the raw relative position: PursuitEvasion._agent_observation uses
-    # ``rel_hdg = normalize(rel_dist)`` and leaves ``rel_dist`` commented out.
-    # Feeding the un-normalised vector here would put the observation far out of
-    # distribution (its magnitude is the metre-scale distance, not 1).
-    rel_hdg_body = normalize(rel_pos_body)
     rel_vel_body = quat_rotate_inverse(
         self_quat_wxyz, opponent_lin_vel_world - self_lin_vel_world)
 
     components = [
         self_pos,           # (3)
-        rot,                # (9)
+        rot,                # (9), (4) or (3)
         lin_vel_body,       # (3)
         self_ang_vel_body,  # (3)
-        rel_pos_body,
-        # rel_hdg_body,       # (3)
+        rel_pos_body if cfg.use_rel_dist else normalize(rel_pos_body),  # (3)
         rel_vel_body,       # (3)
     ]
 
@@ -250,12 +264,27 @@ def build_observation(
         components.append(previous_action)  # (4)
 
     obs = torch.cat(components, dim=-1)
-    if obs.shape[-1] != cfg.obs_dim:
+    if obs.shape[-1] != cfg.base_obs_dim():
         raise ValueError(
             f'Assembled observation has dim {obs.shape[-1]} but metadata '
-            f'declares obs_dim={cfg.obs_dim}. Check the ObsConfig flags.'
+            f'declares base obs_dim={cfg.base_obs_dim()}. Check the ObsConfig flags.'
         )
     return obs
+
+
+def build_esn_target(
+    self_pos: torch.Tensor,
+    self_quat_wxyz: torch.Tensor,
+    self_lin_vel_world: torch.Tensor,
+    opponent_pos: torch.Tensor,
+    opponent_lin_vel_world: torch.Tensor,
+) -> torch.Tensor:
+    """ESN RLS target: body-frame opponent rel distance (3) + rel lin vel (3),
+    matching ``PursuitEvasion._agent_observation``."""
+    rel_pos_body = quat_rotate_inverse(self_quat_wxyz, opponent_pos - self_pos)
+    rel_vel_body = quat_rotate_inverse(
+        self_quat_wxyz, opponent_lin_vel_world - self_lin_vel_world)
+    return torch.cat([rel_pos_body, rel_vel_body], dim=-1)
 
 
 def opponent_role(role: str) -> str:

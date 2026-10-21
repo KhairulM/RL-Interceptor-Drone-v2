@@ -2,14 +2,14 @@
 # Plain OmegaConf (not Hydra); override on the CLI as key=value, e.g.
 #   python scripts/selfplay/train_selfplay.py n_stages=8 temperature=0.5
 
-# Where the JSON policy database and artifacts live (relative to repo root).
-db_dir: scripts/selfplay/outputs/selfplay/db
-ckpt_dir: scripts/selfplay/outputs/selfplay/checkpoints
-work_dir: scripts/selfplay/outputs/selfplay/stages
+# Version name of this campaign. DB/checkpoints/stage artifacts go under
+# scripts/selfplay/outputs/{run_name}/{db,checkpoints,stages}; wandb runs are
+# named {run_name}-{pursuer|evader}-stage{n}.
+run_name: v9-
 
 # Fresh start: wipe db_dir/ckpt_dir/work_dir on launch and re-seed heuristics.
 # false (default) resumes the next incomplete stage and extends the population.
-fresh_start: false
+fresh_start: true
 
 # Worker wiring.
 python: null                       # python executable; null -> sys.executable
@@ -18,25 +18,30 @@ algo: ppo
 num_envs: 4096
 headless: true
 worker_retries: 2                  # relaunch a crashed worker (flaky Isaac SIGSEGV) this many times
+# Extra hydra overrides forwarded to every worker (train and eval), e.g.
+#   task_overrides: [task.esn.enabled=true]
+# ESN changes obs_dim, so use fresh db/ckpt dirs when toggling it.
+task_overrides: []
 
 # Generational loop.
-n_stages: 12
+n_stages: 17
 start_role: pursuer                # side trained first
 frames_per_stage: 500_000_000
 warm_start: true                   # init each policy from latest same-role policy
 seed: 0
 wandb_mode: online                 # per-stage wandb logging; set 'disabled' to turn off
 # Opponent sampling (this method's extension of the paper's win-rate Hedge):
-# temperature-scaled softmax over a multi-metric hardness score.
+# First RL policy per role: uniform scripted opponents. Later: RL-only opponents
+# with temperature-scaled softmax over a multi-metric hardness score.
 temperature: 0.9
 metric_weights:
   win_rate: 1.0
-  avg_time_to_capture: 0.5
-  avg_distance: 0.0          # distance weight zeroed (per request)
+  avg_time_to_capture: 0.8
+  avg_distance: 0.0
   avg_motor_effort: 0.25
   agent_error_rate: 1.0      # agent's own crash/OOB rate vs this opponent; higher => harder opponent => sampled more (both roles)
 
-# Heuristic seed populations (cold start). Names: hover, circular, pursue, flee.
+# Heuristic seeds (first RL policy per role only). Names: hover, circular, pure_pursuit, apf, flee, fast_flee, weave, zigzag, switch forms: a>b@t
 seed_heuristics:
-  pursuer: [pursue, hover]
-  evader: [hover, circular, flee]
+  pursuer: [pure_pursuit, apf]
+  evader: [circular, fast_flee, weave]

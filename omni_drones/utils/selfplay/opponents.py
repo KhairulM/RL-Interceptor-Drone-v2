@@ -26,7 +26,7 @@ Holds a mix of frozen RL policies (PPO checkpoints, evaluated deterministically)
 and scripted heuristic labels, assigns each parallel environment to exactly one
 opponent for the whole run (fixed per generation), and produces the raw CTBR
 actions for the RL-assigned environments. Heuristic geometry (hover / circular /
-pursue / flee) is computed inside the task env, which owns the controllers that
+pure_pursuit / apf / flee) is computed inside the task env, which owns the controllers that
 convert targets and CTBR into motor commands.
 """
 
@@ -139,8 +139,8 @@ class FrozenPolicyBank:
         """Raw (pre-tanh) CTBR actions for RL-assigned envs.
 
         ``opp_obs`` is [num_envs, 1, obs_dim] built from the opponent's own
-        perspective. Each frozen policy runs over the full batch; only its
-        assigned rows are kept. Non-RL rows stay zero.
+        perspective. Each frozen policy runs only over its assigned rows, and
+        non-RL rows stay zero.
         """
         raw = torch.zeros(
             self.num_envs, 1, self.action_dim, device=self.device
@@ -152,11 +152,11 @@ class FrozenPolicyBank:
                 idx = self.assignment.get(pid)
                 if idx is None or idx.numel() == 0:
                     continue
+                policy_obs = opp_obs.index_select(0, idx)
                 td = TensorDict(
-                    {("agents", "observation"): opp_obs},
-                    batch_size=[self.num_envs],
+                    {("agents", "observation"): policy_obs},
+                    batch_size=[idx.numel()],
                     device=self.device,
                 )
-                policy(td)
-                raw[idx] = td[("agents", "action")][idx]
+                raw[idx] = policy.act(td)
         return raw

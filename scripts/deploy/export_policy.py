@@ -180,6 +180,22 @@ def load_checkpoint_into_policy(policy, ckpt_path: str, device) -> None:
 # ---------------------------------------------------------------------------
 # Metadata assembly
 # ---------------------------------------------------------------------------
+def use_checkpoint_esn_readout(cfg, ckpt_path: str) -> None:
+    """Point the env at the shared ESN readout saved next to ``ckpt_path`` so it gets exported."""
+    from omni_drones.utils.esn import readout_sidecar_path
+
+    esn_cfg = cfg.task.get("esn", None)
+    if not esn_cfg or not esn_cfg.get("enabled", False):
+        return
+    if esn_cfg.get("readout", "per_env") == "per_env":
+        return
+    sidecar = readout_sidecar_path(ckpt_path)
+    if not os.path.isfile(sidecar):
+        raise FileNotFoundError(
+            f"Checkpoint was trained with a shared ESN readout but {sidecar} is missing.")
+    esn_cfg.readout_path = sidecar
+
+
 def build_metadata(cfg, base_env, obs_dim: int, action_dim: int) -> ic.PolicyMetadata:
     """Read the observation/CTBR parameters off the live env and config."""
     pursuer_cfg = cfg.task.pursuer
@@ -191,6 +207,8 @@ def build_metadata(cfg, base_env, obs_dim: int, action_dim: int) -> ic.PolicyMet
         use_relative_distance=bool(obs_cfg.get("use_evader_rel_dist", False)),
         use_relative_velocity=bool(obs_cfg.get("use_evader_rel_lin_vel", False)),
         use_previous_action=bool(obs_cfg.get("use_previous_action", True)),
+        rot_repr=str(obs_cfg.get("rot_repr", "matrix")),
+        use_esn=bool(getattr(base_env, "use_esn", False)),
         obs_dim=obs_dim,
         action_dim=action_dim,
     )
@@ -248,6 +266,7 @@ def main(cfg):
     # task.env.num_envs=1 on the CLI to keep the export lightweight; CLI
     # overrides still win over the trained config.
     apply_training_config(cfg, ckpt_path)
+    use_checkpoint_esn_readout(cfg, ckpt_path)
 
     export_dir = cfg.get("export_dir", None) or os.path.join(
         _THIS_DIR, "artifacts", f"{cfg.task.name}_{str(cfg.algo.name).lower()}"
@@ -343,6 +362,10 @@ def main(cfg):
         traced.save(ts_path)
         metadata = build_metadata(cfg, base_env, obs_dim, action_dim)
         ic.save_metadata(metadata, meta_path)
+        if metadata.obs.use_esn:
+            esn_path = os.path.join(export_dir, ic.ESN_FILENAME)
+            torch.save(base_env.esn.export(), esn_path)
+            logging.info("Exported ESN reservoir     -> %s", esn_path)
 
         logging.info("Exported TorchScript policy -> %s", ts_path)
         logging.info("Exported metadata          -> %s", meta_path)

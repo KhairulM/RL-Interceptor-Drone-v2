@@ -26,6 +26,7 @@ from omni_drones.utils.torchrl.transforms import (
     VelController,
 )
 from omni_drones.utils.torchrl import RenderCallback, EpisodeStats
+from omni_drones.utils.esn import save_readout_sidecar
 from omni_drones.learning import ALGOS
 
 from setproctitle import setproctitle
@@ -306,6 +307,7 @@ def main(cfg):
                     run.dir, f"checkpoint_{collector._frames}.pt")
                 os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
                 torch.save(policy.state_dict(), ckpt_path)
+                save_readout_sidecar(base_env, ckpt_path)
                 logging.info(f"Saved checkpoint to {str(ckpt_path)}")
             except AttributeError:
                 logging.warning(
@@ -330,6 +332,7 @@ def main(cfg):
         ckpt_path = os.path.join(run.dir, "checkpoint_final.pt")
         os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
         torch.save(policy.state_dict(), ckpt_path)
+        save_readout_sidecar(base_env, ckpt_path)
 
         if use_wandb:
             assert wandb is not None

@@ -35,6 +35,7 @@ temperature-scaled multi-metric softmax, and records matchup metrics
 """
 
 import math
+import os
 
 import torch
 import torch.distributions as D
@@ -43,19 +44,26 @@ from torchrl.data import Composite, UnboundedContinuous, Binary
 
 import omni_drones.utils.kit as kit_utils
 from omni_drones.controllers import ControllerBase
+from omni_drones.controllers.apf_controller import APFController
 from omni_drones.controllers.intercept_baseline_common import GeometricCTBR
 from omni_drones.envs.isaac_env import AgentSpec, IsaacEnv
 from omni_drones.robots.drone import MultirotorBase
 from omni_drones.utils.selfplay.opponents import FrozenPolicyBank
 from omni_drones.utils.torch import (
+    ROT_OBS_DIMS,
     euler_to_quaternion,
     normalize,
     quaternion_to_rotation_matrix,
+    quat_canonical,
+    quat_log,
     quat_rotate_inverse,
 )
 
 PURSUER = "pursuer"
 EVADER = "evader"
+PURSUIT_HEURISTICS = ("pure_pursuit", "apf")
+# Legacy heuristic names still stored in older policy DBs.
+HEURISTIC_ALIASES = {"pursue": "pure_pursuit"}
 
 
 class PursuitEvasion(IsaacEnv):
@@ -122,13 +130,6 @@ class PursuitEvasion(IsaacEnv):
         # timeout), so no ending is a cheap escape from another.
         self.reward_terminal_weight = float(task_cfg.get(
             "reward_terminal_weight", task_cfg.get("reward_capture_weight", 100.0)))
-        # Partial credit for *forcing* the opponent into the ground or out of the
-        # arena, as a fraction of reward_terminal_weight. Strictly less than 1 so
-        # an actual capture (pursuer) / surviving the episode (evader) stays the
-        # best available outcome and the terminal bonus cannot be farmed by
-        # standing off and waiting for the opponent to self-destruct.
-        self.reward_forced_error_scale = float(
-            task_cfg.get("reward_forced_error_scale", 0.25))
         self.reward_bounds_weight = float(task_cfg.get("reward_bounds_weight", 1.0))
         self.bounds_margin = float(task_cfg.get("bounds_margin", 1.0))
         self.reward_step = float(task_cfg.get("reward_step", 0.005))
@@ -144,6 +145,18 @@ class PursuitEvasion(IsaacEnv):
         self.use_previous_action = bool(self.obs_cfg.get("use_previous_action", True))
         self.use_time_encoding = bool(self.obs_cfg.get("use_time_encoding", True))
         self.time_encoding_dim = int(self.obs_cfg.get("time_encoding_dim", 4))
+        self.rot_repr = self.obs_cfg.get("rot_repr", "matrix")
+        if self.rot_repr not in ROT_OBS_DIMS:
+            raise ValueError(f"observation.rot_repr must be one of {list(ROT_OBS_DIMS)}, got {self.rot_repr!r}")
+
+        self.esn_cfg = task_cfg.get("esn", {})
+        esn_roles = [str(r).lower() for r in self.esn_cfg.get("roles", [PURSUER, EVADER])]
+        esn_enabled = bool(self.esn_cfg.get("enabled", False))
+        # Per role: the obs layout (and so the frozen opponent's policy input) depends on its role.
+        self.use_esn = esn_enabled and self.role in esn_roles
+        self.opp_use_esn = esn_enabled and self.opp_role in esn_roles
+        self._any_esn = self.use_esn or self.opp_use_esn
+        self.esn_output_dim = 6  # opponent rel distance (3) + rel lin vel (3), own body frame
 
         # Per-component Gaussian noise stds (sensor-matched defaults, from Intercept).
         noise_cfg = self.obs_cfg.get("noise", {})
@@ -244,15 +257,71 @@ class PursuitEvasion(IsaacEnv):
             self.num_envs, 1, self.agent_drone.action_spec.shape[-1], device=self.device)
         self.action_error_order1 = torch.zeros(self.num_envs, 1, device=self.device)
         self.agent_effort = torch.zeros(self.num_envs, 1, device=self.device)
-        self._opp_obs = self.observation_spec[("agents", "observation")].zero()
+        self._opp_obs = torch.zeros(
+            self.num_envs, 1, self._opp_obs_dim, device=self.device)
+
+        self.esn = self._make_esn() if self.use_esn else None
+        self.opp_esn = self._make_esn() if self.opp_use_esn else None
+        if self._any_esn:
+            # IsaacEnv._reset recomputes obs for ALL envs; only unstepped envs may advance.
+            self._esn_stepped = torch.zeros(
+                self.num_envs, dtype=torch.bool, device=self.device)
 
         # Frozen opponent bank built from cfg (driver injects the pool/probs).
         self._build_opponent_bank(task_cfg)
+        if self._any_esn:
+            self._load_esn_readouts()
 
         # Draw the confined arena boundary (visible only when not headless).
         self._init_arena_draw()
 
     # --------------------------------------------------------------- setup
+    def _make_esn(self):
+        from omni_drones.utils.esn import BatchedESN
+
+        return BatchedESN(
+            num_envs=self.num_envs,
+            input_dim=self.esn_input_dim,
+            output_dim=self.esn_output_dim,
+            reservoir_size=self.esn_cfg.get("reservoir_size", 500),
+            spectral_radius=self.esn_cfg.get("spectral_radius", 0.9),
+            leak_rate=self.esn_cfg.get("leak_rate", 0.3),
+            input_scale=self.esn_cfg.get("input_scale", 0.1),
+            forgetting_factor=self.esn_cfg.get("forgetting_factor", 0.99),
+            delta=self.esn_cfg.get("delta", 100.0),
+            p_trace_max=self.esn_cfg.get("p_trace_max", 1.0e6),
+            use_bias=self.esn_cfg.get("use_bias", True),
+            seed=self.esn_cfg.get("seed", 0),
+            readout=self.esn_cfg.get("readout", "per_env"),
+            fit_interval=self.esn_cfg.get("fit_interval", 50),
+            fit_forgetting=self.esn_cfg.get("fit_forgetting", 0.999),
+            ridge=self.esn_cfg.get("ridge", 1.0e-4),
+            device=self.device,
+        )
+
+    def _load_esn_readouts(self):
+        """Agent: optional warm-start readout. Opponent: each frozen RL policy's saved readout."""
+        from omni_drones.utils.esn import readout_sidecar_path
+
+        readout_path = self.esn_cfg.get("readout_path", None)
+        if self.esn is not None and readout_path:
+            self.esn.load_readout_state(torch.load(readout_path, map_location=self.device))
+
+        if self.opp_esn is None or self.opp_esn.readout == "per_env":
+            return
+        for p in self.opponent_bank.policies:
+            idx = self.opponent_bank.assignment.get(p["id"])
+            if p["kind"] != "rl" or idx is None or idx.numel() == 0:
+                continue
+            path = readout_sidecar_path(p["checkpoint_path"])
+            if not os.path.isfile(path):
+                raise FileNotFoundError(
+                    f"ESN readout {path} for opponent {p['id']} is missing; "
+                    "shared-readout opponents need the readout saved with their checkpoint.")
+            state = torch.load(path, map_location=self.device)
+            self.opp_esn.set_shared_readout(state["W_shared"], idx)
+            self.opp_esn.reset(idx)
+
     def _build_spawn_dists(self):
         margin = 0.5
         low = torch.tensor(
@@ -291,12 +360,17 @@ class PursuitEvasion(IsaacEnv):
         if not probs:
             probs = {p["id"]: 1.0 / len(policies) for p in policies}
 
-        # Frozen RL opponents are PPO policies; reuse this env's specs since the
-        # observation layout is role-symmetric.
+        # Frozen RL opponents are PPO policies built for the opponent role's obs
+        # layout, which differs from the agent's when only one role uses ESN.
         algo_cfg = opp_cfg.get("algo_cfg", None)
+        opp_obs_spec = self.observation_spec.clone()
+        opp_obs_spec[("agents", "observation")] = UnboundedContinuous(
+            torch.Size([self.num_envs, 1, self._opp_obs_dim]), device=self.device)
+        opp_obs_spec[("agents", "state")] = UnboundedContinuous(
+            torch.Size([self.num_envs, 1, self._opp_state_dim]), device=self.device)
         self.opponent_bank = FrozenPolicyBank(
             policies,
-            self.observation_spec,
+            opp_obs_spec,
             self.action_spec,
             self.reward_spec,
             algo_cfg,
@@ -374,12 +448,20 @@ class PursuitEvasion(IsaacEnv):
             self.agent_drone, self.opp_drone = self.evader, self.pursuer
             self.controller = self.evader_controller
             self.opp_rate_controller = self.pursuer_controller
+        self.opp_ctbr = self._make_heuristic_ctbr(self.opp_drone, self.opp_rate_controller)
+        # Flies the agent itself with a heuristic (eval of heuristic-vs-heuristic matchups).
+        self.agent_ctbr = self._make_heuristic_ctbr(self.agent_drone, self.controller)
+        self.apf = APFController(self.opp_ctbr, self.cfg.task)
+
+        return ["/World/defaultGroundPlane"]
+
+    def _make_heuristic_ctbr(self, drone, rate_controller):
         # Heuristic opponents are flown through the proven CTBR + on-board rate
         # PID stack; LeePositionController is only marginally stable and sinks on
         # the motor-lagged Crazyflie.
         g = 9.81
-        mass = float(self.opp_drone.params["mass"])
-        per_rotor_max = float(self.opp_rate_controller.max_thrusts.reshape(-1)[0])
+        mass = float(drone.params["mass"])
+        per_rotor_max = float(rate_controller.max_thrusts.reshape(-1)[0])
         hover_throttle = math.sqrt(mass * g / (4.0 * per_rotor_max))
         # max_tilt_deg is the dominant knob for scripted-opponent survival: at
         # 42 deg a quarter of the thrust vector points sideways (cos42=0.74), so
@@ -392,25 +474,30 @@ class PursuitEvasion(IsaacEnv):
         # near-wall momentum that caused the wall overshoots.
         opp_max_tilt = float(self.cfg.task.get("heuristic", {}).get(
             "max_tilt_deg", 22.0))
-        self.opp_ctbr = GeometricCTBR(
+        return GeometricCTBR(
             mass=mass, g=g, hover_throttle=hover_throttle,
-            target_clip=float(self.opp_rate_controller.target_clip),
-            min_ratio=float(self.opp_rate_controller.min_thrust_ratio),
-            max_ratio=float(self.opp_rate_controller.max_thrust_ratio),
+            target_clip=float(rate_controller.target_clip),
+            min_ratio=float(rate_controller.min_thrust_ratio),
+            max_ratio=float(rate_controller.max_thrust_ratio),
             kp=8.0, kv=6.0, k_att=12.0, k_yaw=2.0, max_tilt_deg=opp_max_tilt,
         )
 
-        return ["/World/defaultGroundPlane"]
-
     def _set_specs(self):
-        # pos(3) + rot matrix(9) + body lin vel(3) + body ang vel(3)
+        # pos(3) + rotation (matrix 9 / quat 4 / log 3) + body lin vel(3) + body ang vel(3)
         # + opponent rel distance(3) + opponent rel lin vel(3)
         # + previous action (4, optional)
-        obs_dim = 3 + 9 + 3 + 3 + 3 + 3
+        obs_dim = 3 + ROT_OBS_DIMS[self.rot_repr] + 3 + 3 + 3 + 3
         if self.use_previous_action:
             obs_dim += self.agent_drone.action_spec.shape[-1]
 
-        state_dim = obs_dim + (self.time_encoding_dim if self.use_time_encoding else 0)
+        self.esn_input_dim = obs_dim
+        time_dim = self.time_encoding_dim if self.use_time_encoding else 0
+        self._opp_obs_dim = obs_dim + (self.esn_output_dim if self.opp_use_esn else 0)
+        self._opp_state_dim = self._opp_obs_dim + time_dim
+        if self.use_esn:
+            obs_dim += self.esn_output_dim
+
+        state_dim = obs_dim + time_dim
 
         self.observation_spec = Composite({
             "agents": {
@@ -448,7 +535,6 @@ class PursuitEvasion(IsaacEnv):
             "out_of_bounds": UnboundedContinuous(torch.Size([1]), device=self.device),
             "opp_out_of_bounds": UnboundedContinuous(torch.Size([1]), device=self.device),
             "win_rate": UnboundedContinuous(torch.Size([1]), device=self.device),
-            "forced_error": UnboundedContinuous(torch.Size([1]), device=self.device),
             "timeout": UnboundedContinuous(torch.Size([1]), device=self.device),
             "capture_radius": UnboundedContinuous(torch.Size([1]), device=self.device),
             "reward_approach": UnboundedContinuous(torch.Size([1]), device=self.device),
@@ -458,6 +544,7 @@ class PursuitEvasion(IsaacEnv):
             "reward_action_smoothness": UnboundedContinuous(torch.Size([1]), device=self.device),
             "reward_cmd_rate": UnboundedContinuous(torch.Size([1]), device=self.device),
             "reward_terminal": UnboundedContinuous(torch.Size([1]), device=self.device),
+            "esn_pred_err": UnboundedContinuous(torch.Size([1]), device=self.device),
         }).expand(self.num_envs).to(self.device)
 
         self.info_spec = Composite({
@@ -477,6 +564,13 @@ class PursuitEvasion(IsaacEnv):
         num_env = len(env_ids)
         self.pursuer._reset_idx(env_ids, self.training)
         self.evader._reset_idx(env_ids, self.training)
+
+        if self.esn is not None:
+            self.esn.reset(env_ids)
+        if self.opp_esn is not None:
+            self.opp_esn.reset(env_ids)
+        if self._any_esn:
+            self._esn_stepped[env_ids] = False
 
         agent_pos = self.spawn_pos_dist.sample(torch.Size([num_env, 1]))
         opp_pos = self.spawn_pos_dist.sample(torch.Size([num_env, 1]))
@@ -521,6 +615,9 @@ class PursuitEvasion(IsaacEnv):
         self.current_action = tensordict[("info", "policy_action")]
         self.action_error_order1 = tensordict[("stats", "action_error_order1")]
 
+        if self._any_esn:
+            self._esn_stepped[:] = False
+
         # Frozen opponent: combine RL (CTBR->motor) and heuristic (pos->motor).
         opp_cmds = self._compute_opponent_motor_commands(tensordict)
         self.opp_drone.apply_action(opp_cmds)
@@ -548,7 +645,7 @@ class PursuitEvasion(IsaacEnv):
 
         masks = self.opponent_bank.heuristic_masks()
         if masks:
-            target_pos, target_yaw = self._heuristic_targets()
+            target_pos, target_yaw, target_vel = self._heuristic_targets()
             # `done` must be forwarded: GeometricCTBR holds a per-env altitude
             # integrator (ki_z) to null the Crazyflie's steady-state height
             # droop, and it is reset on `done`. Without it the accumulator
@@ -557,7 +654,7 @@ class PursuitEvasion(IsaacEnv):
             # opponent to the floor or pushed it through the ceiling, regardless
             # of what the heuristic geometry commanded.
             heur_raw = self.opp_ctbr.compute(
-                opp_state.squeeze(1), target_pos.squeeze(1), None,
+                opp_state.squeeze(1), target_pos.squeeze(1), target_vel.squeeze(1),
                 target_yaw.squeeze(1), done=done,
             ).reshape(self.num_envs, 1, -1)
             any_heur = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
@@ -580,8 +677,24 @@ class PursuitEvasion(IsaacEnv):
         torch.nan_to_num_(cmds, 0.0)
         return cmds.reshape(self.num_envs, 1, -1)
 
+    def _resolve_heuristic_masks(self, t: torch.Tensor):
+        """Bank masks with switch heuristics ("a>b@T": a before T seconds, b after) expanded to base kinds."""
+        t = t.reshape(-1)
+        out = {}
+        for name, m in self.opponent_bank.heuristic_masks().items():
+            if ">" in name:
+                pair, switch_t = name.split("@")
+                first, second = pair.split(">")
+                parts = [(first, m & (t < float(switch_t))), (second, m & (t >= float(switch_t)))]
+            else:
+                parts = [(name, m)]
+            for k, mk in parts:
+                k = HEURISTIC_ALIASES.get(k, k)
+                out[k] = out[k] | mk if k in out else mk
+        return out
+
     def _heuristic_targets(self):
-        """Env-local target position and yaw for each heuristic type, blended by mask."""
+        """Env-local target position, yaw and target velocity for each heuristic type, blended by mask."""
         opp_pos = self.opp_drone.pos  # [N,1,3] env-local (refreshed in get_state)
         agent_pos = self.agent_drone.pos
         t = (self.progress_buf.float() * self.cfg.sim.dt).reshape(self.num_envs, 1, 1)
@@ -589,8 +702,9 @@ class PursuitEvasion(IsaacEnv):
         # Default target: hold current position.
         target = opp_pos.clone()
         yaw = torch.zeros(self.num_envs, 1, device=self.device)
+        vel = torch.zeros_like(opp_pos)
 
-        masks = self.opponent_bank.heuristic_masks()
+        masks = self._resolve_heuristic_masks(t)
 
         if "hover" in masks:
             m = masks["hover"].reshape(-1, 1, 1)
@@ -616,14 +730,30 @@ class PursuitEvasion(IsaacEnv):
             circ_yaw = (angle.reshape(self.num_envs, 1) + torch.pi / 2)
             yaw = torch.where(masks["circular"].reshape(-1, 1), circ_yaw, yaw)
 
-        if "pursue" in masks:
-            m = masks["pursue"].reshape(-1, 1, 1)
-            target = torch.where(m, agent_pos, target)
-            to_agent = agent_pos - opp_pos
-            p_yaw = torch.atan2(to_agent[..., 1], to_agent[..., 0])
-            yaw = torch.where(masks["pursue"].reshape(-1, 1), p_yaw, yaw)
+        for kind in PURSUIT_HEURISTICS:
+            if kind not in masks:
+                continue
+            p_target, p_vel, p_yaw = self._pursuit_guidance(
+                kind, opp_pos, self.opp_drone.vel_w[..., :3],
+                agent_pos, self.agent_drone.vel_w[..., :3])
+            m = masks[kind].reshape(-1, 1, 1)
+            target = torch.where(m, p_target, target)
+            vel = torch.where(m, p_vel, vel)
+            yaw = torch.where(masks[kind].reshape(-1, 1), p_yaw, yaw)
 
-        if "flee" in masks:
+        flee_kinds = [k for k in ("flee", "weave", "zigzag", "fast_flee") if k in masks]
+        if flee_kinds:
+            flee_mask = torch.stack([masks[k] for k in flee_kinds]).any(0)
+            # Per-env speed multiplier and lateral (perpendicular) oscillation of the flee drive.
+            speed_mult = torch.ones(self.num_envs, 1, 1, device=self.device)
+            lat_wave = torch.zeros(self.num_envs, 1, 1, device=self.device)
+            if "fast_flee" in masks:
+                speed_mult = torch.where(masks["fast_flee"].reshape(-1, 1, 1), 1.5, speed_mult)
+            if "weave" in masks:
+                lat_wave = torch.where(masks["weave"].reshape(-1, 1, 1), torch.sin(2.0 * t), lat_wave)
+            if "zigzag" in masks:
+                zig = torch.sign(torch.sin(torch.pi * t / 0.75))
+                lat_wave = torch.where(masks["zigzag"].reshape(-1, 1, 1), zig, lat_wave)
             # Flee HORIZONTALLY away from the pursuer at a held altitude.
             #
             # The previous version fled along the full 3D `opp_pos - agent_pos`,
@@ -667,19 +797,34 @@ class PursuitEvasion(IsaacEnv):
             edge = self.arena_half_xy - self.heur_wall_margin
             dist_in = (edge - opp_pos[..., :2].abs().amax(dim=-1, keepdim=True))
             speed_scale = (dist_in / self.heur_brake_zone).clamp(0.0, 1.0)
-            full_step = self.heur_speed * self.heur_lookahead
-            outward = away * (full_step * speed_scale)
+            full_step = self.heur_speed * self.heur_lookahead * speed_mult
+            perp = torch.stack(
+                [-away[..., 1], away[..., 0], torch.zeros_like(away[..., 2])], dim=-1)
+            outward = away * (full_step * speed_scale) + perp * (0.5 * full_step * lat_wave * speed_scale)
             inward = push_xy * (full_step * self.heur_wall_gain)
             flee = opp_pos + outward + inward
             # Hold the spawn altitude rather than tracking the (possibly sunk)
             # current one, so the evader always has a positive climb setpoint.
             flee = torch.cat([flee[..., :2], self.opp_local_pos[..., 2:3]], dim=-1)
-            m = masks["flee"].reshape(-1, 1, 1)
+            m = flee_mask.reshape(-1, 1, 1)
             target = torch.where(m, flee, target)
             move = outward + inward
             f_yaw = torch.atan2(move[..., 1], move[..., 0])
-            yaw = torch.where(masks["flee"].reshape(-1, 1), f_yaw, yaw)
+            yaw = torch.where(flee_mask.reshape(-1, 1), f_yaw, yaw)
 
+        return self._clamp_heuristic_target(target), yaw, vel
+
+    def _pursuit_guidance(self, name, self_pos, self_vel, other_pos, other_vel):
+        """Target position, target velocity and yaw for a scripted pursuer chasing `other`."""
+        to_other = other_pos - self_pos
+        yaw = torch.atan2(to_other[..., 1], to_other[..., 0])
+        if name == "apf":
+            target, vel = self.apf.guidance(self_pos, self_vel, other_pos, other_vel, None)
+        else:
+            target, vel = other_pos, torch.zeros_like(other_pos)
+        return target.clone(), vel, yaw
+
+    def _clamp_heuristic_target(self, target: torch.Tensor) -> torch.Tensor:
         # Keep every heuristic target inside the arena shrunk by a safety band,
         # so tracking overshoot can never put the scripted opponent through a
         # wall or below the crash altitude.
@@ -689,7 +834,24 @@ class PursuitEvasion(IsaacEnv):
         target[..., 1] = target[..., 1].clamp(-lim, lim)
         target[..., 2] = target[..., 2].clamp(
             self.arena_z_min + max(sm, 0.5), self.arena_z_max - sm)
-        return target, yaw
+        return target
+
+    def agent_heuristic_raw_action(self, name: str, done: torch.Tensor) -> torch.Tensor:
+        """Pre-tanh CTBR action flying the agent with a scripted heuristic."""
+        name = HEURISTIC_ALIASES.get(name, name)
+        if name not in PURSUIT_HEURISTICS or self.role != PURSUER:
+            raise NotImplementedError(
+                f"agent heuristic {name!r} is only supported as one of "
+                f"{PURSUIT_HEURISTICS} for the pursuer")
+        agent_state = self.agent_drone.get_state()[..., :13]
+        target, vel, yaw = self._pursuit_guidance(
+            name, self.agent_drone.pos, self.agent_drone.vel_w[..., :3],
+            self.opp_drone.pos, self.opp_drone.vel_w[..., :3])
+        target = self._clamp_heuristic_target(target)
+        return self.agent_ctbr.compute(
+            agent_state.squeeze(1), target.squeeze(1), vel.squeeze(1), yaw.squeeze(1),
+            done=done.reshape(self.num_envs, 1),
+        ).reshape(self.num_envs, 1, -1)
 
     def _boundary_push(self, pos: torch.Tensor, margin: float = 1.0) -> torch.Tensor:
         """Inward push per axis that grows within `margin` of each arena wall."""
@@ -707,7 +869,8 @@ class PursuitEvasion(IsaacEnv):
         return torch.cat([px, py, pz], dim=-1)
 
     # ------------------------------------------------------ obs and reward
-    def _agent_observation(self, self_drone, other_drone, prev_action, obs_config):
+    def _agent_observation(self, self_drone, other_drone, prev_action, obs_config,
+                           esn=None, esn_mask=None, esn_fit=False):
         """Symmetric observation for ``self_drone``, in its own body frame."""
         self_pos = self_drone.pos
         self_rot_quat = self_drone.rot
@@ -721,8 +884,13 @@ class PursuitEvasion(IsaacEnv):
         rel_hdg = normalize(rel_dist)
         rel_vel = quat_rotate_inverse(
             self_rot_quat, other_vel_w[..., :3] - self_vel_w[..., :3])
-        rot_mat = quaternion_to_rotation_matrix(self_rot_quat).reshape(
-            self.num_envs, 1, 9)
+        if self.rot_repr == "quat":
+            rot_mat = quat_canonical(self_rot_quat)
+        elif self.rot_repr == "log":
+            rot_mat = quat_log(self_rot_quat)
+        else:
+            rot_mat = quaternion_to_rotation_matrix(self_rot_quat).reshape(
+                self.num_envs, 1, 9)
 
         self_pos_obs = self_pos
         lin_vel = self_vel_b[..., :3]
@@ -732,6 +900,8 @@ class PursuitEvasion(IsaacEnv):
         if obs_config.get("include_noise", False):
             self_pos_obs = self_pos_obs + torch.randn_like(self_pos_obs) * self.obs_noise_pos_std
             rot_mat = rot_mat + torch.randn_like(rot_mat) * self.obs_noise_rot_std
+            if self.rot_repr == "quat":
+                rot_mat = quat_canonical(normalize(rot_mat))
             lin_vel = lin_vel + torch.randn_like(lin_vel) * self.obs_noise_lin_vel_std
             ang_vel = ang_vel + torch.randn_like(ang_vel) * self.obs_noise_rot_vel_std
             rel_dist = rel_dist + torch.randn_like(rel_dist) * self.obs_noise_rel_dist_std
@@ -750,17 +920,37 @@ class PursuitEvasion(IsaacEnv):
         if self.use_previous_action:
             obs.append(self_previous_action)
 
+        if esn is not None:
+            target = torch.cat([rel_dist, rel_vel], dim=-1).squeeze(1)
+            pred = esn.step(torch.cat(obs, dim=-1).squeeze(1), target, esn_mask, fit=esn_fit)
+            obs.append(pred.unsqueeze(1))
+
         return torch.cat(obs, dim=-1)
 
     def _compute_state_and_obs(self):
         self.agent_drone.get_state()
         self.opp_drone.get_state()
 
+        esn_mask = ~self._esn_stepped if self._any_esn else None
+
         obs = self._agent_observation(
-            self.agent_drone, self.opp_drone, self.current_action, self.obs_cfg)
+            self.agent_drone, self.opp_drone, self.current_action, self.obs_cfg,
+            self.esn, esn_mask,
+            esn_fit=self.training and self.esn is not None and self.esn.readout != "per_env")
         # Opponent observation for the frozen policy on the next pre-sim step.
         self._opp_obs = self._agent_observation(
-            self.opp_drone, self.agent_drone, self.opp_prev_action, self.obs_cfg)
+            self.opp_drone, self.agent_drone, self.opp_prev_action, self.obs_cfg,
+            self.opp_esn, esn_mask)
+
+        if self._any_esn:
+            self._esn_stepped[:] = True
+        if self.use_esn:
+            err = self.stats["esn_pred_err"]
+            self.stats["esn_pred_err"][:] = torch.where(
+                esn_mask.unsqueeze(-1),
+                torch.lerp(err, self.esn.err.unsqueeze(-1), 1 - self.alpha),
+                err,
+            )
 
         state = obs
         if self.use_time_encoding:
@@ -780,12 +970,8 @@ class PursuitEvasion(IsaacEnv):
         distance = torch.norm(opp_pos - agent_pos, dim=-1)  # [N,1]
         self._distance = distance
         self._captured = distance <= self.active_capture_radius  # [N,1]
-        # Two distinct terminal geometric events, both resolved the same way:
-        #  * CRASH (ground, or NaN state): a full loss for whoever crashed.
-        #  * LEAVE ARENA (through the walls/ceiling): a full loss for whoever left.
-        # For the *other* drone each is partial credit only
-        # (reward_forced_error_scale * W), never a full win. The dense boundary
-        # penalty still discourages approaching a wall, for both drones.
+        # CRASH (ground/NaN): full loss for the crasher, neutral for the other.
+        # LEAVE ARENA: terminal loss for the evader only; neutral for the pursuer.
         self._agent_crash = (
             self._crashed(agent_pos) | torch.isnan(agent_pos).any(-1))
         self._opp_crash = (
@@ -816,40 +1002,25 @@ class PursuitEvasion(IsaacEnv):
         # latched before these stats are cloned into the observation below.
         self._truncated = (self.progress_buf >= self.max_episode_length - 1).reshape(
             self.num_envs, 1)
-        # Any of these ends the episode. Leaving the arena terminates too, but
-        # (unlike a crash) only as a loss for the leaver, not a win for the other.
+        # Only the evader is confined to the arena; the pursuer may leave freely.
+        evader_oob = self._agent_oob if self.role == EVADER else self._opp_oob
         self._terminated = (
-            self._captured | self._agent_crash | self._opp_crash
-            | self._agent_oob | self._opp_oob)
+            self._captured | self._agent_crash | self._opp_crash | evader_oob)
         self._timeout = self._truncated & ~self._terminated
         if self.role == PURSUER:
             win = self._captured                      # only an actual capture wins
             loss = self._agent_crash | self._timeout  # crashed, or ran out of time
         else:
             win = self._timeout                       # survived the full episode
-            loss = self._captured | self._agent_crash
-        loss = loss | self._agent_oob
+            loss = self._captured | self._agent_crash | self._agent_oob
         self._win = win
         self._loss = loss & ~win
-        # Driving the opponent into the ground or out of the arena is a real
-        # achievement but NOT a full win: it pays reward_forced_error_scale * W.
-        # At full parity the pursuer simply farmed it -- standing off and waiting
-        # for a scripted evader to fall out of the sky gave the same +W as a
-        # capture for a fraction of the effort, and the capture rate collapsed to
-        # ~3% while 93% of "wins" were evader crashes. Partial credit keeps the
-        # signal ("you forced the error") while leaving capture strictly the best
-        # outcome. Only counted when the episode was not already resolved as a
-        # win or a loss for the agent (e.g. both drones hitting the ground).
-        self._forced_error = (
-            (self._opp_crash | self._opp_oob) & ~self._win & ~self._loss)
+        # The opponent crashing or (evader) leaving the arena is neutral for the agent.
         self._terminal_reward = self.reward_terminal_weight * (
-            self._win.float() - self._loss.float()
-            + self.reward_forced_error_scale * self._forced_error.float())
+            self._win.float() - self._loss.float())
         self.stats["reward_terminal"][:] = self._terminal_reward
         self.stats["win_rate"][:] = torch.maximum(
             self.stats["win_rate"], self._win.float())
-        self.stats["forced_error"][:] = torch.maximum(
-            self.stats["forced_error"], self._forced_error.float())
         self.stats["timeout"][:] = torch.maximum(
             self.stats["timeout"], self._timeout.float())
 
@@ -908,7 +1079,10 @@ class PursuitEvasion(IsaacEnv):
         terminal = self._terminal_reward
 
         # Dense inward push so the boundary is learned before it is hit.
-        bounds_pen = self.reward_bounds_weight * self._bounds_proximity(agent_pos)
+        if self.role == EVADER:
+            bounds_pen = self.reward_bounds_weight * self._bounds_proximity(agent_pos)
+        else:
+            bounds_pen = torch.zeros(self.num_envs, 1, device=self.device)
 
         # Optional dense distance penalty (pursuer shaping; see __init__).
         if self.role == PURSUER and self.use_distance:
@@ -969,18 +1143,13 @@ class PursuitEvasion(IsaacEnv):
         self.success_radius = max(radius, self.success_radius_end)
 
     def _crashed(self, pos: torch.Tensor) -> torch.Tensor:
-        """True where the drone has hit the ground (altitude below the crash
-        threshold). This is the only terminal geometric event; the arena
-        walls/ceiling are enforced softly via the boundary penalty, not by
-        terminating the episode."""
+        """True where the drone has hit the ground (altitude below the crash threshold)."""
         z = pos[..., 2]  # [N,1]
         return z < self.minimum_altitude
 
     def _out_of_arena(self, pos: torch.Tensor) -> torch.Tensor:
-        """True where the drone has left the arena through a wall or the ceiling.
-        The floor is intentionally excluded: hitting the ground is a *crash*
-        (see `_crashed`), which is resolved differently (a win for the other
-        drone), whereas leaving the arena is only a loss for the one who left."""
+        """True where the drone has left the arena through a wall or the ceiling
+        (floor excluded: that is a crash). Only terminal for the evader."""
         x, y, z = pos[..., 0], pos[..., 1], pos[..., 2]  # each [N,1]
         return (
             (x.abs() > self.arena_half_xy)

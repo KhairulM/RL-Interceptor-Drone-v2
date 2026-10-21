@@ -1,0 +1,56 @@
+{
+  "policies": [
+    {
+      "id": "evader:hover",
+      "kind": "heuristic",
+      "checkpoint_path": null,
+      "metadata": {
+        "heuristic": "hover"
+      }
+    },
+    {
+      "id": "evader:circular",
+      "kind": "heuristic",
+      "checkpoint_path": null,
+      "metadata": {
+        "heuristic": "circular"
+      }
+    },
+    {
+      "id": "evader:pursue",
+      "kind": "heuristic",
+      "checkpoint_path": null,
+      "metadata": {
+        "heuristic": "pursue"
+      }
+    },
+    {
+      "id": "evader:flee",
+      "kind": "heuristic",
+      "checkpoint_path": null,
+      "metadata": {
+        "heuristic": "flee"
+      }
+    },
+    {
+      "id": "evader:stage3",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/selfplay_v6_fix_reward_and_bounds/checkpoints/evader_stage3.pt",
+      "metadata": {}
+    },
+    {
+      "id": "evader:stage7",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/selfplay_v6_fix_reward_and_bounds/checkpoints/evader_stage7.pt",
+      "metadata": {}
+    }
+  ],
+  "probs": {
+    "evader:hover": 0.16666666666666666,
+    "evader:circular": 0.16666666666666666,
+    "evader:pursue": 0.16666666666666666,
+    "evader:flee": 0.16666666666666666,
+    "evader:stage3": 0.16666666666666666,
+    "evader:stage7": 0.16666666666666666
+  }
+}

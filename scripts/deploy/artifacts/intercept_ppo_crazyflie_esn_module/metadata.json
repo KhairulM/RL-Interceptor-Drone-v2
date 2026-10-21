@@ -1,0 +1,28 @@
+{
+  "algo": "ppo",
+  "artifact_version": 3,
+  "ctbr": {
+    "dt": 0.02,
+    "lpf_coef": 1.0,
+    "max_thrust_ratio": 1.0,
+    "min_thrust_ratio": 0.0,
+    "target_clip": 1.0
+  },
+  "notes": {
+    "action_transform": "PIDrate",
+    "checkpoint": "scripts/wandb/run-20261012_185730-puhacqw5/files/checkpoint_final.pt",
+    "pursuer_model": "Crazyflie",
+    "task": "Intercept"
+  },
+  "obs": {
+    "action_dim": 4,
+    "esn_dim": 6,
+    "obs_dim": 32,
+    "use_ab_world_frame": false,
+    "use_esn": true,
+    "use_previous_action": true,
+    "use_relative_distance": true,
+    "use_relative_velocity": true
+  },
+  "sim_dt": 0.01
+}

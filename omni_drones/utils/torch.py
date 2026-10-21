@@ -239,6 +239,25 @@ def axis_angle_to_matrix(angle, axis):
     return quaternion_to_rotation_matrix(quat)
 
 
+# Attitude observation size per representation: vec(R), w >= 0 quaternion, log(R).
+ROT_OBS_DIMS = {"matrix": 9, "quat": 4, "log": 3}
+
+
+def quat_canonical(q: torch.Tensor) -> torch.Tensor:
+    """Pick the w >= 0 member of {q, -q} (same rotation)."""
+    return torch.where(q[..., :1] < 0, -q, q)
+
+
+def quat_log(q: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+    """SO(3) log of a unit (w, x, y, z) quaternion as a rotation vector theta * axis, theta in [0, pi]."""
+    q = quat_canonical(q)
+    w, v = q[..., :1], q[..., 1:]
+    n = v.norm(dim=-1, keepdim=True)
+    # Small-angle limit of 2 * atan2(n, w) / n is 2 / w.
+    scale = torch.where(n > eps, 2.0 * torch.atan2(n, w) / n.clamp(min=eps), 2.0 / w.clamp(min=eps))
+    return scale * v
+
+
 def quat_mul(a: torch.Tensor, b: torch.Tensor):
     assert a.shape == b.shape
     shape = a.shape

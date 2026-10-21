@@ -34,9 +34,12 @@ from torchrl.data import Composite, UnboundedContinuous
 from omni_drones.envs.isaac_env import AgentSpec, IsaacEnv
 from omni_drones.robots.drone import MultirotorBase
 from omni_drones.utils.torch import (
+    ROT_OBS_DIMS,
     euler_to_quaternion,
     normalize,
     quaternion_to_rotation_matrix,
+    quat_canonical,
+    quat_log,
     quat_rotate_inverse,
 )
 
@@ -96,6 +99,13 @@ class Intercept(IsaacEnv):
         self.evader_cfg = cfg.task.evader
         self.obs_cfg = cfg.task.observation
         self.reward_cfg = cfg.task.reward
+        self.rot_repr = self.obs_cfg.get("rot_repr", "matrix")
+        if self.rot_repr not in ROT_OBS_DIMS:
+            raise ValueError(f"observation.rot_repr must be one of {list(ROT_OBS_DIMS)}, got {self.rot_repr!r}")
+
+        self.esn_cfg = cfg.task.get("esn", {})
+        self.use_esn = bool(self.esn_cfg.get("enabled", False))
+        self.esn_output_dim = 6  # evader rel distance (3) + rel lin vel (3), pursuer body frame
 
         self.pursuer_model_name = self.pursuer_cfg.get("model", "Hummingbird")
         self.pursuer_controller_name = self.pursuer_cfg.get(
@@ -277,6 +287,35 @@ class Intercept(IsaacEnv):
         self.action_error_order1 = torch.zeros(
             self.num_envs, 1, device=self.device)
 
+        if self.use_esn:
+            from omni_drones.utils.esn import BatchedESN
+
+            self.esn = BatchedESN(
+                num_envs=self.num_envs,
+                input_dim=self.esn_input_dim,
+                output_dim=self.esn_output_dim,
+                reservoir_size=self.esn_cfg.get("reservoir_size", 500),
+                spectral_radius=self.esn_cfg.get("spectral_radius", 0.9),
+                leak_rate=self.esn_cfg.get("leak_rate", 0.3),
+                input_scale=self.esn_cfg.get("input_scale", 0.1),
+                forgetting_factor=self.esn_cfg.get("forgetting_factor", 0.99),
+                delta=self.esn_cfg.get("delta", 100.0),
+                p_trace_max=self.esn_cfg.get("p_trace_max", 1.0e6),
+                use_bias=self.esn_cfg.get("use_bias", True),
+                seed=self.esn_cfg.get("seed", 0),
+                readout=self.esn_cfg.get("readout", "per_env"),
+                fit_interval=self.esn_cfg.get("fit_interval", 50),
+                fit_forgetting=self.esn_cfg.get("fit_forgetting", 0.999),
+                ridge=self.esn_cfg.get("ridge", 1.0e-4),
+                device=self.device,
+            )
+            readout_path = self.esn_cfg.get("readout_path", None)
+            if readout_path:
+                self.esn.load_readout_state(torch.load(readout_path, map_location=self.device))
+            # IsaacEnv._reset recomputes obs for ALL envs; only unstepped envs may advance.
+            self._esn_stepped = torch.zeros(
+                self.num_envs, dtype=torch.bool, device=self.device)
+
     def _design_scene(self):
         """Create pursuer, evader, and ground plane."""
         self.pursuer, self.pursuer_controller = MultirotorBase.make(
@@ -401,7 +440,8 @@ class Intercept(IsaacEnv):
 
     def _set_specs(self):
         """Define observation, action, reward, and stats specs."""
-        pursuer_state_dim = 9 + 3 + 3  # rot matrix + lin vel + rot vel
+        # rotation (matrix 9 / quat 4 / log 3) + lin vel + rot vel
+        pursuer_state_dim = ROT_OBS_DIMS[self.rot_repr] + 3 + 3
 
         if self.obs_cfg.use_world_frame_pos:
             pursuer_state_dim += 3  # absolute position in world frame
@@ -417,6 +457,10 @@ class Intercept(IsaacEnv):
 
         if self.obs_cfg.use_previous_action:
             obs_dim += self.pursuer.action_spec.shape[-1]  # previous action
+
+        self.esn_input_dim = obs_dim
+        if self.use_esn:
+            obs_dim += self.esn_output_dim
 
         if self.obs_cfg.use_time_encoding:
             state_dim = obs_dim + self.obs_cfg.time_encoding_dim
@@ -481,6 +525,7 @@ class Intercept(IsaacEnv):
             "mean_travel_v": UnboundedContinuous(torch.Size([1]), device=self.device),
             "max_travel_v": UnboundedContinuous(torch.Size([1]), device=self.device),
             "intercept_v": UnboundedContinuous(torch.Size([1]), device=self.device),
+            "esn_pred_err": UnboundedContinuous(torch.Size([1]), device=self.device),
         }).expand(self.num_envs).to(self.device)
         self.info_spec = Composite({
             "drone_state": UnboundedContinuous(torch.Size([1, 13]), device=self.device),
@@ -502,6 +547,10 @@ class Intercept(IsaacEnv):
 
         self.pursuer._reset_idx(env_ids, self.training)
         self.evader._reset_idx(env_ids, self.training)
+
+        if self.use_esn:
+            self.esn.reset(env_ids)
+            self._esn_stepped[env_ids] = False
 
         # Pursuer spawn location
         pursuer_pos = self.pursuer_init_pos_dist.sample(torch.Size([num_env, 1]))
@@ -607,6 +656,9 @@ class Intercept(IsaacEnv):
 
         self.current_action = tensordict[("info", "policy_action")]
         self.action_error_order1 = tensordict[("stats", "action_error_order1")]  # these are set on the PIDRateController
+
+        if self.use_esn:
+            self._esn_stepped[:] = False
 
     def _post_sim_step(self, tensordict: TensorDictBase):
         """Latch the latest RGB frames from the pursuer camera, if enabled.
@@ -742,6 +794,12 @@ class Intercept(IsaacEnv):
         self.pursuer_rot_vel = pursuer_vel_b[..., 3:6]
         self.pursuer_rot = quaternion_to_rotation_matrix(pursuer_rot_quat).reshape(
             self.num_envs, 1, 9)
+        if self.rot_repr == "quat":
+            rot_obs = quat_canonical(pursuer_rot_quat)
+        elif self.rot_repr == "log":
+            rot_obs = quat_log(pursuer_rot_quat)
+        else:
+            rot_obs = self.pursuer_rot
 
         obs = []
 
@@ -751,7 +809,7 @@ class Intercept(IsaacEnv):
             obs.append(self.pursuer_alt)
 
         obs += [
-            self.pursuer_rot,
+            rot_obs,
             self.pursuer_lin_vel,
             self.pursuer_rot_vel,
         ]
@@ -769,8 +827,9 @@ class Intercept(IsaacEnv):
             obs[0] = noise_pos
 
             # Flattened rotation matrix: small additive perturbation.
-            noisy_rot = self.pursuer_rot + torch.randn_like(
-                self.pursuer_rot) * self.obs_noise_rot_std
+            noisy_rot = rot_obs + torch.randn_like(rot_obs) * self.obs_noise_rot_std
+            if self.rot_repr == "quat":
+                noisy_rot = quat_canonical(normalize(noisy_rot))
             obs[1] = noisy_rot
 
             # Body-frame linear velocity: additive Gaussian.
@@ -788,17 +847,34 @@ class Intercept(IsaacEnv):
                 self.evader_rel_hdg) * self.obs_noise_rel_hdg_std
             obs[4] = normalize(noisy_hdg)
 
+        rel_vel_obs = self.evader_rel_lin_vel
         if self.obs_cfg.use_evader_rel_lin_vel:
             if self.obs_cfg.include_noise:
                 noisy_rel_vel = self.evader_rel_lin_vel + torch.randn_like(
                     self.evader_rel_lin_vel) * self.obs_noise_rel_lin_vel_std
                 obs.append(noisy_rel_vel)
+                rel_vel_obs = noisy_rel_vel
             else:
                 obs.append(self.evader_rel_lin_vel)
 
         # Previous action
         if self.obs_cfg.use_previous_action:
             obs.append(self.current_action)
+
+        if self.use_esn:
+            esn_mask = ~self._esn_stepped
+            esn_target = torch.cat([self.evader_rel_distance, rel_vel_obs], dim=-1)
+            esn_pred = self.esn.step(
+                torch.cat(obs, dim=-1).squeeze(1), esn_target.squeeze(1), esn_mask,
+                fit=self.training and self.esn.readout != "per_env")
+            self._esn_stepped[:] = True
+            obs.append(esn_pred.unsqueeze(1))
+            err = self.stats["esn_pred_err"]
+            self.stats["esn_pred_err"][:] = torch.where(
+                esn_mask.unsqueeze(-1),
+                torch.lerp(err, self.esn.err.unsqueeze(-1), 1 - self.alpha),
+                err,
+            )
 
         state = obs.copy()
 

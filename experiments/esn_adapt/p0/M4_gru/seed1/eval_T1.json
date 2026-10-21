@@ -1,0 +1,67 @@
+{
+  "matchups": {
+    "evader:weave": {
+      "win_rate": 0.7360703945159912,
+      "avg_time_to_capture": 2.643944025039673,
+      "avg_distance": 0.5830111503601074,
+      "avg_motor_effort": 1575.00439453125,
+      "agent_error_rate": 0.1818181872367859,
+      "episodes": 341,
+      "eval_role": "pursuer",
+      "outcomes": {
+        "capture": 0.7360703945159912,
+        "pursuer_crash": 0.11143694818019867,
+        "evader_crash": 0.1319648027420044,
+        "pursuer_oob": 0.08211144059896469,
+        "evader_oob": 0.020527860149741173,
+        "timeout": 0.0,
+        "forced_error": 0.1319648027420044
+      },
+      "agent_terminal_win_rate": 0.7360703945159912,
+      "agent_forced_error_rate": 0.1319648027420044,
+      "avg_episode_len": 251.61289978027344
+    },
+    "evader:zigzag": {
+      "win_rate": 0.7280701994895935,
+      "avg_time_to_capture": 2.8194777965545654,
+      "avg_distance": 0.6914524435997009,
+      "avg_motor_effort": 1700.026123046875,
+      "agent_error_rate": 0.19883041083812714,
+      "episodes": 342,
+      "eval_role": "pursuer",
+      "outcomes": {
+        "capture": 0.7280701994895935,
+        "pursuer_crash": 0.10526315867900848,
+        "evader_crash": 0.13450291752815247,
+        "pursuer_oob": 0.11988303810358047,
+        "evader_oob": 0.02923976629972458,
+        "timeout": 0.002923976629972458,
+        "forced_error": 0.13450291752815247
+      },
+      "agent_terminal_win_rate": 0.7280701994895935,
+      "agent_forced_error_rate": 0.13450291752815247,
+      "avg_episode_len": 269.122802734375
+    },
+    "evader:fast_flee": {
+      "win_rate": 0.6979472041130066,
+      "avg_time_to_capture": 2.8562185764312744,
+      "avg_distance": 0.6964454054832458,
+      "avg_motor_effort": 1702.8431396484375,
+      "agent_error_rate": 0.19354838132858276,
+      "episodes": 341,
+      "eval_role": "pursuer",
+      "outcomes": {
+        "capture": 0.6979472041130066,
+        "pursuer_crash": 0.09677419066429138,
+        "evader_crash": 0.16422288119792938,
+        "pursuer_oob": 0.12316715717315674,
+        "evader_oob": 0.041055720299482346,
+        "timeout": 0.0029325513169169426,
+        "forced_error": 0.16422288119792938
+      },
+      "agent_terminal_win_rate": 0.6979472041130066,
+      "agent_forced_error_rate": 0.16422288119792938,
+      "avg_episode_len": 269.8826904296875
+    }
+  }
+}

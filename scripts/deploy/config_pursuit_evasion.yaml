@@ -7,7 +7,7 @@
 # The artifact's `role` (pursuer | evader) decides which drone the policy flies;
 # the drone sections below are keyed by role, so the same file serves both.
 
-artifact_dir: artifacts/selfplay_ppo_v1_rel_dist/pursuer   # Folder with policy_ts.pt + metadata.json (required).
+artifact_dir: artifacts/selfplay_ppo_v6_fix_reward_and_bounds/pursuer   # Folder with policy_ts.pt + metadata.json (required).
 # ^ v3: retrained from scratch with anti-tumble smoothness reward (body-rate +
 #   action-jerk penalties, lower approach weight). On-trajectory commanded body
 #   rates dropped ~61% (mean 96->37 deg/s, 0% saturation) vs the aggressive
@@ -41,23 +41,26 @@ controller:
   # The policy observes positions relative to the arena centre. Set this to the
   # arena centre expressed in mocap world coordinates.
   arena_origin: [0.0, 0.0, 0.0]
-  enforce_arena: true          # Stop if the agent leaves the trained arena volume.
+  enforce_arena: true          # Stop if the EVADER leaves the arena (episode end in
+                               # training); the pursuer may leave freely.
   arena_margin: 0.3            # Keep scripted setpoints this far inside the walls (m).
 
   stop_on_capture: true        # Stop once the drones are within capture_radius.
   capture_radius: 0.0          # 0 = use the trained eval radius from metadata.
+  stop_on_timeout: false        # Stop after the training episode length
+                               # (metadata.max_episode_length * ctbr.dt; evader win).
 
   opponent:
-    mode: cf             # policy | cf | scripted.
+    mode: policy             # policy | cf | scripted.
     # Required when mode == policy: artifact of the OPPOSING role.
-    artifact_dir: artifacts/selfplay_ppo_v1_rel_dist/evader
+    artifact_dir: artifacts/selfplay_ppo_v6_fix_reward_and_bounds/evader
     motion:                    # Used only when mode == scripted.
-      type: hover           # hover | linear | circular | flee.
+      type: hover           # hover | linear | circular | pure_pursuit | flee.
       yaw_deg: 0.0             # Yaw command for opponent position setpoints (deg).
-      anchor: [2.0, 0.0, 1.0]  # Initial position / hover point [x, y, z] (m).
+      anchor: [0.5, 0.0, 1.0]  # Initial position / hover point [x, y, z] (m); flee holds this z.
       speed: 1.0               # Linear / flee speed (m/s).
       direction: [1.0, 0.0, 0.0]  # World-frame travel direction; normalized at load.
-      radius: 1.5              # Circular orbit radius (m).
+      radius: 1.0              # Circular orbit radius (m).
       omega: 1.0               # Circular angular rate (rad/s).
       lookahead: 0.5           # Flee setpoint lead time (s).
 

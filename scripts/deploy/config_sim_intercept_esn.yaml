@@ -1,0 +1,71 @@
+# CrazySim test of the ESN-module Intercept policy (wandb: Intercept-PPO-Crazyflie-esn-module).
+# Start CrazySim from ~/Projects/CrazySim/crazyflie-firmware:
+#   bash tools/crazyflie-simulation/simulator_files/mujoco/launch/sitl_multiagent_text.sh -m cf2x_L250 -f intercept.txt
+# intercept.txt spawns the pursuer at (0, 0) and the evader at (2, 0).
+
+artifact_dir: artifacts/intercept_ppo_crazyflie_esn_module
+
+controller:
+  evader_source: cf
+  control_dt: 0.02
+  takeoff_height: 1.0
+  takeoff_duration: 3.0
+  state_timeout: 0.5
+  min_altitude: 0.15
+  log_commands: true
+  publish_tf: false
+  mocap_world_frame: world
+  evader_motion:
+    type: hover
+    yaw_deg: 0.0
+    anchor: [2.0, 0.0, 1.0]
+    trajectory_file: 'trajectories/linear_y.csv'
+    trajectory_loop: true
+    linear:
+      speed: 0.5
+      direction: [0.0, 1.0, 0.0]
+    random:
+      speed: 0.5
+      turn_interval_range: [20, 80]
+      vertical_component_range: [-0.5, 0.5]
+      target_lookahead: 0.5
+      seed: 0
+
+pursuer:
+  name: pursuer
+  uri: udp://127.0.0.1:19850
+  cache_dir: ./cache-pursuer
+  control_dt: 0.02
+  log_period_ms: 20
+  max_thrust_pwm: 65535.0
+  rate_sign: [1.0, 1.0, 1.0]
+  state_timeout: 0.1
+  min_altitude: 0.1
+
+evader:
+  name: evader
+  uri: udp://127.0.0.1:19851
+  cache_dir: ./cache-evader
+  control_dt: 0.02
+  log_period_ms: 20
+  max_thrust_pwm: 65535.0
+  rate_sign: [1.0, 1.0, 1.0]
+
+logs:
+  save: true
+  dir: ./logs_esn_module
+  capture_radius: 0.10
+
+mocap:
+  enabled: false
+  server_ip: 192.168.0.210
+  local_ip: ""
+  multicast_address: 239.255.42.99
+  command_port: 1510
+  data_port: 1511
+  body_to_flu_quat_xyzw: [0.0, 0.0, -0.7071067811865476, 0.7071067811865476]
+  pursuer_rigid_body_id: 31
+  evader_rigid_body_id: 32
+  mocap_send_rate_hz: 60.0
+  world_frame: world
+  orientation_align_time: 2.0
