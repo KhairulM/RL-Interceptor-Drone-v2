@@ -526,6 +526,7 @@ class PursuitEvasion(IsaacEnv):
             "return": UnboundedContinuous(torch.Size([1]), device=self.device),
             "episode_len": UnboundedContinuous(torch.Size([1]), device=self.device),
             "distance": UnboundedContinuous(torch.Size([1]), device=self.device),
+            "min_distance": UnboundedContinuous(torch.Size([1]), device=self.device),
             "success_rate": UnboundedContinuous(torch.Size([1]), device=self.device),
             "capture": UnboundedContinuous(torch.Size([1]), device=self.device),
             "time_to_capture": UnboundedContinuous(torch.Size([1]), device=self.device),
@@ -604,6 +605,7 @@ class PursuitEvasion(IsaacEnv):
 
         rel0 = opp_pos - agent_pos
         self.prev_distance[env_ids] = torch.norm(rel0, dim=-1)
+        self.stats["min_distance"][env_ids] = self.prev_distance[env_ids]
         self.opp_prev_action[env_ids] = 0.0
         self._just_reset[env_ids] = True
 
@@ -989,6 +991,8 @@ class PursuitEvasion(IsaacEnv):
             newly > 0, cap_time, self.stats["time_to_capture"])
         self.stats["motor_effort"] += self.agent_effort
         self.stats["distance"].lerp_(distance, 1 - self.alpha)
+        self.stats["min_distance"][:] = torch.minimum(
+            self.stats["min_distance"], distance)
         self.stats["crash"][:] = torch.maximum(
             self.stats["crash"], self._agent_crash.float())
         self.stats["opp_crash"][:] = torch.maximum(

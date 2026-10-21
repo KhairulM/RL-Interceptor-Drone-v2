@@ -32,7 +32,7 @@ Modes:
          ``total_frames`` and save a checkpoint to ``stage_ckpt``.
   eval   Load ``eval_policy`` as the ``task.role`` agent, assign every opponent in
          the pool uniformly across envs, roll out one episode batch, and write
-         per-opponent matchup metrics (win rate, time-to-capture, distance,
+         per-opponent matchup metrics (win rate, time-to-capture, minimum distance,
          motor effort) to ``stage_out``.
 """
 
@@ -235,7 +235,7 @@ def _run_eval(cfg, env, base_env, policy):
     stats = {k: take_first(v).float() for k, v in trajs[("next", "stats")].cpu().items()}
     capture = stats["capture"]
     ttc = stats["time_to_capture"]
-    distance = stats["distance"]
+    min_distance = stats["min_distance"]
     effort = stats["motor_effort"]
 
     dt = float(cfg.sim.dt)
@@ -283,7 +283,7 @@ def _run_eval(cfg, env, base_env, policy):
             # `win_rate` is the pursuer capture rate: the sampling metric.
             "win_rate": win_rate,
             "avg_time_to_capture": avg_ttc,
-            "avg_distance": float(distance[idxs].mean().item()),
+            "avg_min_distance": float(min_distance[idxs].mean().item()),
             "avg_motor_effort": float(effort[idxs].mean().item()),
             "agent_error_rate": agent_error_rate,
             "episodes": n,

@@ -25,7 +25,7 @@
 Stores a growing population of pursuer and evader policies (one JSON file per
 role) plus a matchup table (``matchups.json``) that records, for every
 (pursuer, evader) pair that has been evaluated, the pursuer win rate, average
-time-to-capture, average inter-drone distance, and average motor effort.
+time-to-capture, average episode-minimum inter-drone distance, and average motor effort.
 
 The matchup metrics drive opponent sampling: when training one side against a
 frozen opponent pool, opponents are drawn from a softmax over a per-opponent
@@ -35,6 +35,7 @@ agent are sampled more often.
 """
 
 import json
+import logging
 import math
 import os
 import tempfile
@@ -44,7 +45,7 @@ from typing import Dict, List, Optional
 # capture rate (fraction of episodes ending in capture); the remaining three are
 # averages over episodes of a matchup.
 METRIC_KEYS = (
-    "win_rate", "avg_time_to_capture", "avg_distance", "avg_motor_effort",
+    "win_rate", "avg_time_to_capture", "avg_min_distance", "avg_motor_effort",
     "agent_error_rate",
 )
 
@@ -94,6 +95,13 @@ class PolicyDatabase:
                 self._matchups = json.load(f)
         else:
             self._matchups = {"matchups": {}}
+        if any("avg_min_distance" not in record
+               for record in self._matchups["matchups"].values()):
+            logging.warning(
+                "Historical matchups lack avg_min_distance; their distance "
+                "contribution is neutral until re-evaluated. avg_distance "
+                "cannot be converted to episode minima."
+            )
 
     def save(self):
         for role in (PURSUER, EVADER):
@@ -244,7 +252,7 @@ class PolicyDatabase:
 DEFAULT_METRIC_WEIGHTS = {
     "win_rate": 1.0,
     "avg_time_to_capture": 0.5,
-    "avg_distance": 0.0,
+    "avg_min_distance": 0.5,
     "avg_motor_effort": 0.25,
     # Fraction of episodes in which the TRAINING agent itself crashed to the
     # ground or left the arena against this opponent. A harder opponent forces
@@ -257,20 +265,20 @@ DEFAULT_METRIC_WEIGHTS = {
 # win_rate is the pursuer capture rate.
 _HARDNESS_ORIENTATION = {
     # Training the pursuer against evaders: a hard evader has low capture rate,
-    # long time-to-capture, large distance, high effort to catch.
+    # long time-to-capture, large minimum distance, high effort to catch.
     PURSUER: {
         "win_rate": -1,
         "avg_time_to_capture": +1,
-        "avg_distance": +1,
+        "avg_min_distance": +1,
         "avg_motor_effort": +1,
         "agent_error_rate": +1,
     },
     # Training the evader against pursuers: a hard pursuer has high capture rate,
-    # short time-to-capture, small distance, low effort.
+    # short time-to-capture, small minimum distance, low effort.
     EVADER: {
         "win_rate": +1,
         "avg_time_to_capture": -1,
-        "avg_distance": -1,
+        "avg_min_distance": -1,
         "avg_motor_effort": -1,
         "agent_error_rate": +1,
     },
@@ -281,14 +289,15 @@ def _normalise_metrics(raw: Dict[str, Optional[dict]]) -> Dict[str, Dict[str, fl
     """Min-max normalise each metric to [0, 1] across opponents."""
     normed: Dict[str, Dict[str, float]] = {opp: {} for opp in raw}
     for m in METRIC_KEYS:
-        vals = [raw[opp][m] for opp in raw if raw[opp] is not None]
+        vals = [record[m] for record in raw.values()
+                if record is not None and m in record]
         if vals:
             lo, hi = min(vals), max(vals)
             span = hi - lo
         else:
             lo, hi, span = 0.0, 0.0, 0.0
         for opp in raw:
-            if raw[opp] is None or span <= 1e-9:
+            if raw[opp] is None or m not in raw[opp] or span <= 1e-9:
                 normed[opp][m] = 0.5  # neutral when unknown or degenerate
             else:
                 normed[opp][m] = (raw[opp][m] - lo) / span

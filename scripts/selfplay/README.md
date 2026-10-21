@@ -5,7 +5,7 @@ the OmniDrones / Isaac Sim stack in this repo. Each generation trains **one** si
 with PPO against a **frozen** opponent drawn from a growing population, then
 evaluates the new policy against the pool and adds it back. Opponents are sampled
 with a **temperature-scaled, multi-metric softmax** over win rate,
-time-to-capture, distance, motor effort, and the training agent's own
+time-to-capture, average episode-minimum distance, motor effort, and the training agent's own
 crash/out-of-bounds rate, so training focuses on whichever frozen opponents are
 currently hardest.
 
@@ -230,7 +230,7 @@ JSON files under the database directory (`policy_db.py`):
   |---|---|
   | `win_rate` | pursuer capture rate |
   | `avg_time_to_capture` | mean time-to-capture over captured episodes (falls back to the episode cap when there were none) |
-  | `avg_distance` | mean inter-drone distance |
+  | `avg_min_distance` | mean of each episode's minimum inter-drone distance, including spawn and terminal distances |
   | `avg_motor_effort` | mean accumulated motor effort |
   | `agent_error_rate` | fraction of episodes in which the evaluated role's agent crashed or left the arena |
 
@@ -259,7 +259,7 @@ p_i     = softmax(score_i / temperature)
 ```
 
 Orientation flips by role for the four outcome metrics (a hard evader has low
-capture rate / long capture time / large distance / high effort; a hard pursuer
+capture rate / long capture time / large minimum distance / high effort; a hard pursuer
 is the opposite). **`agent_error_rate` is oriented `+1` for *both* roles**: a
 harder opponent forces the training agent into riskier, less controlled flight,
 so a higher agent crash/OOB rate flags a harder opponent regardless of which side
@@ -290,13 +290,23 @@ temperature: 0.9
 metric_weights:
   win_rate: 1.0
   avg_time_to_capture: 0.5
-  avg_distance: 0.0        # disabled
+  avg_min_distance: 0.5
   avg_motor_effort: 0.25
   agent_error_rate: 1.0
 ```
 
-A weight of `0.0` leaves the metric recorded but out of the score, which is how
-`avg_distance` is currently disabled.
+A weight of `0.0` leaves a metric recorded but out of the score.
+For `avg_min_distance`, larger values increase sampling when training a pursuer
+(harder evaders) and decrease sampling when training an evader (easier pursuers).
+The environment tracks the minimum separately from its existing smoothed
+`stats.distance` log; evaluation averages the first completed episode's minimum
+across environments assigned to each opponent.
+
+Historical matchups containing only `avg_distance` cannot be converted to
+episode minima. Loading them logs a warning; missing `avg_min_distance` values
+contribute neutrally to sampling until those matchups are re-evaluated. New
+evaluations store `avg_min_distance` instead. Custom sampling configs should
+also replace the old weight key with `avg_min_distance`.
 
 ---
 

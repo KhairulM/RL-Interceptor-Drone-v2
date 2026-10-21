@@ -5,7 +5,7 @@
 # Version name of this campaign. DB/checkpoints/stage artifacts go under
 # scripts/selfplay/outputs/{run_name}/{db,checkpoints,stages}; wandb runs are
 # named {run_name}-{pursuer|evader}-stage{n}.
-run_name: v9-
+run_name: v9-min-distance
 
 # Fresh start: wipe db_dir/ckpt_dir/work_dir on launch and re-seed heuristics.
 # false (default) resumes the next incomplete stage and extends the population.
@@ -37,7 +37,7 @@ temperature: 0.9
 metric_weights:
   win_rate: 1.0
   avg_time_to_capture: 0.8
-  avg_distance: 0.0
+  avg_min_distance: 0.5      # higher => harder evader, easier pursuer
   avg_motor_effort: 0.25
   agent_error_rate: 1.0      # agent's own crash/OOB rate vs this opponent; higher => harder opponent => sampled more (both roles)
 
