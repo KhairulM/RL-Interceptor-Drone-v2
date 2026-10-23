@@ -255,6 +255,7 @@ def _run_eval(cfg, env, base_env, policy):
         "timeout": "timeout",
     }
     pursuer_crash = stats[outcome_src["pursuer_crash"]]
+    timeout = stats["timeout"]
     ep_len = stats.get("episode_len")
 
     matchups = {}
@@ -264,16 +265,26 @@ def _run_eval(cfg, env, base_env, policy):
         if n == 0:
             continue
         cap = capture[idxs]
-        win_rate = float(cap.mean().item())
+        capture_rate = float(cap.mean().item())
         captured_mask = cap > 0.5
+        # Pursuer win rate over decisive episodes only. Capture takes precedence
+        # over a simultaneous pursuer crash; evader crash/OOB alone is neutral.
+        pursuer_loss = ~captured_mask & (
+            (pursuer_crash[idxs] > 0.5) | (timeout[idxs] > 0.5))
+        wins = int(captured_mask.sum().item())
+        decisive = wins + int(pursuer_loss.sum().item())
+        win_rate = wins / decisive if decisive > 0 else None
         if bool(captured_mask.any()):
             avg_ttc = float(ttc[idxs][captured_mask].mean().item())
         else:
             avg_ttc = max_time
         pursuer_crash_rate = float((pursuer_crash[idxs] > 0.5).float().mean().item())
         record = {
-            # `win_rate` is the pursuer capture rate: the sampling metric.
+            # `win_rate` is the pursuer's decisive-outcome win rate (the
+            # sampling metric); None when every episode ended neutrally.
             "win_rate": win_rate,
+            "decisive_episodes": decisive,
+            "capture_rate": capture_rate,
             "avg_time_to_capture": avg_ttc,
             "avg_min_distance": float(min_distance[idxs].mean().item()),
             "avg_motor_effort": float(effort[idxs].mean().item()),
@@ -283,7 +294,7 @@ def _run_eval(cfg, env, base_env, policy):
         }
         # Termination breakdown (fractions of episodes; not mutually exclusive
         # only in the degenerate case of two events on the same step).
-        outcomes = {"capture": win_rate}
+        outcomes = {"capture": capture_rate}
         for name, key in outcome_src.items():
             if key in stats:
                 outcomes[name] = float((stats[key][idxs] > 0.5).float().mean().item())

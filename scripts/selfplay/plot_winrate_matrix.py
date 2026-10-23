@@ -2,7 +2,7 @@
 """Visualise the pursuer-vs-evader win-rate matrix from a self-play DB.
 
 Reads a run's matchups.json + pool files and builds a pursuer-generation x
-evader-generation matrix of the pursuer capture rate (win_rate), RL policies
+evader-generation matrix of the pursuer decisive-outcome win rate (win_rate), RL policies
 only (scripted heuristics are excluded). Saves a local
 PNG heatmap and, with --wandb, logs it to Weights & Biases as (1) an image
 panel, (2) a wandb.Table, and (3) a native heatmap custom chart built from that
@@ -41,7 +41,7 @@ def load_matrix(db, metric="win_rate"):
     for i, p in enumerate(purs):
         for j, e in enumerate(evad):
             rec = M.get(f"{p}|{e}")
-            if rec is not None and metric in rec:
+            if rec is not None and rec.get(metric) is not None:
                 mat[i, j] = float(rec[metric])
                 eps[i, j] = int(rec.get("episodes", 0))
     return purs, evad, mat, eps
@@ -71,7 +71,7 @@ def save_png(purs, evad, mat, eps, out_png, metric):
     ax.set_yticklabels([f's{i+1}' for i in range(len(purs))])
     ax.set_xlabel("evader generation")
     ax.set_ylabel("pursuer generation")
-    ax.set_title(f"Pursuer capture rate ({metric})  —  pursuer vs evader")
+    ax.set_title(f"Pursuer win rate ({metric})  —  pursuer vs evader")
     for i in range(len(purs)):
         for j in range(len(evad)):
             if not np.isnan(mat[i, j]):

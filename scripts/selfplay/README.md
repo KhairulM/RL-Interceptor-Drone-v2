@@ -333,18 +333,19 @@ JSON files under the database directory (`policy_db.py`):
 - `pursuer_pool.json`, `evader_pool.json` — one entry per policy:
   `{id, role, generation, kind ("rl"|"heuristic"), checkpoint_path, metadata}`
 - `matchups.json` — per `(pursuer_id, evader_id)` pair. The five **sampling
-  metrics** (`win_rate` is always the pursuer capture rate):
+  metrics** (`win_rate` is always the pursuer's decisive-outcome win rate):
 
   | metric | meaning |
   |---|---|
-  | `win_rate` | pursuer capture rate |
+  | `win_rate` | pursuer win rate over decisive episodes: `capture / (capture + timeout + pursuer crash)`, counting each episode once (capture beats a simultaneous pursuer crash). Evader crashes and evader arena exits are neutral and excluded. `null` when no episode was decisive; sampling then treats it as neutral |
   | `avg_time_to_capture` | mean time-to-capture over captured episodes (falls back to the episode cap when there were none) |
   | `avg_min_distance` | mean of each episode's minimum inter-drone distance, including spawn and terminal distances |
   | `avg_motor_effort` | mean accumulated motor effort |
   | `pursuer_crash_rate` | fraction of episodes in which the pursuer crashed, regardless of the evaluated role; excludes out-of-bounds exits |
 
-  plus diagnostics that do **not** feed sampling: `episodes`, `eval_role`,
-  `avg_episode_len`, and an
+  plus diagnostics that do **not** feed sampling: `episodes`,
+  `decisive_episodes` (the `win_rate` denominator), `capture_rate` (captures
+  over all episodes), `eval_role`, `avg_episode_len`, and an
   `outcomes` block breaking every episode down by how it ended
   (`capture`, `pursuer_crash`, `evader_crash`, `pursuer_oob`, `evader_oob`,
   `timeout`).
@@ -370,7 +371,7 @@ p_i     = (1 - uniform_mix) · q_i + uniform_mix / N
 ```
 
 Orientation flips by role for the four outcome metrics (a hard evader has low
-capture rate / long capture time / large minimum distance / high effort; a hard pursuer
+pursuer win rate / long capture time / large minimum distance / high effort; a hard pursuer
 is the opposite). **`pursuer_crash_rate` is oriented `+1` when training the
 pursuer and `-1` when training the evader**: evaders that cause more pursuer
 crashes are harder opponents, whereas pursuers that crash less are harder
@@ -528,7 +529,8 @@ the green boundary box drawn per env.
 ### Win-rate matrix (pursuer generation × evader generation)
 
 `plot_winrate_matrix.py` turns a run's `matchups.json` into a
-pursuer-generation × evader-generation heatmap of pursuer capture rate for RL
+pursuer-generation × evader-generation heatmap of the pursuer decisive-outcome
+win rate for RL
 policies (scripted heuristics are excluded). It always writes a PNG next to the
 database and can additionally log an image, a `wandb.Table`, and an interactive
 W&B heatmap when supported:
@@ -575,7 +577,9 @@ exits end episodes with neither. `crash` / `out_of_bounds` are always the
 **training agent's**; the opponent's are under `opp_crash` /
 `opp_out_of_bounds`. The evader's out-of-bounds flag ends the episode; the
 pursuer's only records that it left the arena at some point. The matchup
-database's `win_rate` is the pursuer capture rate (mean of `capture`).
+database's `win_rate` is the pursuer's decisive-outcome win rate
+(`capture / (capture + timeout + pursuer crash)`); `capture_rate` keeps the
+mean of `capture` over all episodes.
 
 All terminal stats are latched in `_compute_state_and_obs` (before the stats are
 cloned into the observation), otherwise the episode resets first and every

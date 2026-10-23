@@ -180,7 +180,8 @@ class PolicyDatabase:
         missing = [k for k in METRIC_KEYS if k not in metrics]
         if missing:
             raise KeyError(f"matchup metrics missing keys: {missing}")
-        record = {k: float(metrics[k]) for k in METRIC_KEYS}
+        record = {k: None if metrics[k] is None else float(metrics[k])
+                  for k in METRIC_KEYS}
         record["episodes"] = int(metrics.get("episodes", 0))
         # Keep any diagnostic extras the evaluator attached (e.g. the
         # per-opponent termination breakdown under "outcomes"). Only METRIC_KEYS
@@ -282,9 +283,9 @@ DEFAULT_METRIC_WEIGHTS = {
 }
 
 # +1: larger normalised metric == harder for the training agent; -1: inverse.
-# win_rate is the pursuer capture rate.
+# win_rate is the pursuer's decisive-outcome win rate.
 _HARDNESS_ORIENTATION = {
-    # Training the pursuer against evaders: a hard evader has low capture rate,
+    # Training the pursuer against evaders: a hard evader has low pursuer win rate,
     # long time-to-capture, large minimum distance, high effort to catch.
     PURSUER: {
         "win_rate": -1,
@@ -293,7 +294,7 @@ _HARDNESS_ORIENTATION = {
         "avg_motor_effort": +1,
         "pursuer_crash_rate": +1,
     },
-    # Training the evader against pursuers: a hard pursuer has high capture rate,
+    # Training the evader against pursuers: a hard pursuer has high pursuer win rate,
     # short time-to-capture, small minimum distance, low effort.
     EVADER: {
         "win_rate": +1,
@@ -310,14 +311,14 @@ def _normalise_metrics(raw: Dict[str, Optional[dict]]) -> Dict[str, Dict[str, fl
     normed: Dict[str, Dict[str, float]] = {opp: {} for opp in raw}
     for m in METRIC_KEYS:
         vals = [record[m] for record in raw.values()
-                if record is not None and m in record]
+                if record is not None and record.get(m) is not None]
         if vals:
             lo, hi = min(vals), max(vals)
             span = hi - lo
         else:
             lo, hi, span = 0.0, 0.0, 0.0
         for opp in raw:
-            if raw[opp] is None or m not in raw[opp] or span <= 1e-9:
+            if raw[opp] is None or raw[opp].get(m) is None or span <= 1e-9:
                 normed[opp][m] = 0.5  # neutral when unknown or degenerate
             else:
                 normed[opp][m] = (raw[opp][m] - lo) / span

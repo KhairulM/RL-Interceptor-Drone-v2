@@ -259,6 +259,7 @@ class SelfplayMetricTests(unittest.TestCase):
                                           [[0.0], [1.0], [0.0]]])
         stats["out_of_bounds"] = torch.ones(3, 3, 1)
         stats["opp_out_of_bounds"] = torch.ones(3, 3, 1)
+        stats["timeout"] = torch.zeros(3, 3, 1)
         trajs = TensorDict(
             {("next", "done"): done,
              ("next", "stats"): TensorDict(stats, batch_size=[3, 3])},
@@ -293,6 +294,93 @@ class SelfplayMetricTests(unittest.TestCase):
                     )
                     self.assertNotIn("agent_error_rate", matchups[opponent])
                     self.assertNotIn("agent_terminal_win_rate", matchups[opponent])
+
+    def test_evaluation_win_rate_uses_decisive_pursuer_outcomes(self):
+        path = _ROOT / "scripts/selfplay/run_stage.py"
+        tree = ast.parse(path.read_text())
+        function = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                        and node.name == "_run_eval")
+        write = Mock()
+        scope = {
+            "torch": torch,
+            "_load_state_dict": Mock(),
+            "_write_stage_out": write,
+            "set_exploration_type": lambda _: nullcontext(),
+            "ExplorationType": SimpleNamespace(MODE=None),
+        }
+        exec(compile(ast.Module([function], type_ignores=[]), str(path), "exec"), scope)
+
+        def column(values):
+            return torch.tensor(values, dtype=torch.float32).reshape(-1, 1, 1)
+
+        # Episodes: capture+pursuer crash (win), timeout (loss), pursuer crash
+        # (loss), evader crash (neutral), evader OOB (neutral) | evader crash.
+        capture = column([1, 0, 0, 0, 0, 0])
+        timeout = column([0, 1, 0, 0, 0, 0])
+        pursuer_crash = column([1, 0, 1, 0, 0, 0])
+        evader_crash = column([0, 0, 0, 1, 0, 1])
+        evader_oob = column([0, 0, 0, 0, 1, 0])
+        base = SimpleNamespace(
+            eval=Mock(), device="cpu", max_episode_length=1,
+            opponent_bank=SimpleNamespace(assignment={
+                "mixed": torch.arange(5), "neutral": torch.tensor([5]),
+            }),
+        )
+        cfg = OmegaConf.create({
+            "seed": 0, "eval_policy": "policy.pt",
+            "sim": {"dt": 0.1}, "task": {"role": "pursuer"},
+        })
+        for role in (policy_db.PURSUER, policy_db.EVADER):
+            with self.subTest(role=role):
+                is_pursuer = role == policy_db.PURSUER
+                stats = {key: torch.zeros(6, 1, 1)
+                         for key in ("time_to_capture", "motor_effort", "min_distance")}
+                stats.update(
+                    capture=capture, timeout=timeout,
+                    crash=pursuer_crash if is_pursuer else evader_crash,
+                    opp_crash=evader_crash if is_pursuer else pursuer_crash,
+                    out_of_bounds=torch.zeros(6, 1, 1) if is_pursuer else evader_oob,
+                    opp_out_of_bounds=evader_oob if is_pursuer else torch.zeros(6, 1, 1),
+                )
+                env = Mock()
+                env.rollout.return_value = TensorDict(
+                    {("next", "done"): torch.ones(6, 1, 1, dtype=torch.bool),
+                     ("next", "stats"): TensorDict(stats, batch_size=[6, 1])},
+                    batch_size=[6, 1],
+                )
+                cfg.task.role = role
+                scope["_run_eval"](cfg, env, base, Mock())
+                matchups = write.call_args.args[1]["matchups"]
+                mixed = matchups["mixed"]
+                self.assertAlmostEqual(mixed["win_rate"], 1 / 3)
+                self.assertEqual(mixed["decisive_episodes"], 3)
+                self.assertEqual(mixed["episodes"], 5)
+                self.assertAlmostEqual(mixed["capture_rate"], 0.2)
+                self.assertAlmostEqual(mixed["outcomes"]["capture"], 0.2)
+                neutral = matchups["neutral"]
+                self.assertIsNone(neutral["win_rate"])
+                self.assertEqual(neutral["decisive_episodes"], 0)
+                self.assertEqual(neutral["capture_rate"], 0.0)
+
+    def test_undefined_win_rate_is_recorded_and_sampled_as_neutral(self):
+        with tempfile.TemporaryDirectory() as root:
+            db = policy_db.PolicyDatabase(root)
+            reference = db.add_policy(policy_db.PURSUER, "reference.pt")
+            evaders = [db.add_policy(policy_db.EVADER, f"e{i}.pt") for i in range(3)]
+            for evader, win_rate in zip(evaders, [0.0, None, 1.0]):
+                metrics = dict.fromkeys(policy_db.METRIC_KEYS, 0.0)
+                metrics["win_rate"] = win_rate
+                db.record_matchup(reference, evader, metrics)
+            self.assertIsNone(db.get_matchup(reference, evaders[1])["win_rate"])
+            reloaded = policy_db.PolicyDatabase(root)
+            self.assertIsNone(reloaded.get_matchup(reference, evaders[1])["win_rate"])
+            probs = reloaded.compute_sampling_probs(
+                policy_db.PURSUER, metric_weights={m: 0.0 for m in policy_db.METRIC_KEYS}
+                | {"win_rate": 1.0},
+            )
+            # Hardest (0.0) > undefined (neutral 0.5) > easiest (1.0).
+            self.assertGreater(probs[evaders[0]], probs[evaders[1]])
+            self.assertGreater(probs[evaders[1]], probs[evaders[2]])
 
 
 if __name__ == "__main__":
