@@ -25,12 +25,13 @@
 Stores a growing population of pursuer and evader policies (one JSON file per
 role) plus a matchup table (``matchups.json``) that records, for every
 (pursuer, evader) pair that has been evaluated, the pursuer win rate, average
-time-to-capture, average episode-minimum inter-drone distance, and average motor effort.
+time-to-capture, average episode-minimum inter-drone distance, average motor effort,
+and pursuer crash rate.
 
 The matchup metrics drive opponent sampling: when training one side against a
-frozen opponent pool, opponents are drawn from a softmax over a per-opponent
+frozen opponent pool, opponents are drawn from a uniform/softmax mixture over a per-opponent
 "hardness" score (a temperature-scaled, min-max-normalised weighted sum of the
-four metrics), oriented so that opponents currently harder for the training
+five metrics), oriented so that opponents currently harder for the training
 agent are sampled more often.
 """
 
@@ -41,12 +42,11 @@ import os
 import tempfile
 from typing import Dict, List, Optional
 
-# The four metrics tracked per matchup. ``win_rate`` is always the *pursuer*
-# capture rate (fraction of episodes ending in capture); the remaining three are
-# averages over episodes of a matchup.
+# ``win_rate`` and ``pursuer_crash_rate`` always describe the pursuer,
+# regardless of which role was evaluated.
 METRIC_KEYS = (
     "win_rate", "avg_time_to_capture", "avg_min_distance", "avg_motor_effort",
-    "agent_error_rate",
+    "pursuer_crash_rate",
 )
 
 # Roles.
@@ -95,6 +95,19 @@ class PolicyDatabase:
                 self._matchups = json.load(f)
         else:
             self._matchups = {"matchups": {}}
+        for record in self._matchups["matchups"].values():
+            if "pursuer_crash_rate" not in record:
+                outcomes = record.get("outcomes") or {}
+                if "pursuer_crash" in outcomes:
+                    record["pursuer_crash_rate"] = float(outcomes["pursuer_crash"])
+            record.pop("agent_error_rate", None)
+        if any("pursuer_crash_rate" not in record
+               for record in self._matchups["matchups"].values()):
+            logging.warning(
+                "Historical matchups lack pursuer_crash_rate and outcomes.pursuer_crash; "
+                "their crash contribution is neutral until re-evaluated. "
+                "agent_error_rate cannot be converted to a pursuer-only crash rate."
+            )
         if any("avg_min_distance" not in record
                for record in self._matchups["matchups"].values()):
             logging.warning(
@@ -189,18 +202,25 @@ class PolicyDatabase:
         metric_weights: Optional[Dict[str, float]] = None,
         reference_policy_id: Optional[str] = None,
         kind: Optional[str] = None,
+        uniform_mix: float = 0.0,
     ) -> Dict[str, float]:
         """Probabilities over opponents for training ``target_role``.
 
         Opponents are the policies of the other role. Each opponent's score is a
-        weighted sum of its four matchup metrics against ``reference_policy_id``
+        weighted sum of its five matchup metrics against ``reference_policy_id``
         (the latest ``target_role`` policy by default), each min-max normalised
         across the candidate opponents and oriented so a larger value means the
         opponent is currently *harder* for the training agent. Probabilities are
-        ``softmax(score / temperature)``. Falls back to uniform when there is no
+        ``(1 - uniform_mix) * softmax(score / temperature) + uniform_mix / N``.
+        ``uniform_mix`` must be in [0, 1]; 0 preserves pure prioritized sampling
+        and 1 is fully uniform. Falls back to uniform when there is no
         usable reference or no recorded metrics. ``kind`` restricts the
         candidate opponents to that policy kind ("rl" or "heuristic").
         """
+        if not 0.0 <= uniform_mix <= 1.0:
+            raise ValueError("uniform_mix must be between 0 and 1")
+        if metric_weights and "agent_error_rate" in metric_weights:
+            raise ValueError("replace metric_weights.agent_error_rate with pursuer_crash_rate")
         opp_role = _opponent_role(target_role)
         opponents = [p["id"] for p in self.list_policies(opp_role)
                      if kind is None or p["kind"] == kind]
@@ -243,7 +263,11 @@ class PolicyDatabase:
                 score += abs(weights.get(m, 0.0)) * hardness
             scores[opp] = score
 
-        return _softmax(scores, temperature)
+        prioritized = _softmax(scores, temperature)
+        return {
+            opp: (1.0 - uniform_mix) * prob + uniform_mix / len(opponents)
+            for opp, prob in prioritized.items()
+        }
 
 
 # Default relative importance of each metric in the sampling score. Orientation
@@ -254,11 +278,7 @@ DEFAULT_METRIC_WEIGHTS = {
     "avg_time_to_capture": 0.5,
     "avg_min_distance": 0.5,
     "avg_motor_effort": 0.25,
-    # Fraction of episodes in which the TRAINING agent itself crashed to the
-    # ground or left the arena against this opponent. A harder opponent forces
-    # the agent into riskier, less controlled flight, so a higher agent
-    # crash/OOB rate flags a harder opponent (same orientation for both roles).
-    "agent_error_rate": 1.0,
+    "pursuer_crash_rate": 1.0,
 }
 
 # +1: larger normalised metric == harder for the training agent; -1: inverse.
@@ -271,7 +291,7 @@ _HARDNESS_ORIENTATION = {
         "avg_time_to_capture": +1,
         "avg_min_distance": +1,
         "avg_motor_effort": +1,
-        "agent_error_rate": +1,
+        "pursuer_crash_rate": +1,
     },
     # Training the evader against pursuers: a hard pursuer has high capture rate,
     # short time-to-capture, small minimum distance, low effort.
@@ -280,7 +300,7 @@ _HARDNESS_ORIENTATION = {
         "avg_time_to_capture": -1,
         "avg_min_distance": -1,
         "avg_motor_effort": -1,
-        "agent_error_rate": +1,
+        "pursuer_crash_rate": -1,
     },
 }
 

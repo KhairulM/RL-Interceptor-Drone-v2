@@ -48,12 +48,12 @@ class SelfplayOrchestratorTests(unittest.TestCase):
         args = dict(value.split("=", 1) for value in overrides)
         with open(args["opponent_spec_path"]) as f:
             spec = json.load(f)
-        if "eval_heuristic" not in args:
-            self.calls.append((args, spec))
+        self.assertNotIn("eval_heuristic", args)
+        self.calls.append((args, spec))
         if args["mode"] == "train":
             result = {"checkpoint_path": args["stage_ckpt"]}
         else:
-            if self.fail_eval and "eval_heuristic" not in args:
+            if self.fail_eval:
                 raise RuntimeError("interrupted evaluation")
             result = {
                 "matchups": {
@@ -153,6 +153,28 @@ class SelfplayOrchestratorTests(unittest.TestCase):
                     orchestrator._resume_point(db),
                     (2, start_role, None),
                 )
+
+    def test_uniform_mixture_is_forwarded_to_sampling(self):
+        self.cfg.uniform_mix = 0.5
+        original = orchestrator.PolicyDatabase.compute_sampling_probs
+        with patch.object(
+            orchestrator.PolicyDatabase, "compute_sampling_probs",
+            autospec=True, side_effect=original,
+        ) as sampling:
+            self.run_campaign()
+        self.assertEqual(sampling.call_count, 4)
+        for call in sampling.call_args_list:
+            self.assertEqual(call.kwargs["uniform_mix"], 0.5)
+        for args, spec in self.calls:
+            if args["mode"] == "train":
+                floor = 0.5 / len(spec["probs"])
+                self.assertTrue(all(prob >= floor for prob in spec["probs"].values()))
+
+    def test_invalid_uniform_mixture_fails_before_launching_workers(self):
+        self.cfg.uniform_mix = 1.1
+        with self.assertRaisesRegex(ValueError, "uniform_mix"):
+            self.run_campaign()
+        self.assertEqual(self.calls, [])
 
     def test_resuming_later_generation_does_not_require_scripted_matchups(self):
         self.run_campaign()

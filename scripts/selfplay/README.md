@@ -4,10 +4,10 @@ Population-based self-play for 1v1 quadrotor pursuit–evasion, implemented on t
 the OmniDrones / Isaac Sim stack in this repo. Each generation trains **one** side
 with PPO against a **frozen** opponent drawn from a growing population, then
 evaluates the new policy against the pool and adds it back. Opponents are sampled
-with a **temperature-scaled, multi-metric softmax** over win rate,
-time-to-capture, average episode-minimum distance, motor effort, and the training agent's own
-crash/out-of-bounds rate, so training focuses on whichever frozen opponents are
-currently hardest.
+with a **uniform / temperature-scaled, multi-metric softmax mixture** over win
+rate, time-to-capture, average episode-minimum distance, motor effort, and the
+**pursuer's crash rate**. This prioritizes hard opponents while retaining exposure
+to older policies.
 
 ---
 
@@ -26,6 +26,49 @@ currently hardest.
 
 The task is registered via `omni_drones/envs/single/__init__.py` and is available
 as `task=PursuitEvasion`.
+
+---
+
+## Training loops
+
+### Outer loop — generational self-play (`train_selfplay.py`)
+
+```mermaid
+flowchart TD
+    A([start]) --> B["Seed pursuer / evader pools<br/>with heuristics"]
+    B --> D["Resume point from DB<br/>(or stage 0 + start_role if fresh_start)"]
+    D --> E{"role has a previous<br/>RL policy?"}
+    E -- no --> F["Uniform over<br/>opposing heuristics"]
+    E -- yes --> G["Uniform + multi-metric softmax over<br/>opposing RL policies<br/>(vs latest same-role reference)"]
+    F --> H
+    G --> H["Write train opponent spec<br/>(sampling probs)"]
+    H --> I["<b>Train worker</b><br/>run_stage.py mode=train<br/>(warm-start from latest RL policy)"]
+    I --> J["Add new policy to<br/>role pool in DB"]
+    J --> K["<b>Eval worker</b><br/>run_stage.py mode=eval<br/>same pool, uniform assignment"]
+    K --> L["Record matchup metrics<br/>(win_rate, time, min dist,<br/>effort, pursuer crash rate, outcomes)"]
+    L --> M["Swap role<br/>pursuer ↔ evader"]
+    M --> N{"n_stages done?"}
+    N -- no --> E
+    N -- yes --> O([done])
+
+    DB[("Policy DB<br/>pools + matchups.json")]
+    J -.-> DB
+    L -.-> DB
+    DB -.-> G
+```
+
+### Inner loop — one training stage (`run_stage.py mode=train`)
+
+```mermaid
+flowchart LR
+    S["Load opponent spec"] --> P["policy_sampling:<br/>assign one frozen opponent<br/>per env (fixed for stage)"]
+    P --> R["Collector rollout<br/>agent = PPO policy<br/>opponent = frozen RL / heuristic"]
+    R --> T["PPO train_op<br/>on rollout batch"]
+    T --> L["Log episode stats<br/>(W&B)"]
+    L --> Q{"total_frames<br/>reached?"}
+    Q -- no --> R
+    Q -- yes --> C["Save checkpoint<br/>(+ ESN sidecar)"]
+```
 
 ---
 
@@ -58,8 +101,11 @@ replayed as the other role's opponent:
   [ESN opponent predictor](#esn-opponent-predictor))
 
 Total with the default matrix attitude: **24** (or **28** with previous action),
-plus 6 with ESN. A time encoding is appended to the critic `state` when
-`observation.use_time_encoding` is set.
+plus 6 with ESN. When `observation.use_time_encoding` is set (default `true`),
+the env also emits a separate `("agents", "state")` tensor: the observation with
+a normalized episode-progress encoding appended. The plain `ppo` policy used here
+does not read `state`, so neither the actor nor the critic sees the time encoding
+(see [Network architecture](#network-architecture)).
 
 The frozen opponent uses its own role's observation layout. With the default
 `esn.roles: [pursuer]`, a frozen pursuer still receives its ESN prediction when
@@ -155,6 +201,69 @@ unless overridden.
 
 ---
 
+## Network architecture
+
+Both roles use the same network: the plain `ppo` algorithm
+(`omni_drones/learning/ppo/ppo.py::PPOPolicy`, `PPOConfig` defaults with
+`priv_actor`/`priv_critic` off). Only the input width differs between roles,
+for example when ESN is enabled for only one role.
+
+```mermaid
+flowchart LR
+    O["obs<br/>(agents, observation)<br/>28-D default"] --> A1
+    O --> C1
+    subgraph Actor
+      A1["Linear 256 → LeakyReLU → LayerNorm<br/>×3"] --> AM["Linear → μ (4)"]
+      AS["learned log σ (4)<br/>state-independent"]
+    end
+    AM --> D["IndependentNormal(μ, exp(log σ))"]
+    AS --> D
+    D --> TA["raw action (4)"] --> PID["tanh → [ωx, ωy, ωz, T]<br/>PIDRateController"]
+    subgraph Critic
+      C1["Linear 256 → LeakyReLU → LayerNorm<br/>×3"] --> V["Linear → V (1)"]
+    end
+```
+
+- **Actor:** an MLP with three hidden layers of 256 units. Each layer uses
+  `LazyLinear → LeakyReLU → LayerNorm`. A linear head outputs the 4-D action
+  mean. The standard deviation is a separate learned parameter that does not
+  depend on the observation, with `std = exp(actor_std)`. Actions are sampled
+  from a diagonal Gaussian (`IndependentNormal`) during training.
+- **Critic:** a separate MLP with the same three 256-unit hidden layers and a
+  1-D value head. The actor and critic do not share weights. The critic reads
+  the same `("agents", "observation")` as the actor, not `("agents", "state")`.
+  This means the time encoding appended to `state` is **not** seen by the
+  critic under plain `ppo`.
+- **Action mapping:** the raw Gaussian sample is not bounded by the network.
+  `PIDRateController` applies `tanh` to map it to `[-1, 1]`. It then rescales
+  the thrust channel to `[min_thrust_ratio, max_thrust_ratio]` before the rate
+  controller tracks the command.
+- **Layer sizes:** `LazyLinear` infers the input width from the first forward
+  pass on `observation_spec.zero()`. Checkpoints therefore depend on `obs_dim`.
+  Policies trained with different `rot_repr`, `use_previous_action`, or ESN
+  settings cannot be loaded into the same pool.
+- **Initialization:** every `Linear` weight is initialized as orthogonal with
+  gain `0.01`, and every bias as `0`. This happens unless `algo.checkpoint_path`
+  is set. In self-play, warm starts load the weights afterward through
+  `init_policy`.
+- **Optimization:** the actor and critic have separate Adam optimizers, both
+  with `lr = 5e-4`. Training uses GAE with `γ = 0.99, λ = 0.95`, normalized
+  advantages, and a `ValueNorm1` running normalization of returns. The policy
+  loss uses clipped PPO with `clip = 0.1`. The value loss uses a clipped Huber
+  loss with `δ = 10`, and the entropy coefficient is `0.001`. Each update runs
+  `ppo_epochs = 4` epochs of `num_minibatches = 16` on a rollout of
+  `train_every = 32` steps × `num_envs`.
+- **ESN is not part of the network:** the optional ESN reservoir and its
+  readout run inside the environment. They only add 6 input features. The PPO
+  gradient does not flow into them, and their readout is saved separately as
+  `<checkpoint>_esn.pt`.
+- **Frozen opponents** are instantiated as the same `PPOPolicy`, with the
+  algorithm config forwarded from the worker. Only the actor runs for these
+  opponents, in `ExplorationType.MODE`, so they act deterministically using the
+  Gaussian mean. Evaluation workers also act deterministically.
+
+---
+
 ## Opponent pool
 
 Each parallel env is assigned **one** frozen opponent for the whole run (fixed per
@@ -232,10 +341,10 @@ JSON files under the database directory (`policy_db.py`):
   | `avg_time_to_capture` | mean time-to-capture over captured episodes (falls back to the episode cap when there were none) |
   | `avg_min_distance` | mean of each episode's minimum inter-drone distance, including spawn and terminal distances |
   | `avg_motor_effort` | mean accumulated motor effort |
-  | `agent_error_rate` | fraction of episodes in which the evaluated role's agent crashed or left the arena |
+  | `pursuer_crash_rate` | fraction of episodes in which the pursuer crashed, regardless of the evaluated role; excludes out-of-bounds exits |
 
   plus diagnostics that do **not** feed sampling: `episodes`, `eval_role`,
-  `avg_episode_len`, `agent_terminal_win_rate`, and an
+  `avg_episode_len`, and an
   `outcomes` block breaking every episode down by how it ended
   (`capture`, `pursuer_crash`, `evader_crash`, `pursuer_oob`, `evader_oob`,
   `timeout`).
@@ -245,39 +354,45 @@ JSON files under the database directory (`policy_db.py`):
   or the evader removed itself before it could be caught. The five sampling
   metrics alone cannot tell those apart.
 
-### Opponent sampling (multi-metric, temperature)
+### Opponent sampling (multi-metric, temperature, uniform mixture)
 
 For training `role`, each candidate opponent's five matchup metrics (vs the latest
 same-role reference policy) are min-max normalised across candidates, oriented so
 a larger value means the opponent is currently **harder** for the training agent,
-combined by `metric_weights`, and turned into probabilities with a softmax scaled
-by `temperature`:
+combined by `metric_weights`, and turned into prioritized probabilities with a
+softmax scaled by `temperature`. The final distribution mixes these with a
+uniform distribution over the same `N` eligible opponents:
 
 ```
 score_i = Σ_m  w_m · hardness_m(i)
-p_i     = softmax(score_i / temperature)
+q_i     = softmax(score_i / temperature)
+p_i     = (1 - uniform_mix) · q_i + uniform_mix / N
 ```
 
 Orientation flips by role for the four outcome metrics (a hard evader has low
 capture rate / long capture time / large minimum distance / high effort; a hard pursuer
-is the opposite). **`agent_error_rate` is oriented `+1` for *both* roles**: a
-harder opponent forces the training agent into riskier, less controlled flight,
-so a higher agent crash/OOB rate flags a harder opponent regardless of which side
-is learning.
-
-`agent_error_rate` is not redundant with `win_rate` — it measures a different
-axis of difficulty. In the v4 run the final pursuer errored most against
-`evader:s5` (0.100) while still capturing it 89% of the time, yet barely errored
-against the strongest evader `evader:s8` (0.035) despite capturing it only 5% —
-that evader wins by clean evasion rather than by forcing crashes.
+is the opposite). **`pursuer_crash_rate` is oriented `+1` when training the
+pursuer and `-1` when training the evader**: evaders that cause more pursuer
+crashes are harder opponents, whereas pursuers that crash less are harder
+opponents. Evaluation always counts the pursuer's crashes: `stats.crash` when
+evaluating a pursuer, `stats.opp_crash` when evaluating an evader. Evader crashes
+and either side's out-of-bounds exits do not enter this metric.
 
 Low temperature → focus on the hardest opponents; high temperature → uniform.
 Cold start (no reference / no metrics) falls back to uniform.
 
-At startup, the orchestrator evaluates missing scripted-pursuer ×
-scripted-evader matchups. A role's first RL generation samples scripted
-opponents uniformly. Later generations sample only opposing RL policies using
-the multi-metric softmax; scripted opponents are excluded from both training and
+`uniform_mix` must be between `0` and `1` (invalid values fail before launching
+workers). `0` restores pure prioritized softmax; `1` makes sampling fully uniform.
+The default `0.5` allocates half the probability mass uniformly and half by
+hardness, so each candidate has probability at least `0.5 / N`. This protects
+past opponents from being nearly ignored as newer counters emerge; it does not
+guarantee that forgetting is eliminated or that every opponent gets an environment
+when the environment batch is small.
+
+Scripted-pursuer × scripted-evader matchups are not evaluated by the training
+loop. A role's first RL generation samples scripted opponents uniformly. Later
+generations sample only opposing RL policies using
+the uniform/softmax mixture; scripted opponents are excluded from both training and
 evaluation pools. Each new RL policy is evaluated uniformly against the same
 eligible pool used for its training. Scripted policies and historical matchups
 remain in the database for diagnostics. Resuming an interrupted first generation
@@ -287,15 +402,19 @@ Defaults (`scripts/selfplay/train_selfplay.yaml`):
 
 ```yaml
 temperature: 0.9
+uniform_mix: 0.5
 metric_weights:
   win_rate: 1.0
-  avg_time_to_capture: 0.5
+  avg_time_to_capture: 0.8
   avg_min_distance: 0.5
   avg_motor_effort: 0.25
-  agent_error_rate: 1.0
+  pursuer_crash_rate: 0.0
 ```
 
 A weight of `0.0` leaves a metric recorded but out of the score.
+`pursuer_crash_rate` defaults to `0.0` because a pursuer crash ends the episode
+without a capture, so the metric largely duplicates `win_rate` and would
+double-count crashes in the hardness score.
 For `avg_min_distance`, larger values increase sampling when training a pursuer
 (harder evaders) and decrease sampling when training an evader (easier pursuers).
 The environment tracks the minimum separately from its existing smoothed
@@ -307,6 +426,19 @@ episode minima. Loading them logs a warning; missing `avg_min_distance` values
 contribute neutrally to sampling until those matchups are re-evaluated. New
 evaluations store `avg_min_distance` instead. Custom sampling configs should
 also replace the old weight key with `avg_min_distance`.
+
+For historical crash metrics, loading reconstructs missing `pursuer_crash_rate`
+from `outcomes.pursuer_crash`, which is already pursuer-relative for either
+evaluation role. Existing `pursuer_crash_rate` values take precedence. The old
+`agent_error_rate` is removed from loaded records, not renamed: it mixed crash/OOB
+events and could refer to either role. If pursuer outcomes are unavailable, loading
+logs a warning and that metric contributes neutrally until re-evaluation. These
+in-memory conversions are persisted on the next database save; loading alone does
+not rewrite files. Replace custom `metric_weights.agent_error_rate` settings with
+`metric_weights.pursuer_crash_rate`; the old weight key now raises an error.
+The ESN adaptation report also uses the pursuer-only metric and writes
+`heatmap_pursuer_crash.png`. It accepts historical `outcomes.pursuer_crash` values,
+but fails with a re-evaluation message if neither exact crash metric is available.
 
 ---
 
@@ -355,7 +487,7 @@ stage is retried without adding a duplicate policy entry. Use
 Current defaults from `scripts/selfplay/train_selfplay.yaml`: `run_name` is
 `selfplay_v8_no_forced_error_reward`, `fresh_start=false`, `n_stages=26`,
 `num_envs=4096`, `frames_per_stage=500_000_000`, `start_role=pursuer`,
-`warm_start=true`, `wandb_mode=online`, and `temperature=0.9`. Outputs go to
+`warm_start=true`, `wandb_mode=online`, `temperature=0.9`, and `uniform_mix=0.5`. Outputs go to
 `scripts/selfplay/outputs/{run_name}/{db,checkpoints,stages}`; W&B runs are named
 `{run_name}-{role}-stage{n}`. `task_overrides` are forwarded to train and eval
 workers; use a separate campaign/database when changing observation dimensions,
@@ -427,18 +559,23 @@ pool that existed when it was added.
 
 ## Logged stats
 
-`return`, `episode_len`, `distance`, `success_rate`, `capture`, `win_rate`,
+`return`, `episode_len`, `distance`, `capture`,
 `timeout`, `time_to_capture`, `motor_effort`, `crash`,
 `opp_crash`, `out_of_bounds`, `opp_out_of_bounds`, `capture_radius`, and the
 per-term reward components (`reward_approach`, `reward_precision`,
 `reward_distance`, `reward_body_rate`, `reward_action_smoothness`,
-`reward_cmd_rate`, `reward_terminal`), plus `esn_pred_err` when ESN is enabled.
+`reward_cmd_rate`, `reward_survival`, `reward_terminal`), plus `esn_pred_err`
+when ESN is enabled. `reward_survival` is the evader's per-step `reward_step`
+bonus (zero when training the pursuer).
 
-`crash` / `out_of_bounds` are always the **training agent's**; the opponent's are
-under `opp_crash` / `opp_out_of_bounds`. `stats.win_rate` counts role-specific
-full wins: for pursuer training it matches capture; for evader training it
-counts episodes survived to timeout. The matchup database's `win_rate` is always
-the pursuer capture rate.
+`capture` and `timeout` are role-independent: `capture` is the pursuer win rate
+and `timeout` (episode reached the time limit with no other terminal event) is
+the evader win rate. They do not sum to 1, because crashes and evader arena
+exits end episodes with neither. `crash` / `out_of_bounds` are always the
+**training agent's**; the opponent's are under `opp_crash` /
+`opp_out_of_bounds`. The evader's out-of-bounds flag ends the episode; the
+pursuer's only records that it left the arena at some point. The matchup
+database's `win_rate` is the pursuer capture rate (mean of `capture`).
 
 All terminal stats are latched in `_compute_state_and_obs` (before the stats are
 cloned into the observation), otherwise the episode resets first and every

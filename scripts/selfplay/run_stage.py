@@ -33,7 +33,7 @@ Modes:
   eval   Load ``eval_policy`` as the ``task.role`` agent, assign every opponent in
          the pool uniformly across envs, roll out one episode batch, and write
          per-opponent matchup metrics (win rate, time-to-capture, minimum distance,
-         motor effort) to ``stage_out``.
+         motor effort, pursuer crash rate) to ``stage_out``.
 """
 
 import json
@@ -244,7 +244,7 @@ def _run_eval(cfg, env, base_env, policy):
     # How each episode actually ended, from the evaluated agent's point of view.
     # Recorded per matchup so a zero capture rate can be attributed: an evader
     # that crashes or flies out of the arena ends the episode without ever being
-    # intercepted, which is invisible in the four sampling metrics alone.
+    # intercepted, which is invisible in the aggregate sampling metrics alone.
     role = str(cfg.task.role)
     agent_is_pursuer = role == "pursuer"
     outcome_src = {
@@ -254,8 +254,8 @@ def _run_eval(cfg, env, base_env, policy):
         "evader_oob": "opp_out_of_bounds" if agent_is_pursuer else "out_of_bounds",
         "timeout": "timeout",
     }
+    pursuer_crash = stats[outcome_src["pursuer_crash"]]
     ep_len = stats.get("episode_len")
-    terminal_win = stats.get("win_rate")
 
     matchups = {}
     for opp_id, idxs in base_env.opponent_bank.assignment.items():
@@ -270,22 +270,14 @@ def _run_eval(cfg, env, base_env, policy):
             avg_ttc = float(ttc[idxs][captured_mask].mean().item())
         else:
             avg_ttc = max_time
-        # Fraction of episodes where the EVALUATED AGENT (this role) crashed to
-        # the ground or left the arena. stats["crash"]/["out_of_bounds"] are
-        # always the agent's (opponent errors live under opp_*), so this is a
-        # role-agnostic "how hard did this opponent push the agent" signal that
-        # feeds opponent sampling (harder opponent -> higher agent error rate).
-        agent_error_rate = 0.0
-        if "crash" in stats and "out_of_bounds" in stats:
-            err = (stats["crash"][idxs] > 0.5) | (stats["out_of_bounds"][idxs] > 0.5)
-            agent_error_rate = float(err.float().mean().item())
+        pursuer_crash_rate = float((pursuer_crash[idxs] > 0.5).float().mean().item())
         record = {
             # `win_rate` is the pursuer capture rate: the sampling metric.
             "win_rate": win_rate,
             "avg_time_to_capture": avg_ttc,
             "avg_min_distance": float(min_distance[idxs].mean().item()),
             "avg_motor_effort": float(effort[idxs].mean().item()),
-            "agent_error_rate": agent_error_rate,
+            "pursuer_crash_rate": pursuer_crash_rate,
             "episodes": n,
             "eval_role": role,
         }
@@ -296,10 +288,6 @@ def _run_eval(cfg, env, base_env, policy):
             if key in stats:
                 outcomes[name] = float((stats[key][idxs] > 0.5).float().mean().item())
         record["outcomes"] = outcomes
-        # Terminal reward actually earned by the evaluated agent, so a gap
-        # between "wins" and "captures" shows up directly in the table.
-        if terminal_win is not None:
-            record["agent_terminal_win_rate"] = float(terminal_win[idxs].mean().item())
         if ep_len is not None:
             record["avg_episode_len"] = float(ep_len[idxs].mean().item())
         matchups[opp_id] = record

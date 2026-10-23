@@ -1,7 +1,10 @@
 import ast
 from contextlib import nullcontext
+import glob
 import importlib.util
+import json
 import math
+import os
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
@@ -22,6 +25,131 @@ _SPEC.loader.exec_module(policy_db)
 
 
 class SelfplayMetricTests(unittest.TestCase):
+    def test_uniform_mixture_matches_formula_and_probability_floor(self):
+        for role in (policy_db.PURSUER, policy_db.EVADER):
+            with self.subTest(role=role), tempfile.TemporaryDirectory() as root:
+                db = policy_db.PolicyDatabase(root)
+                other = policy_db.EVADER if role == policy_db.PURSUER else policy_db.PURSUER
+                reference = db.add_policy(role, "reference.pt")
+                opponents = [db.add_policy(other, f"opponent{i}.pt") for i in range(3)]
+                db.add_policy(other, None, kind="heuristic")
+                for opponent, win_rate in zip(opponents, [0.0, 0.5, 1.0]):
+                    metrics = dict.fromkeys(policy_db.METRIC_KEYS, 0.0)
+                    metrics["win_rate"] = win_rate
+                    pair = (reference, opponent) if role == policy_db.PURSUER else (opponent, reference)
+                    db.record_matchup(*pair, metrics)
+                prioritized = db.compute_sampling_probs(role, temperature=0.01, kind="rl")
+                for mix in (0.0, 0.5, 1.0):
+                    probs = db.compute_sampling_probs(
+                        role, temperature=0.01, kind="rl", uniform_mix=mix,
+                    )
+                    self.assertEqual(set(probs), set(opponents))
+                    self.assertAlmostEqual(sum(probs.values()), 1.0)
+                    for opponent in opponents:
+                        self.assertAlmostEqual(
+                            probs[opponent], (1 - mix) * prioritized[opponent] + mix / 3,
+                        )
+                        self.assertGreaterEqual(probs[opponent], mix / 3)
+
+    def test_uniform_mixture_validation_and_cold_start(self):
+        with tempfile.TemporaryDirectory() as root:
+            db = policy_db.PolicyDatabase(root)
+            for mix in (-0.1, 1.1, math.nan, math.inf):
+                with self.subTest(mix=mix), self.assertRaisesRegex(ValueError, "uniform_mix"):
+                    db.compute_sampling_probs(policy_db.PURSUER, uniform_mix=mix)
+            self.assertEqual(db.compute_sampling_probs(policy_db.PURSUER, uniform_mix=0.5), {})
+            first = db.add_policy(policy_db.EVADER, "first.pt")
+            self.assertEqual(
+                db.compute_sampling_probs(policy_db.PURSUER, uniform_mix=0.5), {first: 1.0},
+            )
+            second = db.add_policy(policy_db.EVADER, "second.pt")
+            self.assertEqual(
+                db.compute_sampling_probs(policy_db.PURSUER, uniform_mix=0.5),
+                {first: 0.5, second: 0.5},
+            )
+
+    def test_pursuer_crash_rate_orientation_for_both_roles(self):
+        for role in (policy_db.PURSUER, policy_db.EVADER):
+            with self.subTest(role=role), tempfile.TemporaryDirectory() as root:
+                db = policy_db.PolicyDatabase(root)
+                other = policy_db.EVADER if role == policy_db.PURSUER else policy_db.PURSUER
+                reference = db.add_policy(role, "reference.pt")
+                opponents = [db.add_policy(other, f"opponent{i}.pt") for i in range(2)]
+                for opponent, crash_rate in zip(opponents, [0.1, 0.9]):
+                    metrics = dict.fromkeys(policy_db.METRIC_KEYS, 0.0)
+                    metrics["pursuer_crash_rate"] = crash_rate
+                    pair = (reference, opponent) if role == policy_db.PURSUER else (opponent, reference)
+                    db.record_matchup(*pair, metrics)
+                weights = dict.fromkeys(policy_db.METRIC_KEYS, 0.0)
+                weights["pursuer_crash_rate"] = 1.0
+                probs = db.compute_sampling_probs(role, metric_weights=weights)
+                harder, easier = opponents[::-1] if role == policy_db.PURSUER else opponents
+                self.assertAlmostEqual(probs[harder] / probs[easier], math.e)
+
+    def test_historical_crash_rates_use_pursuer_outcomes_not_agent_errors(self):
+        with tempfile.TemporaryDirectory() as root:
+            records = {}
+            for role in (policy_db.PURSUER, policy_db.EVADER):
+                records[f"pursuer|{role}"] = {
+                    "avg_min_distance": 0.1, "agent_error_rate": 0.9,
+                    "eval_role": role, "outcomes": {"pursuer_crash": 0.2},
+                }
+            records["pursuer|unknown"] = {
+                "avg_min_distance": 0.1, "agent_error_rate": 0.9,
+            }
+            records["pursuer|new"] = {
+                "avg_min_distance": 0.1, "pursuer_crash_rate": 0.3,
+                "outcomes": {"pursuer_crash": 0.8},
+            }
+            path = Path(root) / "matchups.json"
+            path.write_text(json.dumps({"matchups": records}))
+            with self.assertLogs(level="WARNING") as logs:
+                db = policy_db.PolicyDatabase(root)
+            self.assertTrue(any("pursuer_crash_rate" in line for line in logs.output))
+            for role in (policy_db.PURSUER, policy_db.EVADER):
+                record = db.get_matchup("pursuer", role)
+                self.assertEqual(record["pursuer_crash_rate"], 0.2)
+                self.assertNotIn("agent_error_rate", record)
+            self.assertNotIn("pursuer_crash_rate", db.get_matchup("pursuer", "unknown"))
+            self.assertEqual(db.get_matchup("pursuer", "new")["pursuer_crash_rate"], 0.3)
+            raw = {key: db.get_matchup("pursuer", key) for key in ("pursuer", "unknown", "new")}
+            self.assertEqual(policy_db._normalise_metrics(raw)["unknown"]["pursuer_crash_rate"], 0.5)
+            db.save()
+            saved = json.loads(path.read_text())["matchups"]
+            self.assertEqual(saved["pursuer|evader"]["pursuer_crash_rate"], 0.2)
+
+    def test_legacy_metric_weight_is_rejected(self):
+        with tempfile.TemporaryDirectory() as root:
+            db = policy_db.PolicyDatabase(root)
+            with self.assertRaisesRegex(ValueError, "pursuer_crash_rate"):
+                db.compute_sampling_probs(
+                    policy_db.PURSUER, metric_weights={"agent_error_rate": 1.0},
+                )
+
+    def test_report_reads_new_and_historical_pursuer_crash_rates(self):
+        path = _ROOT / "scripts/experiments/esn_adapt/report.py"
+        tree = ast.parse(path.read_text())
+        function = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                        and node.name == "load")
+        with tempfile.TemporaryDirectory() as root:
+            scope = {"ROOT": root, "SETS": ["T0"], "glob": glob, "json": json, "os": os}
+            exec(compile(ast.Module([function], type_ignores=[]), str(path), "exec"), scope)
+            output = Path(root) / "test" / "method" / "seed0" / "eval_T0.json"
+            output.parent.mkdir(parents=True)
+            records = {
+                "new": {"pursuer_crash_rate": 0.2},
+                "legacy": {"agent_error_rate": 0.9, "outcomes": {"pursuer_crash": 0.3}},
+            }
+            output.write_text(json.dumps({"matchups": records}))
+            data, _ = scope["load"]("test")
+            matchups = data["method"]["T0"]["seed0"]
+            self.assertEqual(matchups["new"]["pursuer_crash_rate"], 0.2)
+            self.assertEqual(matchups["legacy"]["pursuer_crash_rate"], 0.3)
+            records["unknown"] = {"agent_error_rate": 0.9}
+            output.write_text(json.dumps({"matchups": records}))
+            with self.assertRaisesRegex(ValueError, "re-evaluate"):
+                scope["load"]("test")
+
     def test_sampling_distance_orientation_for_both_roles(self):
         for role in (policy_db.PURSUER, policy_db.EVADER):
             with self.subTest(role=role), tempfile.TemporaryDirectory() as root:
@@ -123,6 +251,14 @@ class SelfplayMetricTests(unittest.TestCase):
         stats = {key: torch.zeros(3, 3, 1)
                  for key in ("capture", "time_to_capture", "motor_effort")}
         stats.update(min_distance=minimum, distance=torch.full((3, 3, 1), 99.0))
+        stats["crash"] = torch.tensor([[[0.0], [1.0], [0.0]],
+                                      [[0.0], [0.0], [0.0]],
+                                      [[0.0], [0.0], [1.0]]])
+        stats["opp_crash"] = torch.tensor([[[0.0], [0.0], [1.0]],
+                                          [[0.0], [0.0], [0.0]],
+                                          [[0.0], [1.0], [0.0]]])
+        stats["out_of_bounds"] = torch.ones(3, 3, 1)
+        stats["opp_out_of_bounds"] = torch.ones(3, 3, 1)
         trajs = TensorDict(
             {("next", "done"): done,
              ("next", "stats"): TensorDict(stats, batch_size=[3, 3])},
@@ -149,6 +285,14 @@ class SelfplayMetricTests(unittest.TestCase):
                 self.assertAlmostEqual(matchups["second"]["avg_min_distance"], 7.0)
                 self.assertNotIn("avg_distance", matchups["first"])
                 self.assertEqual(matchups["first"]["episodes"], 2)
+                expected = [0.5, 0.0] if role == policy_db.PURSUER else [0.0, 1.0]
+                for opponent, crash_rate in zip(("first", "second"), expected):
+                    self.assertEqual(matchups[opponent]["pursuer_crash_rate"], crash_rate)
+                    self.assertEqual(
+                        matchups[opponent]["outcomes"]["pursuer_crash"], crash_rate,
+                    )
+                    self.assertNotIn("agent_error_rate", matchups[opponent])
+                    self.assertNotIn("agent_terminal_win_rate", matchups[opponent])
 
 
 if __name__ == "__main__":

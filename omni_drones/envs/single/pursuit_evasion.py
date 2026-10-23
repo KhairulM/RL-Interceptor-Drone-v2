@@ -527,7 +527,6 @@ class PursuitEvasion(IsaacEnv):
             "episode_len": UnboundedContinuous(torch.Size([1]), device=self.device),
             "distance": UnboundedContinuous(torch.Size([1]), device=self.device),
             "min_distance": UnboundedContinuous(torch.Size([1]), device=self.device),
-            "success_rate": UnboundedContinuous(torch.Size([1]), device=self.device),
             "capture": UnboundedContinuous(torch.Size([1]), device=self.device),
             "time_to_capture": UnboundedContinuous(torch.Size([1]), device=self.device),
             "motor_effort": UnboundedContinuous(torch.Size([1]), device=self.device),
@@ -535,7 +534,6 @@ class PursuitEvasion(IsaacEnv):
             "opp_crash": UnboundedContinuous(torch.Size([1]), device=self.device),
             "out_of_bounds": UnboundedContinuous(torch.Size([1]), device=self.device),
             "opp_out_of_bounds": UnboundedContinuous(torch.Size([1]), device=self.device),
-            "win_rate": UnboundedContinuous(torch.Size([1]), device=self.device),
             "timeout": UnboundedContinuous(torch.Size([1]), device=self.device),
             "capture_radius": UnboundedContinuous(torch.Size([1]), device=self.device),
             "reward_approach": UnboundedContinuous(torch.Size([1]), device=self.device),
@@ -544,6 +542,7 @@ class PursuitEvasion(IsaacEnv):
             "reward_body_rate": UnboundedContinuous(torch.Size([1]), device=self.device),
             "reward_action_smoothness": UnboundedContinuous(torch.Size([1]), device=self.device),
             "reward_cmd_rate": UnboundedContinuous(torch.Size([1]), device=self.device),
+            "reward_survival": UnboundedContinuous(torch.Size([1]), device=self.device),
             "reward_terminal": UnboundedContinuous(torch.Size([1]), device=self.device),
             "esn_pred_err": UnboundedContinuous(torch.Size([1]), device=self.device),
         }).expand(self.num_envs).to(self.device)
@@ -982,10 +981,8 @@ class PursuitEvasion(IsaacEnv):
         self._opp_oob = self._out_of_arena(opp_pos)
 
         captured = self._captured.float()
-        newly = ((captured > 0) & (self.stats["success_rate"] <= 0)).float()
-        self.stats["success_rate"][:] = torch.maximum(
-            self.stats["success_rate"], captured)
-        self.stats["capture"][:] = self.stats["success_rate"]
+        newly = ((captured > 0) & (self.stats["capture"] <= 0)).float()
+        self.stats["capture"][:] = torch.maximum(self.stats["capture"], captured)
         cap_time = self.progress_buf.unsqueeze(1).float() * self.cfg.sim.dt
         self.stats["time_to_capture"][:] = torch.where(
             newly > 0, cap_time, self.stats["time_to_capture"])
@@ -1023,8 +1020,6 @@ class PursuitEvasion(IsaacEnv):
         self._terminal_reward = self.reward_terminal_weight * (
             self._win.float() - self._loss.float())
         self.stats["reward_terminal"][:] = self._terminal_reward
-        self.stats["win_rate"][:] = torch.maximum(
-            self.stats["win_rate"], self._win.float())
         self.stats["timeout"][:] = torch.maximum(
             self.stats["timeout"], self._timeout.float())
 
@@ -1100,11 +1095,14 @@ class PursuitEvasion(IsaacEnv):
                       - smoothness_pen - cmd_rate_pen - bounds_pen + terminal)
             self.stats["reward_approach"].lerp_(approach, 1 - self.alpha)
             self.stats["reward_precision"].lerp_(precision, 1 - self.alpha)
+            self.stats["reward_survival"].lerp_(torch.zeros_like(reward), 1 - self.alpha)
         else:
-            reward = (self.reward_step - body_rate_pen - smoothness_pen
+            survival = torch.full_like(body_rate_pen, self.reward_step)
+            reward = (survival - body_rate_pen - smoothness_pen
                       - cmd_rate_pen - bounds_pen + terminal)
             self.stats["reward_approach"].lerp_(torch.zeros_like(reward), 1 - self.alpha)
             self.stats["reward_precision"].lerp_(torch.zeros_like(reward), 1 - self.alpha)
+            self.stats["reward_survival"].lerp_(survival, 1 - self.alpha)
 
         self.stats["reward_distance"].lerp_(reward_distance, 1 - self.alpha)
         self.stats["reward_body_rate"].lerp_(-body_rate_pen, 1 - self.alpha)

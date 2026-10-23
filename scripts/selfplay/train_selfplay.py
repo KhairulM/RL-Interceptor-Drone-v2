@@ -24,8 +24,9 @@
 
 Runs entirely outside Isaac Sim: it manages the JSON policy database and, each
 stage, alternates which side trains, samples a frozen opponent distribution from
-the database (temperature-scaled multi-metric softmax over win rate,
-time-to-capture, distance, and motor effort), then spawns two isolated worker
+the database (uniform mixed with temperature-scaled multi-metric softmax over
+win rate, time-to-capture, distance, motor effort, and pursuer crash rate),
+then spawns two isolated worker
 processes (``run_stage.py``): one to train the new policy against the pool and
 one to evaluate it against the eligible opponents to fill in the matchup metrics.
 
@@ -165,48 +166,14 @@ def _run_worker(cfg, overrides):
         f"{result.returncode}): {' '.join(cmd)}")
 
 
-def _eval_heuristic_matchups(cfg, db, work_dir):
-    """Fill missing scripted-pursuer vs scripted-evader matchups (no RL side to evaluate them)."""
-    evaders = [p for p in db.list_policies(EVADER) if p["kind"] == "heuristic"]
-    for pursuer in db.list_policies(PURSUER):
-        if pursuer["kind"] != "heuristic":
-            continue
-        missing = [e for e in evaders if db.get_matchup(pursuer["id"], e["id"]) is None]
-        if not missing:
-            continue
-        name = pursuer["metadata"]["heuristic"]
-        tag = pursuer["id"].split(":", 1)[1]
-        spec_path = os.path.join(work_dir, f"{tag}_eval_opp.json")
-        _write_json(spec_path, {
-            "policies": [{k: e.get(k) for k in ("id", "kind", "checkpoint_path", "metadata")}
-                         for e in missing],
-            "probs": {e["id"]: 1.0 / len(missing) for e in missing},
-        })
-        out_path = os.path.join(work_dir, f"{tag}_eval_out.json")
-        overrides = [
-            "mode=eval",
-            f"task={cfg.task}",
-            f"algo={cfg.algo}",
-            f"task.role={PURSUER}",
-            f"task.env.num_envs={max(int(cfg.num_envs), len(missing) * 8)}",
-            f"headless={bool(cfg.headless)}",
-            f"seed={int(cfg.seed)}",
-            f"opponent_spec_path={spec_path}",
-            f"eval_heuristic={name}",
-            f"stage_out={out_path}",
-        ]
-        overrides += list(cfg.get("task_overrides", []) or [])
-        _run_worker(cfg, overrides)
-        with open(out_path, "r") as f:
-            matchups = json.load(f)["matchups"]
-        for opp_id, metrics in matchups.items():
-            db.record_matchup(pursuer["id"], opp_id, metrics)
-        print(f"[db] recorded {len(matchups)} heuristic matchups for {pursuer['id']}")
-
-
 def main():
     base = OmegaConf.load(os.path.join(_THIS_DIR, "train_selfplay.yaml"))
     cfg = OmegaConf.merge(base, OmegaConf.from_cli())
+    uniform_mix = float(cfg.uniform_mix)
+    if not 0.0 <= uniform_mix <= 1.0:
+        raise ValueError("uniform_mix must be between 0 and 1")
+    if "agent_error_rate" in cfg.metric_weights:
+        raise ValueError("replace metric_weights.agent_error_rate with pursuer_crash_rate")
 
     run_name = str(cfg.run_name)
     out_dir = os.path.join(_THIS_DIR, "outputs", run_name)
@@ -228,7 +195,6 @@ def main():
     db = PolicyDatabase(db_dir)
     _seed_pool(db, PURSUER, list(cfg.seed_heuristics.pursuer))
     _seed_pool(db, EVADER, list(cfg.seed_heuristics.evader))
-    _eval_heuristic_matchups(cfg, db, work_dir)
 
     metric_weights = OmegaConf.to_container(cfg.metric_weights, resolve=True)
     temperature = float(cfg.temperature)
@@ -255,7 +221,8 @@ def main():
         if reference:
             probs = db.compute_sampling_probs(
                 role, temperature=temperature, metric_weights=metric_weights,
-                reference_policy_id=reference["id"], kind="rl")
+                reference_policy_id=reference["id"], kind="rl",
+                uniform_mix=uniform_mix)
         else:
             opp_ids = [p["id"] for p in db.list_policies(opp_role)
                        if p["kind"] == "heuristic"]

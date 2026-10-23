@@ -18,7 +18,7 @@ arena:
   half_xy: 2.0
   z_min: 0.1
   z_max: 3.0
-  visualize: true          # draw the boundary box (only shown when not headless)
+  visualize: true
 
 # Capture-radius curriculum (shrinks the capture threshold during training,
 # like Intercept). Fixed at success_radius_eval outside training.
@@ -81,7 +81,7 @@ observation:
 esn:
   enabled: false
   roles: [pursuer]   # roles whose policies get the ESN input; obs_dim differs per role
-  reservoir_size: 500
+  reservoir_size: 700
   spectral_radius: 0.9
   leak_rate: 0.3
   input_scale: 0.1

@@ -21,7 +21,18 @@ def load(tag):
         for T in SETS:
             f = f"{d}/eval_{T}.json"
             if os.path.exists(f):
-                data.setdefault(m, {}).setdefault(T, {})[s] = json.load(open(f))["matchups"]
+                with open(f) as stream:
+                    matchups = json.load(stream)["matchups"]
+                for opponent, record in matchups.items():
+                    if "pursuer_crash_rate" not in record:
+                        outcomes = record.get("outcomes") or {}
+                        if "pursuer_crash" not in outcomes:
+                            raise ValueError(
+                                f"{f}: {opponent} lacks pursuer_crash_rate and "
+                                "outcomes.pursuer_crash; re-evaluate this matchup"
+                            )
+                        record["pursuer_crash_rate"] = outcomes["pursuer_crash"]
+                data.setdefault(m, {}).setdefault(T, {})[s] = matchups
         if os.path.exists(f"{d}/state.json"):
             cost.setdefault(m, []).append(json.load(open(f"{d}/state.json")).get("train_seconds", np.nan))
     return data, cost
@@ -75,9 +86,9 @@ def main():
     plt.savefig(f"{out}/bars.png", dpi=130)
     plt.close()
 
-    # Per-evader heatmap (seed-averaged capture rate) and own-error rate.
+    # Per-evader heatmap (seed-averaged capture rate) and pursuer crash rate.
     opps = [(T, o) for T in SETS for o in next(iter(next(iter(data.values())).get(T, {}).values()), {})]
-    for key, name in (("win_rate", "capture"), ("agent_error_rate", "own_error")):
+    for key, name in (("win_rate", "capture"), ("pursuer_crash_rate", "pursuer_crash")):
         M = np.full((len(methods), len(opps)), np.nan)
         for i, m in enumerate(methods):
             for k, (T, o) in enumerate(opps):
@@ -101,7 +112,7 @@ def main():
         d = [seed_vals(data[m][T], "win_rate").mean() - seed_vals(data[base][T], "win_rate").mean()
              for T in ("T1", "T2", "T3") if T in data[m] and T in data[base]]
         lines.append(f"- {m}: {np.mean(d):+.3f}" if d else f"- {m}: n/a")
-    lines += ["", "Figures: bars.png, heatmap_capture.png, heatmap_own_error.png",
+    lines += ["", "Figures: bars.png, heatmap_capture.png, heatmap_pursuer_crash.png",
               "Not yet produced (need logging not implemented): learning curves, adaptation-latency curves, trajectories/GIFs."]
     open(f"{out}/summary.md", "w").write("\n".join(lines) + "\n")
     print("\n".join(lines))
