@@ -138,6 +138,76 @@ def _load_state_dict(policy, path, device):
         policy.load_state_dict(state, strict=False)
 
 
+class _OpponentRefresher:
+    """Re-samples the frozen-opponent assignment from the episodes played since the last refresh (thesis D1).
+
+    Episodes in flight at a refresh finish against the newly assigned opponent and are credited to it.
+    """
+
+    def __init__(self, rcfg, base_env, max_time):
+        from omni_drones.utils.selfplay import samplers
+
+        self.samplers = samplers
+        self.every = int(rcfg.every_frames)
+        self.sampler = str(rcfg.sampler)
+        self.temperature = float(rcfg.temperature)
+        self.uniform_mix = float(rcfg.uniform_mix)
+        self.weights = dict(rcfg.metric_weights) if rcfg.get("metric_weights") else None
+        self.descriptors = None
+        if rcfg.get("descriptors_path"):
+            with open(rcfg.descriptors_path) as f:
+                self.descriptors = json.load(f)
+        self.log_path = rcfg.get("log_path", None)
+        self.bank = base_env.opponent_bank
+        self.role = base_env.role
+        self.num_envs = base_env.num_envs
+        self.max_time = max_time
+        self.frames = 0
+        self.since = 0
+        self._chunks = []
+        if getattr(base_env, "oracle_desc_table", None) is not None:
+            raise ValueError("opponent refresh is incompatible with the per-env oracle descriptor")
+
+    def add(self, data, frames):
+        self.frames += frames
+        self.since += frames
+        done = data.get(("next", "done")).reshape(self.num_envs, -1)
+        env_i, t_i = done.nonzero(as_tuple=True)
+        if env_i.numel():
+            stats = data.get(("next", "stats"))
+            g = lambda k: stats.get(k).reshape(self.num_envs, -1)[env_i, t_i].float()
+            crash_key = "crash" if self.role == "pursuer" else "opp_crash"
+            self._chunks.append({
+                "opp": self.bank.env_policy[env_i].clone(),
+                "capture": g("capture") > 0.5, "pursuer_crash": g(crash_key) > 0.5, "timeout": g("timeout") > 0.5,
+                "ttc": g("time_to_capture"), "min_distance": g("min_distance"), "effort": g("motor_effort")})
+        if self.since >= self.every:
+            self.refresh()
+
+    def refresh(self):
+        self.since = 0
+        if not self._chunks:
+            return
+        cat = {k: torch.cat([c[k] for c in self._chunks]).cpu().numpy() for k in self._chunks[0]}
+        self._chunks = []
+        raw, counts = {}, {}
+        for i, pid in enumerate(self.bank.ids):
+            sel = cat["opp"] == i
+            counts[pid] = int(sel.sum())
+            raw[pid] = None if not sel.any() else self.samplers.opponent_metrics(
+                cat["capture"][sel], cat["pursuer_crash"][sel], cat["timeout"][sel], cat["ttc"][sel],
+                cat["min_distance"][sel], cat["effort"][sel], self.max_time)
+        probs = self.samplers.compute_probs(
+            self.sampler, raw, self.role, self.temperature, self.uniform_mix, self.weights, self.descriptors)
+        self.bank.assign(probs, self.num_envs)
+        logging.info(f"opponent refresh at {self.frames} frames: {probs}")
+        if self.log_path:
+            os.makedirs(os.path.dirname(os.path.abspath(self.log_path)), exist_ok=True)
+            with open(self.log_path, "a") as f:
+                f.write(json.dumps({"frames": self.frames, "probs": probs, "episodes": counts,
+                                    "metrics": raw}) + "\n")
+
+
 def _run_train(cfg, env, base_env, policy):
     from omni_drones.utils.torchrl import EpisodeStats
     from omni_drones.utils.torchrl.collector import Collector
@@ -168,10 +238,17 @@ def _run_train(cfg, env, base_env, policy):
 
     env.train()
     base_env.train()
+    refresher = None
+    rcfg = cfg.get("refresh", None)
+    if rcfg is not None and int(rcfg.get("every_frames", 0)) > 0:
+        refresher = _OpponentRefresher(
+            rcfg, base_env, max_time=base_env.max_episode_length * float(cfg.sim.dt))
     pbar = tqdm(collector, total=total_frames // frames_per_batch)
     for i, data in enumerate(pbar):
         info = {"env_frames": collector._frames, "rollout_fps": collector._fps}
         episode_stats.add(data.to_tensordict())
+        if refresher is not None:
+            refresher.add(data, frames_per_batch)
         if len(episode_stats) >= base_env.num_envs:
             stats = {
                 "train/" + (".".join(k) if isinstance(k, tuple) else k):
@@ -215,6 +292,10 @@ def _run_eval(cfg, env, base_env, policy):
     base_env.eval()
     env.eval()
     env.set_seed(int(cfg.seed))
+
+    if cfg.get("eval_cutoff_steps", None):
+        _run_eval_multi(cfg, env, base_env, policy)
+        return
 
     with set_exploration_type(ExplorationType.MODE):
         trajs = env.rollout(
@@ -304,6 +385,73 @@ def _run_eval(cfg, env, base_env, policy):
         matchups[opp_id] = record
 
     _write_stage_out(cfg, {"matchups": matchups})
+
+
+@torch.no_grad()
+def _run_eval_multi(cfg, env, base_env, policy):
+    """Count every episode that starts before ``eval_cutoff_steps`` (thesis evals), plus behaviour features."""
+    from omni_drones.utils.selfplay.eval_accumulator import (
+        EpisodeAccumulator, behaviour_step_features, summarize_matchups)
+
+    cutoff = int(cfg.eval_cutoff_steps)
+    max_len = int(base_env.max_episode_length)
+    step_dt = float(cfg.sim.dt) * int(cfg.sim.substeps)
+    acc = EpisodeAccumulator(base_env.num_envs, cutoff, base_env.device)
+    pursuer, evader = base_env.pursuer, base_env.evader
+
+    td = env.reset()
+    prev_vel = evader.vel_w[:, 0, :3].clone()
+    traj_out = cfg.get("eval_traj_out", None)
+    if traj_out:
+        # float32: float16 positions (~2 mm steps) ruin second differences / dt^2 (A3a run 1).
+        # Env -> opponent assignment is contiguous, so record evenly spaced envs to cover every opponent.
+        rec = torch.linspace(0, base_env.num_envs - 1, int(cfg.get("eval_traj_envs", 512)),
+                             device=base_env.device).long().unique()
+        z_rec, d_rec = [base_env.opponent_z()[rec].float().cpu()], []
+        pos_rec = [pursuer.pos[rec, 0].float().cpu()]
+    steps = 0
+    with set_exploration_type(ExplorationType.MODE):
+        for t in range(cutoff + max_len):
+            td = policy(td)
+            td, td_next = env.step_and_maybe_reset(td)
+            stats = {k: v for k, v in td.get(("next", "stats")).items()}
+            e_vel = evader.vel_w[:, 0, :3]
+            feats = behaviour_step_features(
+                evader.pos[:, 0], e_vel, pursuer.pos[:, 0], prev_vel, step_dt)
+            acc.step(t, td.get(("next", "done")), stats, feats)
+            if traj_out:
+                z_rec.append(base_env.opponent_z()[rec].float().cpu())
+                pos_rec.append(pursuer.pos[rec, 0].float().cpu())
+                d_rec.append(td.get(("next", "done")).reshape(-1)[rec].cpu())
+            prev_vel = e_vel.clone()
+            td = td_next
+            steps = t + 1
+            if acc.all_counted_done():
+                break
+
+    if traj_out:
+        env_policy = base_env.opponent_bank.env_policy[rec].cpu()
+        os.makedirs(os.path.dirname(os.path.abspath(traj_out)), exist_ok=True)
+        # z[k] is the state after step k-1 (post-reset for envs done at step k-1); z[0] is the initial state.
+        torch.save({"z": torch.stack(z_rec), "own_pos": torch.stack(pos_rec), "done": torch.stack(d_rec),
+                    "envs": rec.cpu(),
+                    "opponent": [base_env.opponent_bank.ids[i] for i in env_policy.tolist()],
+                    "step_dt": step_dt}, traj_out)
+
+    episodes = acc.episodes()
+    assignment = base_env.opponent_bank.assignment
+    matchups = summarize_matchups(episodes, assignment, str(cfg.task.role), step_dt, max_len)
+    ep_out = cfg.get("eval_episodes_out", None)
+    if ep_out:
+        os.makedirs(os.path.dirname(os.path.abspath(ep_out)), exist_ok=True)
+        torch.save({"episodes": episodes,
+                    "assignment": {k: v.cpu() for k, v in assignment.items()}}, ep_out)
+    _write_stage_out(cfg, {
+        "matchups": matchups,
+        "eval": {"cutoff_steps": cutoff, "steps_run": steps, "step_dt": step_dt,
+                 "num_envs": int(base_env.num_envs),
+                 "episodes": int(episodes["env"].numel()) if episodes else 0},
+    })
 
 
 def _write_stage_out(cfg, payload):

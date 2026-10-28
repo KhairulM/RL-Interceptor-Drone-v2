@@ -60,6 +60,10 @@ PURSUER, EVADER, PolicyDatabase = (
 )
 
 _RUN_STAGE = os.path.join(_THIS_DIR, "run_stage.py")
+_spec_s = importlib.util.spec_from_file_location(
+    "selfplay_samplers", os.path.join(_REPO_ROOT, "omni_drones", "utils", "selfplay", "samplers.py"))
+_samplers = importlib.util.module_from_spec(_spec_s)
+_spec_s.loader.exec_module(_samplers)
 
 
 def _other(role):
@@ -120,6 +124,43 @@ def _seed_pool(db, role, heuristics):
     for name in heuristics:
         db.add_policy(role, None, kind="heuristic", metadata={"heuristic": name})
         print(f"[seed] {role} heuristic '{name}'")
+
+
+def _pursuer_opponent_probs(db, reference_id, cfg):
+    """Thesis F3 samplers for the pursuer's evader opponents (RL evaders only).
+
+    hedge:  Roncero et al. 2026 eq. (12), challenge c_j = 1 - J(reference pursuer, evader j).
+    qd_dpp: the same Hedge quality, re-weighted by a DPP over behaviour descriptors (mean and std of the per-step
+            behaviour features over all recorded matchups of evader j, z-normalised over the pool).
+    """
+    sampler = str(cfg.pursuer_sampler)
+    evaders = [p["id"] for p in db.list_policies(EVADER) if p["kind"] == "rl"]
+    challenge = {}
+    for e in evaders:
+        m = db.get_matchup(reference_id, e) or {}
+        j = m.get("neutralization_rate", m.get("win_rate"))
+        challenge[e] = 1.0 - (float(j) if j is not None else 0.0)
+    gamma, eta = float(cfg.hedge_gamma), float(cfg.hedge_eta)
+    if sampler == "hedge" or len(evaders) < 2:
+        return _samplers.hedge_probs(challenge, gamma, eta)
+    if sampler != "qd_dpp":
+        raise ValueError(f"unknown pursuer_sampler {sampler!r}")
+    desc = {}
+    for e in evaders:
+        rows = []
+        for p in db.list_policies(PURSUER):
+            m = db.get_matchup(p["id"], e) or {}
+            b = m.get("behaviour")
+            if b:
+                rows.append(list(b["mean"]) + list(b["std"]))
+        if not rows:
+            raise ValueError(f"qd_dpp: no behaviour statistics for {e} (needs eval_cutoff_steps)")
+        desc[e] = [sum(col) / len(col) for col in zip(*rows)]
+    keys = list(desc)
+    mu = [sum(desc[k][i] for k in keys) / len(keys) for i in range(len(desc[keys[0]]))]
+    sd = [max((sum((desc[k][i] - mu[i]) ** 2 for k in keys) / len(keys)) ** 0.5, 1e-6) for i in range(len(mu))]
+    desc = {k: [(v - m) / d for v, m, d in zip(desc[k], mu, sd)] for k in keys}
+    return _samplers.qd_dpp_probs(_samplers.hedge_scores(challenge, eta), desc, 1.0, gamma)
 
 
 def _pool_to_worker_spec(db, role, probs):
@@ -218,7 +259,9 @@ def main():
         # 1) Scripted opponents bootstrap each role's first RL policy only.
         retry_id = incomplete_policy["id"] if incomplete_policy else None
         reference = _previous_rl_policy(db, role, retry_id)
-        if reference:
+        if reference and role == PURSUER and str(cfg.get("pursuer_sampler", "default")) != "default":
+            probs = _pursuer_opponent_probs(db, reference["id"], cfg)
+        elif reference:
             probs = db.compute_sampling_probs(
                 role, temperature=temperature, metric_weights=metric_weights,
                 reference_policy_id=reference["id"], kind="rl",
@@ -259,6 +302,8 @@ def main():
             f"stage_out={train_out}",
         ]
         overrides += list(cfg.get("task_overrides", []) or [])
+        role_overrides = list((cfg.get("role_task_overrides", {}) or {}).get(role, []) or [])
+        overrides += role_overrides
         if bool(cfg.warm_start):
             latest = db.latest_policy_id(role)
             latest_entry = db.get_policy(role, latest) if latest else None
@@ -300,6 +345,8 @@ def main():
             f"stage_out={eval_out}",
         ]
         eval_overrides += list(cfg.get("task_overrides", []) or [])
+        eval_overrides += role_overrides
+        eval_overrides += list(cfg.get("eval_extra_overrides", []) or [])
         _run_worker(cfg, eval_overrides)
 
         with open(eval_out, "r") as f:

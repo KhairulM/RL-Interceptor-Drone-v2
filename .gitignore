@@ -165,3 +165,14 @@ deploy/artifacts/
 # Keep exported PyTorch policy weights under scripts/deploy/artifacts/
 !scripts/deploy/artifacts/**/*.pt
 !scripts/deploy/artifacts/**/*.pth
+
+# Thesis experiment checkpoints and bulky rollouts
+experiments/thesis/**/ckpt/
+experiments/thesis/**/rollouts/
+# Thesis: binary dumps, Isaac logs, locks and lane stdout stay local (text results and summaries are committed)
+experiments/thesis/**/*.pt
+experiments/thesis/**/*_log.txt
+!experiments/thesis/driver_log.txt
+experiments/thesis/**/*.lock
+experiments/thesis/.isaac_slots/
+experiments/thesis/lane*_out.txt

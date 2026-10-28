@@ -47,3 +47,16 @@ metric_weights:
 seed_heuristics:
   pursuer: [pure_pursuit, apf]
   evader: [circular, fast_flee, weave]
+
+# Thesis F3: sampler for the pursuer's (RL) evader opponents. default = the multi-metric softmax above;
+# hedge = Roncero et al. 2026 eq. (12); qd_dpp = Hedge quality x DPP diversity (needs behaviour stats in evals,
+# i.e. eval_extra_overrides: [eval_cutoff_steps=1500]). The evader side always uses the default rule.
+pursuer_sampler: default
+hedge_gamma: 0.7
+hedge_eta: 2.0
+eval_extra_overrides: []           # extra hydra overrides for eval workers only
+# Thesis F4: extra hydra overrides for the workers of one role only (train and eval), e.g. the pursuer's sensor
+# restrictions vs the flags that let the evader's frozen pursuer opponents see the same inputs.
+role_task_overrides:
+  pursuer: []
+  evader: []

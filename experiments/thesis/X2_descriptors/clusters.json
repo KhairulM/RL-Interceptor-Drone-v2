@@ -1,0 +1,103 @@
+{
+  "k": 7,
+  "silhouette": {
+    "2": 0.26503066463907754,
+    "3": 0.3180112450147352,
+    "4": 0.37284863196753437,
+    "5": 0.41406759854221736,
+    "6": 0.4545143948205281,
+    "7": 0.4614675605342901,
+    "8": 0.39713281084535723
+  },
+  "labels": {
+    "v9/evader:s1": 0,
+    "v9/evader:s3": 6,
+    "v9/evader:s5": 6,
+    "v9/evader:s7": 6,
+    "v9/evader:s9": 4,
+    "v9/evader:s11": 4,
+    "v9/evader:s13": 4,
+    "v9/evader:s15": 3,
+    "v9/evader:s17": 3,
+    "v9/evader:s19": 3,
+    "v10/evader:s1": 0,
+    "v10/evader:s3": 6,
+    "v10/evader:s5": 6,
+    "v10/evader:s7": 5,
+    "v10/evader:s9": 5,
+    "v10/evader:s11": 5,
+    "v11/evader:s1": 0,
+    "v11/evader:s3": 6,
+    "v11/evader:s5": 6,
+    "v11/evader:s7": 4,
+    "v11/evader:s9": 4,
+    "v11/evader:s11": 4,
+    "heur/evader:hover": 1,
+    "heur/evader:circular": 2,
+    "heur/evader:flee": 1,
+    "heur/evader:weave": 1,
+    "heur/evader:zigzag": 1,
+    "heur/evader:fast_flee": 1,
+    "heur/evader:flee>circular@0.5": 2,
+    "heur/evader:circular>hover@0.5": 2,
+    "heur/evader:hover>flee@0.5": 1,
+    "heur/evader:flee>weave@0.5": 1
+  },
+  "medoids": [
+    "v9/evader:s1",
+    "heur/evader:zigzag",
+    "heur/evader:flee>circular@0.5",
+    "v9/evader:s17",
+    "v9/evader:s9",
+    "v10/evader:s9",
+    "v9/evader:s5"
+  ],
+  "members": {
+    "0": [
+      "v9/evader:s1",
+      "v10/evader:s1",
+      "v11/evader:s1"
+    ],
+    "1": [
+      "heur/evader:hover",
+      "heur/evader:flee",
+      "heur/evader:weave",
+      "heur/evader:zigzag",
+      "heur/evader:fast_flee",
+      "heur/evader:hover>flee@0.5",
+      "heur/evader:flee>weave@0.5"
+    ],
+    "2": [
+      "heur/evader:circular",
+      "heur/evader:flee>circular@0.5",
+      "heur/evader:circular>hover@0.5"
+    ],
+    "3": [
+      "v9/evader:s15",
+      "v9/evader:s17",
+      "v9/evader:s19"
+    ],
+    "4": [
+      "v9/evader:s9",
+      "v9/evader:s11",
+      "v9/evader:s13",
+      "v11/evader:s7",
+      "v11/evader:s9",
+      "v11/evader:s11"
+    ],
+    "5": [
+      "v10/evader:s7",
+      "v10/evader:s9",
+      "v10/evader:s11"
+    ],
+    "6": [
+      "v9/evader:s3",
+      "v9/evader:s5",
+      "v9/evader:s7",
+      "v10/evader:s3",
+      "v10/evader:s5",
+      "v11/evader:s3",
+      "v11/evader:s5"
+    ]
+  }
+}

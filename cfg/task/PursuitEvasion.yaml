@@ -63,6 +63,8 @@ observation:
   use_time_encoding: true
   time_encoding_dim: 4
   use_rel_dist: true
+  agent_rel_vel: true   # false: drop the opponent's relative velocity from the agent's obs (thesis A3, positions-only)
+  opp_drop_rel_vel: false  # true: same for the frozen opponent's obs (frozen pursuers trained positions-only, thesis F4)
   rot_repr: matrix   # attitude obs: matrix (vec(R), 9-D), quat (w>=0, 4-D) or log (log(R) rotation vector, 3-D)
   # Per-component Gaussian noise stds applied to the agent's observation when
   # include_noise is true (sensor-matched defaults, from Intercept).
@@ -97,6 +99,35 @@ esn:
   fit_forgetting: 0.999   # per-step decay of pooled statistics
   ridge: 1.0e-4           # relative to mean diag of the pooled feature covariance
   readout_path: null      # warm-start shared readout (<ckpt>_esn.pt saved next to checkpoints)
+
+# Privileged inputs appended to the agent obs (thesis diagnostic X4; all off by default; change obs_dim).
+oracle:
+  opp_accel: false        # opponent acceleration (finite difference), agent body frame, scaled x0.1
+  opp_command: false      # opponent's latest CTBR command (tanh, 4-D)
+  accel_source: vel      # vel: finite difference of velocities | pos: second difference of the evader position estimate
+  accel_ema: 0.0          # >0: EMA filter (this alpha) on the acceleration estimate; with observation.include_noise the
+                          # finite difference uses noisy velocities (rel_lin_vel_std), as a real estimator would
+  descriptor_path: null   # JSON {opponent_id: [floats]}: fixed behaviour descriptor of the assigned opponent
+  opp_side_accel: false   # frozen RL opponents also get opp_accel (vel source, noise-free); for opponents trained with it (F2)
+
+# Online opponent adaptation for the pursuer (thesis A1; omni_drones/utils/opponent_adapt.py). Changes obs_dim.
+adapt:
+  enabled: false
+  kind: nf                # nf (learned basis) | esn (random reservoir) | raw (linear on history) | stack (frame stack)
+  model_path: null        # nf: trained basis (+ input normalisation for all kinds)
+  history: 10             # steps of [rel_pos, rel_vel, own_vel] in the input window
+  horizon: 15             # prediction horizon (steps)
+  z_mode: vel             # vel: input window [rel_pos, rel_vel, own_vel] | pos: [rel_pos, own_pos, own_vel] (needs freeze, target dvel)
+  target: disp            # disp: evader relative displacement over the horizon | dvel: evader velocity change
+                          # (fed to the policy as the predicted mean acceleration, scaled like oracle.opp_accel)
+  forgetting: 0.98        # RLS forgetting factor
+  delta: 10.0             # RLS initial covariance scale
+  p_max_ratio: 1.0        # cap on the RLS covariance trace, relative to its initial value (anti wind-up)
+  freeze: false           # true: no online update (readout stays at its initial value)
+  reset_on_episode: true  # false: keep the adapted readout across episodes (across-episode adaptation)
+  reservoir_size: 128
+  seed: 0
+  opp_side: false         # evader role only: frozen pursuer opponents get the same (clean-input) adapter output (F4)
 
 # Scripted opponent motion (used for heuristic seeds: hover/circular/pure_pursuit/apf/flee).
 # `flee` runs horizontally away from the pursuer at a held altitude; it never

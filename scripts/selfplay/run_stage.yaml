@@ -31,6 +31,22 @@ stage_ckpt: null           # where to save the trained checkpoint (mode=train)
 init_policy: null          # optional warm-start checkpoint (mode=train)
 eval_policy: null          # checkpoint to evaluate (mode=eval)
 eval_heuristic: null       # evaluate a scripted agent instead of eval_policy (mode=eval)
+# Multi-episode eval (thesis): count every episode that starts before this step (null = first episode per env).
+eval_cutoff_steps: null
+eval_episodes_out: null    # optional .pt with the per-episode records (bootstrap CIs, across-episode curves)
+eval_traj_out: null        # optional .pt with per-step opponent-adapter inputs of evenly spaced envs (thesis A1a)
+eval_traj_envs: 512
+
+# Opponent re-sampling inside one training run (thesis D1): every `every_frames`, recompute the opponent
+# probabilities from the episodes played since the last refresh and reassign envs. 0 = fixed probabilities.
+refresh:
+  every_frames: 0
+  sampler: softmax          # uniform | softmax | qd_dpp (omni_drones/utils/selfplay/samplers.py)
+  temperature: 0.9
+  uniform_mix: 0.5
+  metric_weights: {win_rate: 1.0, avg_time_to_capture: 0.8, avg_min_distance: 0.5, avg_motor_effort: 0.3, pursuer_crash_rate: 0.0}
+  descriptors_path: null    # JSON {opponent_id: [floats]} (qd_dpp)
+  log_path: null            # JSONL of per-refresh probabilities and metrics
 
 # WandB: one run per training stage, grouped by target policy (role).
 wandb:

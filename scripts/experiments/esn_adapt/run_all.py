@@ -1,4 +1,4 @@
-"""Resumable driver for the ESN adaptation experiment (docs/esn_adaptation_experiment_plan.md).
+"""Resumable driver for the ESN adaptation experiment (P0 results summarised in docs/research_plan.md).
 
     python scripts/experiments/esn_adapt/run_all.py --phase smoke
     python scripts/experiments/esn_adapt/run_all.py --phase p0 --frames 100000000 --seeds 3

@@ -1,0 +1,39 @@
+{
+  "policies": [
+    {
+      "id": "v6/evader:s1",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/selfplay_v6_fix_reward_and_bounds/checkpoints/evader_stage1.pt",
+      "metadata": {
+        "campaign": "v6",
+        "stage": 1,
+        "db_id": "evader:s3"
+      }
+    },
+    {
+      "id": "v6/evader:s7",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/selfplay_v6_fix_reward_and_bounds/checkpoints/evader_stage7.pt",
+      "metadata": {
+        "campaign": "v6",
+        "stage": 7,
+        "db_id": "evader:s6"
+      }
+    },
+    {
+      "id": "v6/evader:s11",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/selfplay_v6_fix_reward_and_bounds/checkpoints/evader_stage11.pt",
+      "metadata": {
+        "campaign": "v6",
+        "stage": 11,
+        "db_id": "evader:s8"
+      }
+    }
+  ],
+  "probs": {
+    "v6/evader:s1": 0.3333333333333333,
+    "v6/evader:s7": 0.3333333333333333,
+    "v6/evader:s11": 0.3333333333333333
+  }
+}

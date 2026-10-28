@@ -1,0 +1,326 @@
+2026-10-26 11:54:07 === start X0 (--exp X0)
+2026-10-26 11:54:07 X0 v6: v6/pursuer:s10 vs ['v6/evader:s1', 'v6/evader:s7', 'v6/evader:s11']
+2026-10-26 11:58:32 === start X0 (--exp X0)
+2026-10-26 11:58:32 X0 v6: v6/pursuer:s10 vs ['v6/evader:s1', 'v6/evader:s7', 'v6/evader:s11']
+2026-10-26 12:01:13 X0 v9: v9/pursuer:s20 vs ['v9/evader:s1', 'v9/evader:s11', 'v9/evader:s19']
+2026-10-26 12:04:08 X0 v10: v10/pursuer:s12 vs ['v10/evader:s1', 'v10/evader:s7', 'v10/evader:s11']
+2026-10-26 12:07:28 X0 v11: v11/pursuer:s12 vs ['v11/evader:s1', 'v11/evader:s7', 'v11/evader:s11']
+2026-10-26 12:12:29 === done X0
+2026-10-26 12:12:39 === start X1 (--exp X1)
+2026-10-26 12:12:39 X1 campaigns=['v9', 'v10', 'v11'] pursuers=14 evaders=32
+2026-10-26 12:16:09 X1 done v9/pursuer:s14 (1/14)
+2026-10-26 12:19:49 X1 done v9/pursuer:s16 (2/14)
+2026-10-26 12:25:21 X1 done v9/pursuer:s18 (3/14)
+2026-10-26 12:28:23 X2 k=8 vendi_all=4.92 vendi_rl=4.18
+2026-10-26 12:28:55 NOTE: the 12:28 'X2 k=8' line above was a dry run on partial X1 data (4 pursuers); real X2 runs after X1.
+2026-10-26 12:29:31 X1 done v9/pursuer:s20 (4/14)
+2026-10-26 12:33:35 X1 done v10/pursuer:s6 (5/14)
+2026-10-26 12:37:40 X1 done v10/pursuer:s8 (6/14)
+2026-10-26 12:41:46 X1 done v10/pursuer:s10 (7/14)
+2026-10-26 12:45:54 X1 done v10/pursuer:s12 (8/14)
+2026-10-26 12:49:22 X1 done v11/pursuer:s6 (9/14)
+2026-10-26 12:53:07 X1 done v11/pursuer:s8 (10/14)
+2026-10-26 12:57:15 X1 done v11/pursuer:s10 (11/14)
+2026-10-26 13:01:19 X1 done v11/pursuer:s12 (12/14)
+2026-10-26 13:05:31 X1 done heur/pursuer:pure_pursuit (13/14)
+2026-10-26 13:09:45 X1 done heur/pursuer:apf (14/14)
+2026-10-26 13:09:46 === done X1
+2026-10-26 13:09:46 === start X2 (--exp X2)
+2026-10-26 13:09:47 X2 k=7 vendi_all=4.54 vendi_rl=3.79
+2026-10-26 13:09:47 === done X2
+2026-10-26 13:09:47 === start X3 (--exp X3)
+2026-10-26 13:42:27 X3 generalist seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/generalist_seed0.pt
+2026-10-26 14:15:06 X3 generalist seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/generalist_seed1.pt
+2026-10-26 14:47:49 X3 generalist seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/generalist_seed2.pt
+2026-10-26 15:04:45 X3 exploiter 0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/exploiter0.pt
+2026-10-26 15:21:43 X3 exploiter 1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/exploiter1.pt
+2026-10-26 15:38:58 X3 exploiter 2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/exploiter2.pt
+2026-10-26 15:39:05 === start D1 (--exp D1)
+2026-10-26 16:24:15 D1_sampler S-W seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/S-W/ckpt/seed0.pt
+2026-10-26 16:25:00 X3 specialist v10/evader:s1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_v10_evader_s1.pt
+2026-10-26 16:34:34 X3 specialist v10/evader:s3: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_v10_evader_s3.pt
+2026-10-26 16:46:04 X3 specialist v10/evader:s5: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_v10_evader_s5.pt
+2026-10-26 16:58:05 X3 specialist v10/evader:s7: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_v10_evader_s7.pt
+2026-10-26 17:10:09 X3 specialist v10/evader:s9: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_v10_evader_s9.pt
+2026-10-26 17:18:11 D1_sampler S-M seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/S-M/ckpt/seed0.pt
+2026-10-26 17:21:33 X3 specialist v10/evader:s11: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_v10_evader_s11.pt
+2026-10-26 17:31:30 X3 specialist heur/evader:zigzag: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_heur_evader_zigzag.pt
+2026-10-26 17:43:02 X3 specialist heur/evader:fast_flee: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_heur_evader_fast_flee.pt
+2026-10-26 17:54:47 X3 specialist heur/evader:flee>circular@0.5: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_heur_evader_flee-circularat0.5.pt
+2026-10-26 18:06:08 X3 specialist heur/evader:circular>hover@0.5: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_heur_evader_circular-hoverat0.5.pt
+2026-10-26 18:12:00 D1_sampler QD seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/QD/ckpt/seed0.pt
+2026-10-26 18:16:44 X3 specialist heur/evader:hover>flee@0.5: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_heur_evader_hover-fleeat0.5.pt
+2026-10-26 18:27:24 X3 specialist heur/evader:flee>weave@0.5: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_heur_evader_flee-weaveat0.5.pt
+2026-10-26 18:39:15 X3 specialist exploit/evader:g0e0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_exploit_evader_g0e0.pt
+2026-10-26 18:51:21 X3 specialist exploit/evader:g0e1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_exploit_evader_g0e1.pt
+2026-10-26 19:02:51 X3 specialist exploit/evader:g0e2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_exploit_evader_g0e2.pt
+2026-10-26 19:02:51 === done X3
+2026-10-26 19:02:51 === start X4 (--exp X4)
+2026-10-26 19:04:41 D1_sampler S-W seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/S-W/ckpt/seed1.pt
+2026-10-26 19:52:42 X4 O1_descriptor seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X4_oracles/ckpt/O1_descriptor_seed0.pt
+2026-10-26 20:05:30 D1_sampler S-M seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/S-M/ckpt/seed1.pt
+2026-10-26 20:53:19 X4 O1_descriptor seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X4_oracles/ckpt/O1_descriptor_seed1.pt
+2026-10-26 21:06:14 D1_sampler QD seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/QD/ckpt/seed1.pt
+2026-10-26 21:54:06 X4 O1_descriptor seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X4_oracles/ckpt/O1_descriptor_seed2.pt
+2026-10-26 22:06:55 D1_sampler S-W seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/S-W/ckpt/seed2.pt
+2026-10-26 22:55:10 X4 O2a_accel seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X4_oracles/ckpt/O2a_accel_seed0.pt
+2026-10-26 23:07:43 D1_sampler S-M seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/S-M/ckpt/seed2.pt
+2026-10-27 00:02:02 X4 O2a_accel seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X4_oracles/ckpt/O2a_accel_seed1.pt
+2026-10-27 00:09:02 D1_sampler QD seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/QD/ckpt/seed2.pt
+2026-10-27 00:17:36 === done D1
+2026-10-27 00:17:36 === start D1b (--exp D1b)
+2026-10-27 01:09:08 X4 O2a_accel seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X4_oracles/ckpt/O2a_accel_seed2.pt
+2026-10-27 01:12:05 D1b_duplicates S-M seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1b_duplicates/S-M/ckpt/seed0.pt
+2026-10-27 02:16:12 X4 O2b_command seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X4_oracles/ckpt/O2b_command_seed0.pt
+2026-10-27 02:16:27 D1b_duplicates QD seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1b_duplicates/QD/ckpt/seed0.pt
+2026-10-27 03:20:57 D1b_duplicates S-M seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1b_duplicates/S-M/ckpt/seed1.pt
+2026-10-27 03:23:11 X4 O2b_command seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X4_oracles/ckpt/O2b_command_seed1.pt
+2026-10-27 04:22:50 D1b_duplicates QD seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1b_duplicates/QD/ckpt/seed1.pt
+2026-10-27 04:28:03 X4 O2b_command seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X4_oracles/ckpt/O2b_command_seed2.pt
+2026-10-27 04:42:54 === done X4
+2026-10-27 04:43:07 === start A1a (--exp A1a)
+2026-10-27 04:54:29 === start A1b (--exp A1b)
+2026-10-27 04:58:25 === start A1a (--exp A1a)
+2026-10-27 04:58:32 A1a basis H=5: final val shared mse 0.00004
+2026-10-27 05:00:27 A1a basis H=15: final val shared mse 0.00240
+2026-10-27 05:02:23 A1a basis H=25: final val shared mse 0.01539
+2026-10-27 05:04:13 === done A1a
+2026-10-27 05:04:14 === start A1b (--exp A1b)
+2026-10-27 05:07:05 NOTE: A1a run1 (untuned RLS: delta 10, lambda 0.98) showed RLS wind-up; A1b stopped at start and its dir removed; outputs kept as A1a_basis/*_run1_untuned.*
+2026-10-27 05:08:28 === start A1a (--exp A1a)
+2026-10-27 05:08:28 A1a basis H=5: final val shared mse 0.00004
+2026-10-27 05:09:50 A1a tune H=5 raw: {'delta': 10.0, 'forgetting': 0.98} (val err 0.0074)
+2026-10-27 05:11:17 A1a tune H=5 esn: {'delta': 10.0, 'forgetting': 0.98} (val err 0.0081)
+2026-10-27 05:12:41 A1a tune H=5 nf: {'delta': 0.1, 'forgetting': 0.98} (val err 0.0033)
+2026-10-27 05:14:32 A1a basis H=15: final val shared mse 0.00240
+2026-10-27 05:15:52 A1a tune H=15 raw: {'delta': 10.0, 'forgetting': 0.98} (val err 0.0895)
+2026-10-27 05:17:19 A1a tune H=15 esn: {'delta': 10.0, 'forgetting': 0.98} (val err 0.0900)
+2026-10-27 05:18:43 A1a tune H=15 nf: {'delta': 0.01, 'forgetting': 0.999} (val err 0.0335)
+2026-10-27 05:18:52 D1b_duplicates S-M seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1b_duplicates/S-M/ckpt/seed2.pt
+2026-10-27 05:19:30 A1a basis H=25: final val shared mse 0.01539
+2026-10-27 05:19:54 A1a tune H=25 raw: {'delta': 1.0, 'forgetting': 0.999} (val err 0.2487)
+2026-10-27 05:20:21 A1a tune H=25 esn: {'delta': 10.0, 'forgetting': 0.995} (val err 0.2488)
+2026-10-27 05:20:54 A1a tune H=25 nf: {'delta': 0.01, 'forgetting': 0.999} (val err 0.0916)
+2026-10-27 05:22:39 === done A1a
+2026-10-27 05:22:39 === start A1b (--exp A1b)
+2026-10-27 06:15:12 A1b M0h_stack seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/M0h_stack/ckpt/seed0.pt
+2026-10-27 06:22:53 D1b_duplicates QD seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1b_duplicates/QD/ckpt/seed2.pt
+2026-10-27 06:32:49 === done D1b
+2026-10-27 06:32:49 === start D2 (--exp D2)
+2026-10-27 07:06:26 D2 S-U seed0: {'sampler': 'S-U', 'seed': 0, 'J_vs_exploiter': 0.30275759100914, 'capture_vs_exploiter': 0.2500288486480713, 'exploitability': 0.69724240899086, 'pursuer_crash': 0.003922926262021065, 'timeout': 0.6933194994926453}
+2026-10-27 07:13:17 A1b M0h_stack seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/M0h_stack/ckpt/seed1.pt
+2026-10-27 07:33:49 D2 S-U seed1: {'sampler': 'S-U', 'seed': 1, 'J_vs_exploiter': 0.1973479837179184, 'capture_vs_exploiter': 0.15410345792770386, 'exploitability': 0.8026520162820816, 'pursuer_crash': 0.0020308205857872963, 'timeout': 0.8008601069450378}
+2026-10-27 08:07:03 D2 S-U seed2: {'sampler': 'S-U', 'seed': 2, 'J_vs_exploiter': 0.48734384775161743, 'capture_vs_exploiter': 0.446061909198761, 'exploitability': 0.5126561522483826, 'pursuer_crash': 0.0016295491950586438, 'timeout': 0.5110266208648682}
+2026-10-27 08:12:59 A1b M0h_stack seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/M0h_stack/ckpt/seed2.pt
+2026-10-27 08:34:54 D2 S-W seed0: {'sampler': 'S-W', 'seed': 0, 'J_vs_exploiter': 0.3910049498081207, 'capture_vs_exploiter': 0.098558209836483, 'exploitability': 0.6089950501918793, 'pursuer_crash': 0.000322788895573467, 'timeout': 0.6086722612380981}
+2026-10-27 09:08:23 D2 S-W seed1: {'sampler': 'S-W', 'seed': 1, 'J_vs_exploiter': 0.44892528653144836, 'capture_vs_exploiter': 0.1298874169588089, 'exploitability': 0.5510747134685516, 'pursuer_crash': 0.00010235414811177179, 'timeout': 0.5509723424911499}
+2026-10-27 09:16:10 A1b ESN seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/ESN/ckpt/seed0.pt
+2026-10-27 09:35:40 D2 S-W seed2: {'sampler': 'S-W', 'seed': 2, 'J_vs_exploiter': 0.5400999188423157, 'capture_vs_exploiter': 0.12373951822519302, 'exploitability': 0.4599000811576843, 'pursuer_crash': 0.003015738446265459, 'timeout': 0.45688435435295105}
+2026-10-27 10:09:31 D2 S-M seed0: {'sampler': 'S-M', 'seed': 0, 'J_vs_exploiter': 0.17011301219463348, 'capture_vs_exploiter': 0.14787209033966064, 'exploitability': 0.8298869878053665, 'pursuer_crash': 0.00024044241581577808, 'timeout': 0.8296465277671814}
+2026-10-27 10:26:02 A1b ESN seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/ESN/ckpt/seed1.pt
+2026-10-27 10:38:03 D2 S-M seed1: {'sampler': 'S-M', 'seed': 1, 'J_vs_exploiter': 0.290611207485199, 'capture_vs_exploiter': 0.21101556718349457, 'exploitability': 0.709388792514801, 'pursuer_crash': 0.00011619800352491438, 'timeout': 0.7092726230621338}
+2026-10-27 11:09:42 D2 S-M seed2: {'sampler': 'S-M', 'seed': 2, 'J_vs_exploiter': 0.5046626329421997, 'capture_vs_exploiter': 0.45419639348983765, 'exploitability': 0.4953373670578003, 'pursuer_crash': 0.0005485463771037757, 'timeout': 0.49478879570961}
+2026-10-27 11:35:54 A1b ESN seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/ESN/ckpt/seed2.pt
+2026-10-27 11:41:35 D2 QD seed0: {'sampler': 'QD', 'seed': 0, 'J_vs_exploiter': 0.4804842472076416, 'capture_vs_exploiter': 0.13838447630405426, 'exploitability': 0.5195157527923584, 'pursuer_crash': 0.0016697975806891918, 'timeout': 0.5179502964019775}
+2026-10-27 12:11:25 D2 QD seed1: {'sampler': 'QD', 'seed': 1, 'J_vs_exploiter': 0.20606133341789246, 'capture_vs_exploiter': 0.15022073686122894, 'exploitability': 0.7939386665821075, 'pursuer_crash': 0.000119317504868377, 'timeout': 0.7938193678855896}
+2026-10-27 12:42:45 A1b NF_frozen seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/NF_frozen/ckpt/seed0.pt
+2026-10-27 12:43:26 D2 QD seed2: {'sampler': 'QD', 'seed': 2, 'J_vs_exploiter': 0.20937685668468475, 'capture_vs_exploiter': 0.1506231427192688, 'exploitability': 0.7906231433153152, 'pursuer_crash': 0.00035608309553936124, 'timeout': 0.7902670502662659}
+2026-10-27 12:43:26 === done D2
+2026-10-27 12:43:59 === start X3 (--exp X3 --seeds 5)
+2026-10-27 12:43:59 X3 generalist seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/generalist_seed0.pt
+2026-10-27 12:43:59 X3 generalist seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/generalist_seed1.pt
+2026-10-27 12:43:59 X3 generalist seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/generalist_seed2.pt
+2026-10-27 13:35:01 X3 generalist seed3: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/generalist_seed3.pt
+2026-10-27 13:48:11 A1b NF_frozen seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/NF_frozen/ckpt/seed1.pt
+2026-10-27 14:24:39 X3 generalist seed4: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/generalist_seed4.pt
+2026-10-27 14:24:39 X3 exploiter 0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/exploiter0.pt
+2026-10-27 14:24:39 X3 exploiter 1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/exploiter1.pt
+2026-10-27 14:24:39 X3 exploiter 2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/exploiter2.pt
+2026-10-27 14:47:16 X3 specialist v10/evader:s1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_v10_evader_s1.pt
+2026-10-27 14:47:16 X3 specialist v10/evader:s3: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_v10_evader_s3.pt
+2026-10-27 14:47:16 X3 specialist v10/evader:s5: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_v10_evader_s5.pt
+2026-10-27 14:47:16 X3 specialist v10/evader:s7: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_v10_evader_s7.pt
+2026-10-27 14:47:16 X3 specialist v10/evader:s9: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_v10_evader_s9.pt
+2026-10-27 14:47:16 X3 specialist v10/evader:s11: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_v10_evader_s11.pt
+2026-10-27 14:47:16 X3 specialist heur/evader:zigzag: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_heur_evader_zigzag.pt
+2026-10-27 14:47:16 X3 specialist heur/evader:fast_flee: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_heur_evader_fast_flee.pt
+2026-10-27 14:47:16 X3 specialist heur/evader:flee>circular@0.5: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_heur_evader_flee-circularat0.5.pt
+2026-10-27 14:47:16 X3 specialist heur/evader:circular>hover@0.5: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_heur_evader_circular-hoverat0.5.pt
+2026-10-27 14:47:16 X3 specialist heur/evader:hover>flee@0.5: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_heur_evader_hover-fleeat0.5.pt
+2026-10-27 14:47:16 X3 specialist heur/evader:flee>weave@0.5: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_heur_evader_flee-weaveat0.5.pt
+2026-10-27 14:47:16 X3 specialist exploit/evader:g0e0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_exploit_evader_g0e0.pt
+2026-10-27 14:47:16 X3 specialist exploit/evader:g0e1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_exploit_evader_g0e1.pt
+2026-10-27 14:47:16 X3 specialist exploit/evader:g0e2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/X3_gap/ckpt/spec_exploit_evader_g0e2.pt
+2026-10-27 14:47:16 === done X3
+2026-10-27 14:47:16 === start D1 (--exp D1 --seeds 5)
+2026-10-27 14:47:16 D1_sampler S-W seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/S-W/ckpt/seed0.pt
+2026-10-27 14:47:16 D1_sampler S-M seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/S-M/ckpt/seed0.pt
+2026-10-27 14:47:16 D1_sampler QD seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/QD/ckpt/seed0.pt
+2026-10-27 14:47:16 D1_sampler S-W seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/S-W/ckpt/seed1.pt
+2026-10-27 14:47:16 D1_sampler S-M seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/S-M/ckpt/seed1.pt
+2026-10-27 14:47:16 D1_sampler QD seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/QD/ckpt/seed1.pt
+2026-10-27 14:47:16 D1_sampler S-W seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/S-W/ckpt/seed2.pt
+2026-10-27 14:47:16 D1_sampler S-M seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/S-M/ckpt/seed2.pt
+2026-10-27 14:47:16 D1_sampler QD seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/QD/ckpt/seed2.pt
+2026-10-27 14:48:48 A1b NF_frozen seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/NF_frozen/ckpt/seed2.pt
+2026-10-27 15:36:51 D1_sampler S-W seed3: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/S-W/ckpt/seed3.pt
+2026-10-27 15:52:01 A1b NF_OA seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/NF_OA/ckpt/seed0.pt
+2026-10-27 16:35:57 D1_sampler S-M seed3: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/S-M/ckpt/seed3.pt
+2026-10-27 17:01:18 A1b NF_OA seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/NF_OA/ckpt/seed1.pt
+2026-10-27 17:35:11 D1_sampler QD seed3: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/QD/ckpt/seed3.pt
+2026-10-27 18:10:55 A1b NF_OA seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/NF_OA/ckpt/seed2.pt
+2026-10-27 18:28:18 === done A1b
+2026-10-27 18:30:00 === start D1c (--exp D1c)
+2026-10-27 18:33:19 D1_sampler S-W seed4: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/S-W/ckpt/seed4.pt
+2026-10-27 19:18:45 nodup S-M seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/S-M/ckpt/seed0.pt
+2026-10-27 19:35:14 D1_sampler S-M seed4: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/S-M/ckpt/seed4.pt
+2026-10-27 20:19:12 nodup QD seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/QD/ckpt/seed0.pt
+2026-10-27 20:37:40 D1_sampler QD seed4: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1_sampler/QD/ckpt/seed4.pt
+2026-10-27 20:49:03 === done D1
+2026-10-27 20:49:03 === start D2 (--exp D2 --seeds 5)
+2026-10-27 20:49:03 D2 S-U seed0: {'sampler': 'S-U', 'seed': 0, 'J_vs_exploiter': 0.30275759100914, 'capture_vs_exploiter': 0.2500288486480713, 'exploitability': 0.69724240899086, 'pursuer_crash': 0.003922926262021065, 'timeout': 0.6933194994926453}
+2026-10-27 20:49:03 D2 S-U seed1: {'sampler': 'S-U', 'seed': 1, 'J_vs_exploiter': 0.1973479837179184, 'capture_vs_exploiter': 0.15410345792770386, 'exploitability': 0.8026520162820816, 'pursuer_crash': 0.0020308205857872963, 'timeout': 0.8008601069450378}
+2026-10-27 20:49:03 D2 S-U seed2: {'sampler': 'S-U', 'seed': 2, 'J_vs_exploiter': 0.48734384775161743, 'capture_vs_exploiter': 0.446061909198761, 'exploitability': 0.5126561522483826, 'pursuer_crash': 0.0016295491950586438, 'timeout': 0.5110266208648682}
+2026-10-27 21:02:21 NOTE: D1c stopped after ~20 min (user chose F1 option B); requeued after A2. Partial run files of D1c may exist.
+2026-10-27 21:02:29 CORRECTION to previous note: D1c had run ~2.5 h; 2 runs complete (nodup S-M seed0, nodup QD seed0) and are kept; dup S-M seed0 was interrupted and will restart.
+2026-10-27 21:03:16 === start F1 (--exp F1 --seeds 5)
+2026-10-27 21:07:40 === start A2a (--exp A2a)
+2026-10-27 21:07:48 A2a basis dvel H=1: val shared mse 0.00025
+2026-10-27 21:11:34 A2a basis dvel H=5: val shared mse 0.00696
+2026-10-27 21:15:20 A2a basis dvel H=10: val shared mse 0.04478
+2026-10-27 21:19:00 === done A2a
+2026-10-27 21:23:58 D2 S-U seed3: {'sampler': 'S-U', 'seed': 3, 'J_vs_exploiter': 0.35630616545677185, 'capture_vs_exploiter': 0.24314795434474945, 'exploitability': 0.6436938345432281, 'pursuer_crash': 0.002501990180462599, 'timeout': 0.6416467428207397}
+2026-10-27 21:55:48 F1 QD_acc seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/F1_final/QD_acc/ckpt/seed0.pt
+2026-10-27 21:56:31 D2 S-U seed4: {'sampler': 'S-U', 'seed': 4, 'J_vs_exploiter': 0.2952783703804016, 'capture_vs_exploiter': 0.25745829939842224, 'exploitability': 0.7047216296195984, 'pursuer_crash': 0.00035236080293543637, 'timeout': 0.7043692469596863}
+2026-10-27 21:56:31 D2 S-W seed0: {'sampler': 'S-W', 'seed': 0, 'J_vs_exploiter': 0.3910049498081207, 'capture_vs_exploiter': 0.098558209836483, 'exploitability': 0.6089950501918793, 'pursuer_crash': 0.000322788895573467, 'timeout': 0.6086722612380981}
+2026-10-27 21:56:31 D2 S-W seed1: {'sampler': 'S-W', 'seed': 1, 'J_vs_exploiter': 0.44892528653144836, 'capture_vs_exploiter': 0.1298874169588089, 'exploitability': 0.5510747134685516, 'pursuer_crash': 0.00010235414811177179, 'timeout': 0.5509723424911499}
+2026-10-27 21:56:31 D2 S-W seed2: {'sampler': 'S-W', 'seed': 2, 'J_vs_exploiter': 0.5400999188423157, 'capture_vs_exploiter': 0.12373951822519302, 'exploitability': 0.4599000811576843, 'pursuer_crash': 0.003015738446265459, 'timeout': 0.45688435435295105}
+2026-10-27 22:26:45 D2 S-W seed3: {'sampler': 'S-W', 'seed': 3, 'J_vs_exploiter': 0.4262058138847351, 'capture_vs_exploiter': 0.3677483797073364, 'exploitability': 0.5737941861152649, 'pursuer_crash': 0.004223160911351442, 'timeout': 0.5695710182189941}
+2026-10-27 22:57:03 F1 QD_acc seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/F1_final/QD_acc/ckpt/seed1.pt
+2026-10-27 22:59:02 D2 S-W seed4: {'sampler': 'S-W', 'seed': 4, 'J_vs_exploiter': 0.9915477633476257, 'capture_vs_exploiter': 0.7687448859214783, 'exploitability': 0.008452236652374268, 'pursuer_crash': 0.000908843067009002, 'timeout': 0.007634281646460295}
+2026-10-27 22:59:02 D2 S-M seed0: {'sampler': 'S-M', 'seed': 0, 'J_vs_exploiter': 0.17011301219463348, 'capture_vs_exploiter': 0.14787209033966064, 'exploitability': 0.8298869878053665, 'pursuer_crash': 0.00024044241581577808, 'timeout': 0.8296465277671814}
+2026-10-27 22:59:02 D2 S-M seed1: {'sampler': 'S-M', 'seed': 1, 'J_vs_exploiter': 0.290611207485199, 'capture_vs_exploiter': 0.21101556718349457, 'exploitability': 0.709388792514801, 'pursuer_crash': 0.00011619800352491438, 'timeout': 0.7092726230621338}
+2026-10-27 22:59:02 D2 S-M seed2: {'sampler': 'S-M', 'seed': 2, 'J_vs_exploiter': 0.5046626329421997, 'capture_vs_exploiter': 0.45419639348983765, 'exploitability': 0.4953373670578003, 'pursuer_crash': 0.0005485463771037757, 'timeout': 0.49478879570961}
+2026-10-27 23:29:09 D2 S-M seed3: {'sampler': 'S-M', 'seed': 3, 'J_vs_exploiter': 0.29106831550598145, 'capture_vs_exploiter': 0.2532399296760559, 'exploitability': 0.7089316844940186, 'pursuer_crash': 0.00011675423593260348, 'timeout': 0.7088149189949036}
+2026-10-27 23:59:09 F1 QD_acc seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/F1_final/QD_acc/ckpt/seed2.pt
+2026-10-28 00:02:31 D2 S-M seed4: {'sampler': 'S-M', 'seed': 4, 'J_vs_exploiter': 0.2870528995990753, 'capture_vs_exploiter': 0.2528853714466095, 'exploitability': 0.7129471004009247, 'pursuer_crash': 0.04559478908777237, 'timeout': 0.6675808429718018}
+2026-10-28 00:02:31 D2 QD seed0: {'sampler': 'QD', 'seed': 0, 'J_vs_exploiter': 0.4804842472076416, 'capture_vs_exploiter': 0.13838447630405426, 'exploitability': 0.5195157527923584, 'pursuer_crash': 0.0016697975806891918, 'timeout': 0.5179502964019775}
+2026-10-28 00:02:31 D2 QD seed1: {'sampler': 'QD', 'seed': 1, 'J_vs_exploiter': 0.20606133341789246, 'capture_vs_exploiter': 0.15022073686122894, 'exploitability': 0.7939386665821075, 'pursuer_crash': 0.000119317504868377, 'timeout': 0.7938193678855896}
+2026-10-28 00:02:31 D2 QD seed2: {'sampler': 'QD', 'seed': 2, 'J_vs_exploiter': 0.20937685668468475, 'capture_vs_exploiter': 0.1506231427192688, 'exploitability': 0.7906231433153152, 'pursuer_crash': 0.00035608309553936124, 'timeout': 0.7902670502662659}
+2026-10-28 00:33:10 D2 QD seed3: {'sampler': 'QD', 'seed': 3, 'J_vs_exploiter': 0.4406130313873291, 'capture_vs_exploiter': 0.12312312424182892, 'exploitability': 0.5593869686126709, 'pursuer_crash': 0.0005177591228857636, 'timeout': 0.5588692426681519}
+2026-10-28 01:00:53 F1 SU_acc seed3: /home/user/Projects/RLInterceptorDrone/experiments/thesis/F1_final/SU_acc/ckpt/seed3.pt
+2026-10-28 01:05:54 D2 QD seed4: {'sampler': 'QD', 'seed': 4, 'J_vs_exploiter': 0.5157076716423035, 'capture_vs_exploiter': 0.4806218147277832, 'exploitability': 0.48429232835769653, 'pursuer_crash': 0.0003238691424485296, 'timeout': 0.48396846652030945}
+2026-10-28 01:05:54 === done D2
+2026-10-28 01:05:54 === start A1b (--exp A1b --seeds 5)
+2026-10-28 01:05:55 A1b M0h_stack seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/M0h_stack/ckpt/seed0.pt
+2026-10-28 01:05:55 A1b M0h_stack seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/M0h_stack/ckpt/seed1.pt
+2026-10-28 01:05:55 A1b M0h_stack seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/M0h_stack/ckpt/seed2.pt
+2026-10-28 01:58:40 A1b M0h_stack seed3: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/M0h_stack/ckpt/seed3.pt
+2026-10-28 02:04:36 F1 QD_acc seed3: /home/user/Projects/RLInterceptorDrone/experiments/thesis/F1_final/QD_acc/ckpt/seed3.pt
+2026-10-28 03:02:04 A1b M0h_stack seed4: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/M0h_stack/ckpt/seed4.pt
+2026-10-28 03:08:04 F1 SU_acc seed4: /home/user/Projects/RLInterceptorDrone/experiments/thesis/F1_final/SU_acc/ckpt/seed4.pt
+2026-10-28 03:13:03 A1b ESN seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/ESN/ckpt/seed0.pt
+2026-10-28 03:13:03 A1b ESN seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/ESN/ckpt/seed1.pt
+2026-10-28 03:13:03 A1b ESN seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/ESN/ckpt/seed2.pt
+2026-10-28 04:09:06 A1b ESN seed3: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/ESN/ckpt/seed3.pt
+2026-10-28 04:13:04 F1 QD_acc seed4: /home/user/Projects/RLInterceptorDrone/experiments/thesis/F1_final/QD_acc/ckpt/seed4.pt
+2026-10-28 04:22:25 F1 analysed, paired seeds [0, 1, 2, 3, 4]
+2026-10-28 04:22:25 === done F1
+2026-10-28 04:22:25 === start A2a (--exp A2a --seeds 3)
+2026-10-28 04:22:26 A2a basis dvel H=1: val shared mse 0.00025
+2026-10-28 04:24:32 A2a basis dvel H=5: val shared mse 0.00696
+2026-10-28 04:25:18 A2a basis dvel H=10: val shared mse 0.04478
+2026-10-28 04:26:05 === done A2a
+2026-10-28 04:26:05 === start A2b (--exp A2b --seeds 3)
+2026-10-28 05:21:06 A1b ESN seed4: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/ESN/ckpt/seed4.pt
+2026-10-28 05:22:47 A2b NFacc_frozen seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_frozen/ckpt/seed0.pt
+2026-10-28 05:34:35 A1b NF_frozen seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/NF_frozen/ckpt/seed0.pt
+2026-10-28 05:34:35 A1b NF_frozen seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/NF_frozen/ckpt/seed1.pt
+2026-10-28 05:34:35 A1b NF_frozen seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/NF_frozen/ckpt/seed2.pt
+2026-10-28 06:26:59 A2b NFacc_frozen seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_frozen/ckpt/seed1.pt
+2026-10-28 06:29:19 A1b NF_frozen seed3: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/NF_frozen/ckpt/seed3.pt
+2026-10-28 07:30:58 A2b NFacc_frozen seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_frozen/ckpt/seed2.pt
+2026-10-28 07:32:49 A1b NF_frozen seed4: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/NF_frozen/ckpt/seed4.pt
+2026-10-28 07:41:17 A1b NF_OA seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/NF_OA/ckpt/seed0.pt
+2026-10-28 07:41:17 A1b NF_OA seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/NF_OA/ckpt/seed1.pt
+2026-10-28 07:41:17 A1b NF_OA seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/NF_OA/ckpt/seed2.pt
+2026-10-28 08:34:53 A2b NFacc_OA seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_OA/ckpt/seed0.pt
+2026-10-28 08:36:33 A1b NF_OA seed3: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/NF_OA/ckpt/seed3.pt
+2026-10-28 09:43:24 A2b NFacc_OA seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_OA/ckpt/seed1.pt
+2026-10-28 09:44:46 A1b NF_OA seed4: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A1b_policy/NF_OA/ckpt/seed4.pt
+2026-10-28 09:58:30 === done A1b
+2026-10-28 10:05:12 === start D1c (--exp D1c)
+2026-10-28 10:05:12 nodup S-M seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/S-M/ckpt/seed0.pt
+2026-10-28 10:05:12 nodup QD seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/QD/ckpt/seed0.pt
+2026-10-28 10:48:49 A2b NFacc_OA seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_OA/ckpt/seed2.pt
+2026-10-28 10:58:07 dup S-M seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/S-M/ckpt/seed0.pt
+2026-10-28 11:04:05 === done A2b
+2026-10-28 11:04:06 === start D1c (--exp D1c --seeds 3)
+2026-10-28 11:04:06 nodup S-M seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/S-M/ckpt/seed0.pt
+2026-10-28 11:04:06 nodup QD seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/QD/ckpt/seed0.pt
+2026-10-28 11:04:06 dup S-M seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/S-M/ckpt/seed0.pt
+2026-10-28 11:08:21 [skip: run locked by another lane] /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/QD/ckpt/seed0.pt
+2026-10-28 11:08:21 dup QD seed0: None
+2026-10-28 12:01:06 nodup S-M seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/S-M/ckpt/seed1.pt
+2026-10-28 12:01:34 dup QD seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/QD/ckpt/seed0.pt
+2026-10-28 12:11:20 nodup S-M seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/S-M/ckpt/seed1.pt
+2026-10-28 12:11:20 [skip: run locked by another lane] /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/QD/ckpt/seed1.pt
+2026-10-28 12:11:20 nodup QD seed1: None
+2026-10-28 13:03:47 nodup QD seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/QD/ckpt/seed1.pt
+2026-10-28 13:05:56 dup S-M seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/S-M/ckpt/seed1.pt
+2026-10-28 13:11:59 dup S-M seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/S-M/ckpt/seed1.pt
+2026-10-28 13:15:49 [skip: run locked by another lane] /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/QD/ckpt/seed1.pt
+2026-10-28 13:15:49 dup QD seed1: None
+2026-10-28 14:08:50 dup QD seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/QD/ckpt/seed1.pt
+2026-10-28 14:08:51 nodup S-M seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/S-M/ckpt/seed2.pt
+2026-10-28 14:19:25 nodup S-M seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/S-M/ckpt/seed2.pt
+2026-10-28 14:19:25 [skip: run locked by another lane] /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/QD/ckpt/seed2.pt
+2026-10-28 14:19:25 nodup QD seed2: None
+2026-10-28 15:12:11 nodup QD seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/QD/ckpt/seed2.pt
+2026-10-28 15:13:28 dup S-M seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/S-M/ckpt/seed2.pt
+2026-10-28 15:21:03 dup S-M seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/S-M/ckpt/seed2.pt
+2026-10-28 15:25:14 [skip: run locked by another lane] /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/QD/ckpt/seed2.pt
+2026-10-28 15:25:14 dup QD seed2: None
+2026-10-28 15:25:14 === done D1c
+2026-10-28 15:26:46 === start A2b (--exp A2b --seeds 5)
+2026-10-28 15:26:46 A2b NFacc_frozen seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_frozen/ckpt/seed0.pt
+2026-10-28 15:26:46 A2b NFacc_frozen seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_frozen/ckpt/seed1.pt
+2026-10-28 15:26:46 A2b NFacc_frozen seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_frozen/ckpt/seed2.pt
+2026-10-28 15:45:38 === start A3a (--exp A3a)
+2026-10-28 16:11:44 A2b NFacc_frozen seed3: None
+2026-10-28 18:27:49 === start D1c (--exp D1c --seeds 3)
+2026-10-28 18:27:49 nodup S-M seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/S-M/ckpt/seed0.pt
+2026-10-28 18:27:49 nodup QD seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/QD/ckpt/seed0.pt
+2026-10-28 18:27:49 dup S-M seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/S-M/ckpt/seed0.pt
+2026-10-28 18:27:49 dup QD seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/QD/ckpt/seed0.pt
+2026-10-28 18:27:49 nodup S-M seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/S-M/ckpt/seed1.pt
+2026-10-28 18:27:49 nodup QD seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/QD/ckpt/seed1.pt
+2026-10-28 18:27:49 dup S-M seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/S-M/ckpt/seed1.pt
+2026-10-28 18:27:49 dup QD seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/QD/ckpt/seed1.pt
+2026-10-28 18:27:49 nodup S-M seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/S-M/ckpt/seed2.pt
+2026-10-28 18:27:49 nodup QD seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/nodup/QD/ckpt/seed2.pt
+2026-10-28 18:27:49 dup S-M seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/S-M/ckpt/seed2.pt
+2026-10-28 18:28:09 === start A3a (--exp A3a)
+2026-10-28 18:33:33 A3a H=5: val/clean/zero=0.1773, val/clean/FD=0.2589, val/clean/NF_clean=0.1270, val/clean/NF_aug=0.1300, val/noisy/zero=0.1773, val/noisy/FD=27.6290, val/noisy/NF_clean=0.1525, val/noisy/NF_aug=0.1316, test/clean/zero=0.1803, test/clean/FD=0.2648, test/clean/NF_clean=0.1526, test/clean/NF_aug=0.1554, test/noisy/zero=0.1803, test/noisy/FD=27.6457, test/noisy/NF_clean=0.1801, test/noisy/NF_aug=0.1571, test/noisy/FD_ema=0.8492, val/noisy/FD_ema=0.8469, ema_alpha=0.0500
+2026-10-28 18:33:52 A3a H=10: val/clean/zero=0.3400, val/clean/FD=0.5390, val/clean/NF_clean=0.2414, val/clean/NF_aug=0.2465, val/noisy/zero=0.3400, val/noisy/FD=55.2597, val/noisy/NF_clean=0.2808, val/noisy/NF_aug=0.2493, test/clean/zero=0.3395, test/clean/FD=0.5596, test/clean/NF_clean=0.2884, test/clean/NF_aug=0.2901, test/noisy/zero=0.3395, test/noisy/FD=55.2901, test/noisy/NF_clean=0.3309, test/noisy/NF_aug=0.2931, test/noisy/FD_ema=1.6988, val/noisy/FD_ema=1.6962, ema_alpha=0.0500
+2026-10-28 18:33:52 === done A3a
+2026-10-28 18:33:53 === start A2b (--exp A2b --seeds 5)
+2026-10-28 18:33:53 A2b NFacc_frozen seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_frozen/ckpt/seed0.pt
+2026-10-28 18:33:53 A2b NFacc_frozen seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_frozen/ckpt/seed1.pt
+2026-10-28 18:33:53 A2b NFacc_frozen seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_frozen/ckpt/seed2.pt
+2026-10-28 18:35:36 === start A3a (--exp A3a)
+2026-10-28 18:46:36 A3a H=5: val/clean/zero=0.1773, val/clean/FD=0.0573, val/clean/NF_clean=0.1271, val/clean/NF_aug=0.1300, val/noisy/zero=0.1773, val/noisy/FD=27.6280, val/noisy/NF_clean=0.1526, val/noisy/NF_aug=0.1316, test/clean/zero=0.1803, test/clean/FD=0.0705, test/clean/NF_clean=0.1526, test/clean/NF_aug=0.1554, test/noisy/zero=0.1803, test/noisy/FD=27.6445, test/noisy/NF_clean=0.1801, test/noisy/NF_aug=0.1571, test/noisy/FD_ema=0.8492, val/noisy/FD_ema=0.8468, ema_alpha=0.0500
+2026-10-28 18:46:55 A3a H=10: val/clean/zero=0.3400, val/clean/FD=0.1674, val/clean/NF_clean=0.2414, val/clean/NF_aug=0.2465, val/noisy/zero=0.3400, val/noisy/FD=55.2576, val/noisy/NF_clean=0.2808, val/noisy/NF_aug=0.2493, test/clean/zero=0.3395, test/clean/FD=0.1969, test/clean/NF_clean=0.2884, test/clean/NF_aug=0.2901, test/noisy/zero=0.3395, test/noisy/FD=55.2877, test/noisy/NF_clean=0.3309, test/noisy/NF_aug=0.2931, test/noisy/FD_ema=1.6987, val/noisy/FD_ema=1.6961, ema_alpha=0.0500
+2026-10-28 18:46:55 === done A3a
+2026-10-28 18:46:55 === start A2b (--exp A2b --seeds 5)
+2026-10-28 18:46:56 A2b NFacc_frozen seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_frozen/ckpt/seed0.pt
+2026-10-28 18:46:56 A2b NFacc_frozen seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_frozen/ckpt/seed1.pt
+2026-10-28 18:46:56 A2b NFacc_frozen seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_frozen/ckpt/seed2.pt
+2026-10-28 19:14:18 dup QD seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/D1c_nofloor/dup/QD/ckpt/seed2.pt
+2026-10-28 19:24:59 === done D1c
+2026-10-28 19:24:59 === start A2b (--exp A2b --seeds 5)
+2026-10-28 19:25:00 A2b NFacc_frozen seed0: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_frozen/ckpt/seed0.pt
+2026-10-28 19:25:00 A2b NFacc_frozen seed1: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_frozen/ckpt/seed1.pt
+2026-10-28 19:25:00 A2b NFacc_frozen seed2: /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_frozen/ckpt/seed2.pt
+2026-10-28 19:25:00 [skip: run locked by another lane] /home/user/Projects/RLInterceptorDrone/experiments/thesis/A2b_nfacc/NFacc_frozen/ckpt/seed3.pt
+2026-10-28 19:25:00 A2b NFacc_frozen seed3: None

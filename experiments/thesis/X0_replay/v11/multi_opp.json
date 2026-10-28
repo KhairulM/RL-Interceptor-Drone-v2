@@ -1,0 +1,39 @@
+{
+  "policies": [
+    {
+      "id": "v11/evader:s1",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/v11-uniform-mix/checkpoints/evader_stage1.pt",
+      "metadata": {
+        "campaign": "v11",
+        "stage": 1,
+        "db_id": "evader:s3"
+      }
+    },
+    {
+      "id": "v11/evader:s7",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/v11-uniform-mix/checkpoints/evader_stage7.pt",
+      "metadata": {
+        "campaign": "v11",
+        "stage": 7,
+        "db_id": "evader:s6"
+      }
+    },
+    {
+      "id": "v11/evader:s11",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/v11-uniform-mix/checkpoints/evader_stage11.pt",
+      "metadata": {
+        "campaign": "v11",
+        "stage": 11,
+        "db_id": "evader:s8"
+      }
+    }
+  ],
+  "probs": {
+    "v11/evader:s1": 0.3333333333333333,
+    "v11/evader:s7": 0.3333333333333333,
+    "v11/evader:s11": 0.3333333333333333
+  }
+}
