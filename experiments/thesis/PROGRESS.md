@@ -22,6 +22,9 @@ the log).
 - Python: `env -u PYTHONPATH .venv/bin/python` (py3.11, torch 2.7, torchrl 0.11.1). **Unset PYTHONPATH**: the shell
   exports ROS humble (py3.10) paths that break pytest/imports. The driver strips it for subprocesses.
 - Tests: `env -u PYTHONPATH .venv/bin/python -m pytest -q tests/` (all must pass).
+- Git: work is on branch `thesis-experiments` (pushed to `origin` = github.com/KhairulM/OmniDrones). `run.py` calls
+  `scripts/experiments/thesis/git_sync.sh` after every finished (non-smoke) experiment: commits code + text results and
+  pushes (user request 10-28). `.pt` files, Isaac logs, locks and lane stdout are git-ignored.
 - Isaac/OmniDrones runs: `scripts/selfplay/run_stage.py` (Hydra; `mode=train|eval`). The thesis driver wraps it.
 - wandb disabled for thesis runs (`wandb.mode=disabled`).
 
@@ -94,6 +97,7 @@ Expected: F2 campaigns ~10-29 16:00, F4 ~10-30 22:00, F3 ~11-01 14:00, final eva
 
 (Timestamps of log entries written on 10-27 before 21:20 are approximate; `driver_log.txt` has exact times.)
 
+- 2026-10-28 22:00: user: push to GitHub after every finished experiment. Branch `thesis-experiments` created and pushed (558a8fb); auto-sync hook in `run.py`.
 - 2026-10-28 21:45: D1c done: no floor -> both samplers collapse (train -0.29); duplicates then hurt S-M but not QD-DPP. In RESULTS.md (summary + reference-paper table).
 - 2026-10-28 21:35: user: add the learned-estimator campaign regardless of A3b/A3c (real interceptors rarely measure
   evader velocity/acceleration). F4 pre-registered (positions only + sensor noise, nf vs none, 3 seeds). Also found and
