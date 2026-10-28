@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-10-28 23:25; refreshed after every new result)
+## Summary (updated 2026-10-29 02:40; refreshed after every new result)
 
 **How to read the numbers.** J = neutralisation rate. `0.676 [0.533, 0.846]` = mean over training seeds and its
 95 % confidence interval (CI). CIs are percentile bootstraps over seeds (resample the per-seed values with replacement
@@ -62,7 +62,11 @@ J = neutralisation rate (capture, or the evader crashes / leaves the arena). "In
 - A3a (offline, no evader velocity observed): noise-free, the second difference of the evader position
   estimates its acceleration 1.5-2.2x better than a learned estimator. With realistic sensor noise (2 cm) position
   differences are useless (errors 28-55 m/s; even EMA-filtered, worse than predicting zero), and only the
-  noise-augmented learned estimator beats zero (-13 to -26 %). A3b tests this in closed loop.
+  noise-augmented learned estimator beats zero (-13 to -26 %).
+- A3b (closed loop, 3 seeds, no evader velocity observed): removing the evader's velocity cuts train J from 0.65
+  (M0) to 0.29, and neither acceleration estimate replaces it. Under sensor noise the position-difference input
+  destroys the policy (train 0.38 -> 0.07); the learned estimator is unaffected by noise and beats it by +0.23 train /
+  +0.18 held-out RL (CIs exclude 0), but it is **not better than no estimator** (n.s.; worse on exploiters, -0.14).
 - Overall reading: what the pursuer lacks against unseen evaders is the opponent's current/near-future acceleration.
   A learned opponent model helps when it predicts that quantity; online adaptation of the model does not add to
   closed-loop performance in this (noise-free, full-state) setting.
@@ -74,8 +78,7 @@ J = neutralisation rate (capture, or the evader crashes / leaves the arena). "In
   generalisation is bimodal per seed: a policy either handles the later v10 evaders (0.82-0.97) or fails on all of
   them (0.10-0.29).
 
-**Pending**: A3b (positions-only
-policies, 3 seeds) and A3c (noise evaluation of the velocity-based policies) queued; final runs F2a (exploitability
+**Pending**: A3c (noise evaluation of the velocity-based policies) queued; final runs F2a (exploitability
 of the acceleration-input pursuer) and F2b/F2c (self-play campaigns with vs without the acceleration input) queued.
 
 ## Relation to the reference papers (updated 2026-10-28 19:10)
@@ -112,7 +115,7 @@ disagrees under our protocol, extends the claim, or does not test it.
 | 5 | Seeds may converge to different strategies (Roncero, limitations). | Generalist (uniform sampler) train J 0.56-0.87 across 5 seeds; held-out generalisation is **bimodal per seed**: 1-2 of 5 seeds fail on all later v10 evaders (J 0.10-0.29) while the others reach 0.82-0.97 (F1). | **Extends:** quantifies it; with 3 seeds (Roncero) effects of +/- 0.1 can come from one seed. |
 | 6 | Observation design: Roncero and Gavin give the pursuer opponent position + velocity to a memoryless MLP; Gavin leaves "trajectory prediction" out of scope; AgilePE adds a temporal window of opponent state. | Adding the opponent's acceleration (finite difference of two consecutive observations) is the **largest effect in this thesis**: train 0.722 -> 0.940 (+0.199 [+0.128, +0.270]), exploiters 0.497 -> 0.983 (+0.464 [+0.239, +0.638]), held-out RL 0.634 -> 0.838 (CI includes 0 because of the bimodal seeds) (F1, 5 seeds). A learned acceleration estimate does the same (A2b, 5 seeds: all paired differences to the finite difference within +/- 0.04, n.s.). A raw 10-step history stack (our analogue of a temporal window) was *worse* than no history (train -0.254 [-0.355, -0.152]) (A1b). | **New:** a memoryless pursuer with position + velocity (Roncero, Gavin) is limited by the missing opponent acceleration far more than by opponent sampling. Caveat: AgilePE's window length and architecture are not given, so the history-stack result is not a test of AgilePE itself. |
 | 7 | Future work in Roncero: online adaptation, recurrent policies. | Online RLS adaptation of a learned opponent model (NF-OA), within and across episodes, adds nothing in closed loop (A1b, A2b); a random reservoir (ESN) is worse than no adaptation. Recurrent policies (GRU) **not tested**. | **Answers part of it (negative)** in a noise-free full-state setting. |
-| 8 | Sensor noise: AgilePE reports robustness under real sensor noise (mocap + IMU); Roncero and Gavin assume perfect state. | A3a (offline): with 2 cm position noise, acceleration from position differences is useless (error 28-55 m/s); a noise-augmented learned estimator is the only method better than zero. Closed loop: A3b / A3c pending. | **Pending.** |
+| 8 | Sensor noise: AgilePE reports robustness under real sensor noise (mocap + IMU); Roncero and Gavin assume perfect state. | A3a (offline): with 2 cm position noise, acceleration from position differences is useless (error 28-55 m/s); a noise-augmented learned estimator is the only method better than zero. Closed loop (A3b, pursuers without evader velocity): position differences collapse the policy under noise (train 0.38 -> 0.07); the learned estimator is noise-proof and beats them by +0.23, but is not better than no estimator. A3c (velocity-observing policies under noise) pending. | **Partly new:** an explicit robustness comparison of opponent-acceleration inputs under noise, which none of the three papers makes; the positive claim is limited to "learned > finite difference under noise", not "learned > nothing". |
 | 9 | Real-world transfer (all three), multi-pursuer coordination (Gavin), FOV-limited sensing (AgilePE). | Not studied. | **Not tested.** |
 
 ## X0_replay (done 2026-10-26)
@@ -568,6 +571,58 @@ Noise model = `observation.noise` stds: relative and own position 0.02 m, own ve
   same in both runs). A1a / A2a used the same float16 recorder; their inputs are velocity-based, where the effect
   is much smaller (e.g. velocity FD one step ahead, 0.0045 m/s in A2a, is partly quantisation), and they were not
   re-run.
+
+## A3b_posonly (done 2026-10-29 02:15; 3 seeds; closed loop)
+
+Pursuers whose observation has **no evader velocity** (`observation.agent_rel_vel=false`; relative position only),
+train pool, uniform, 150M frames, noise-free training. P_none: nothing added. P_fd: second difference of the evader
+position (`oracle.accel_source=pos`). P_nf: frozen learned estimator from A3a (aug basis, H = 10, 10-step window of
+relative position / own position / own velocity). Note: both estimators give the evader's **acceleration**, not its
+velocity; the policy is memoryless. Eval noise-free ("clean") and with the sensor-noise model ("noisy"); P_fd also
+with the tuned EMA ("noisyema", 2 of 3 seeds at write-up, last eval still running).
+[A3b_posonly/summary.md](A3b_posonly/summary.md). Mean J, 95 % bootstrap CI over 3 seeds:
+
+| policy / eval | train | held-out RL | held-out scripted | exploiters* |
+|---|---|---|---|---|
+| M0 (velocity observed, ref., clean) | 0.650 [0.562, 0.748] | 0.473 [0.369, 0.604] | 0.998 | 0.309 [0.295, 0.324] |
+| P_none clean | 0.289 [0.280, 0.300] | 0.296 [0.244, 0.331] | 0.866 [0.824, 0.914] | 0.374 [0.256, 0.528] |
+| P_none noisy | 0.288 [0.283, 0.293] | 0.291 [0.239, 0.322] | 0.863 [0.825, 0.907] | 0.381 [0.269, 0.530] |
+| P_fd clean | **0.378** [0.342, 0.413] | 0.215 [0.200, 0.223] | **0.984** [0.982, 0.987] | 0.268 [0.261, 0.281] |
+| P_fd noisy | 0.073 [0.043, 0.113] | 0.084 [0.042, 0.140] | 0.086 [0.073, 0.099] | 0.343 [0.221, 0.470] |
+| P_fd noisy + EMA (n=2) | 0.254 [0.248, 0.260] | 0.167 [0.153, 0.181] | 0.863 [0.819, 0.907] | 0.328 [0.278, 0.378] |
+| P_nf clean | 0.303 [0.269, 0.321] | 0.269 [0.252, 0.278] | 0.902 [0.850, 0.936] | 0.233 [0.222, 0.253] |
+| P_nf noisy | 0.302 [0.269, 0.321] | 0.263 [0.255, 0.268] | 0.898 [0.852, 0.928] | 0.229 [0.222, 0.239] |
+
+\* exploiters were trained against M0 seed 0 (a velocity-observing pursuer).
+
+Seed-paired differences (mean [95 % CI], 3 seeds):
+
+| comparison | train | held-out RL | held-out scripted | exploiters |
+|---|---|---|---|---|
+| P_nf - P_none (clean) | +0.014 [-0.031, +0.041] | -0.027 [-0.062, +0.032] | +0.036 [-0.064, +0.095] | **-0.140 [-0.302, -0.003]** |
+| P_fd - P_none (clean) | **+0.089 [+0.062, +0.127]** | **-0.081 [-0.131, -0.021]** | **+0.119 [+0.070, +0.163]** | -0.105 [-0.267, +0.025] |
+| P_nf - P_none (noisy) | +0.014 [-0.023, +0.037] | -0.028 [-0.056, +0.026] | +0.035 [-0.055, +0.090] | **-0.152 [-0.308, -0.030]** |
+| P_nf - P_fd (noisy) | **+0.229 [+0.156, +0.277]** | **+0.178 [+0.125, +0.226]** | **+0.812 [+0.753, +0.855]** | -0.113 [-0.231, +0.007] |
+| P_fd noisy - clean | **-0.305 [-0.350, -0.267]** | **-0.130 [-0.158, -0.083]** | **-0.898 [-0.910, -0.885]** | +0.074 [-0.043, +0.189] |
+| P_nf noisy - clean | -0.001 [-0.004, +0.000] | -0.006 [-0.011, +0.003] | -0.003 [-0.009, +0.002] | -0.004 [-0.014, +0.006] |
+
+- **Not observing the evader's velocity is crippling**: train J 0.29 vs 0.65 for M0 (seeds 0-2, not seed-paired runs
+  but the same seeds/pool/frames). Neither acceleration estimate makes up for it: the policy is memoryless and gets
+  acceleration but no velocity.
+- **Under sensor noise, the position second difference destroys the policy** (train 0.38 -> 0.07; even the scripted
+  evaders drop from 0.98 to 0.09). EMA filtering recovers part of it (0.25, still below P_none). The learned
+  estimator is **unaffected by noise** (all noisy - clean differences <= 0.006) and beats FD under noise by +0.23
+  train / +0.18 held-out RL (CIs exclude 0). This is the closed-loop confirmation of A3a's noise result.
+- But the learned estimator **does not beat no estimator at all** (P_nf - P_none n.s. on train / held-out, and
+  *worse* on the exploiters, -0.14 to -0.15, CI excludes 0). Noise-free, FD helps on train and scripted evaders
+  (+0.09 / +0.12) but hurts on held-out RL (-0.08).
+- Prediction "P_fd ~ P_nf noise-free; P_nf > P_fd with noise; both > P_none": "P_nf > P_fd with noise" **held**;
+  "P_fd ~ P_nf noise-free" **did not hold** (FD higher on train/scripted, lower on held-out RL); "both > P_none"
+  **did not hold**.
+- Design limitation (found only now, stated plainly): A3b removes the evader velocity *and* offers only an
+  acceleration estimate, so it tests "acceleration without velocity". It does not test a learned estimator that
+  recovers the evader's velocity from noisy positions. The pre-registered F4 campaigns use the same inputs and
+  therefore inherit this limitation (see PROGRESS.md, 10-29 02:40).
 
 ## F1_final (done 2026-10-28 04:22; 5 seeds, noise-free)
 
