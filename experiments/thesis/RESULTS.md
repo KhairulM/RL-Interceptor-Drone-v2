@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-10-29 02:40; refreshed after every new result)
+## Summary (updated 2026-10-29 04:00; refreshed after every new result)
 
 **How to read the numbers.** J = neutralisation rate. `0.676 [0.533, 0.846]` = mean over training seeds and its
 95 % confidence interval (CI). CIs are percentile bootstraps over seeds (resample the per-seed values with replacement
@@ -67,9 +67,15 @@ J = neutralisation rate (capture, or the evader crashes / leaves the arena). "In
   (M0) to 0.29, and neither acceleration estimate replaces it. Under sensor noise the position-difference input
   destroys the policy (train 0.38 -> 0.07); the learned estimator is unaffected by noise and beats it by +0.23 train /
   +0.18 held-out RL (CIs exclude 0), but it is **not better than no estimator** (n.s.; worse on exploiters, -0.14).
+- A3c (velocity-observing policies trained noise-free, evaluated with sensor noise, 5 seeds): the finite-difference
+  acceleration input collapses (train 0.94 -> 0.33, below M0 0.70); the learned estimator + online RLS holds (0.90 ->
+  0.80) and beats the finite difference on every split (+0.20 to +0.49) and M0 on held-out RL (+0.12) and exploiters
+  (+0.53), CIs exclude 0. **Online adaptation helps under noise** (+0.09 train, +0.24 exploiters vs frozen), the
+  first closed-loop gain from adaptation in this thesis.
 - Overall reading: what the pursuer lacks against unseen evaders is the opponent's current/near-future acceleration.
-  A learned opponent model helps when it predicts that quantity; online adaptation of the model does not add to
-  closed-loop performance in this (noise-free, full-state) setting.
+  A learned opponent model helps when it predicts that quantity. Noise-free it is equivalent to a finite difference
+  and online adaptation adds nothing; with realistic sensor noise the learned estimator (especially with online RLS)
+  is the only acceleration input that keeps its benefit. Without any evader velocity, no acceleration input helps.
 
 **Final 2x2 (F1, 5 seeds)**
 - {uniform, QD-DPP} x {plain, acceleration input}: the **acceleration input is the dominant factor** (train +0.20,
@@ -78,10 +84,10 @@ J = neutralisation rate (capture, or the evader crashes / leaves the arena). "In
   generalisation is bimodal per seed: a policy either handles the later v10 evaders (0.82-0.97) or fails on all of
   them (0.10-0.29).
 
-**Pending**: A3c (noise evaluation of the velocity-based policies) queued; final runs F2a (exploitability
+**Pending**: final runs F2a (exploitability
 of the acceleration-input pursuer) and F2b/F2c (self-play campaigns with vs without the acceleration input) queued.
 
-## Relation to the reference papers (updated 2026-10-28 19:10)
+## Relation to the reference papers (updated 2026-10-29 04:00)
 
 Reference papers (the thesis is positioned against these three):
 **[AgilePE]** Tang et al. 2026, arXiv:2608.14135; **[Roncero]** Sanchez Roncero et al. 2026 (AMSPBH),
@@ -114,8 +120,8 @@ disagrees under our protocol, extends the claim, or does not test it.
 | 4 | Population training generalises to unseen opponents (Roncero: unseen APF evader; Gavin: SP/PFSP pursuers vs other evaders). | Consistent for scripted opponents: held-out scripted evaders (zigzag, fast flee, 4 switching evaders) are neutralised at J 0.99-1.00 by every pursuer. **Not** for learned opponents: against the independent v10 lineage the generalist loses up to 0.37 J to a specialist; fresh exploiters (PPO best responses, 100M frames) reach J 0.22-0.43 against it (X3), and the mean exploitability per sampler is 0.44-0.69 (D2; one failed exploiter included). | **Consistent for scripted, contradicted for learned opponents.** None of the three papers reports exploitability or held-out RL lineages. |
 | 5 | Seeds may converge to different strategies (Roncero, limitations). | Generalist (uniform sampler) train J 0.56-0.87 across 5 seeds; held-out generalisation is **bimodal per seed**: 1-2 of 5 seeds fail on all later v10 evaders (J 0.10-0.29) while the others reach 0.82-0.97 (F1). | **Extends:** quantifies it; with 3 seeds (Roncero) effects of +/- 0.1 can come from one seed. |
 | 6 | Observation design: Roncero and Gavin give the pursuer opponent position + velocity to a memoryless MLP; Gavin leaves "trajectory prediction" out of scope; AgilePE adds a temporal window of opponent state. | Adding the opponent's acceleration (finite difference of two consecutive observations) is the **largest effect in this thesis**: train 0.722 -> 0.940 (+0.199 [+0.128, +0.270]), exploiters 0.497 -> 0.983 (+0.464 [+0.239, +0.638]), held-out RL 0.634 -> 0.838 (CI includes 0 because of the bimodal seeds) (F1, 5 seeds). A learned acceleration estimate does the same (A2b, 5 seeds: all paired differences to the finite difference within +/- 0.04, n.s.). A raw 10-step history stack (our analogue of a temporal window) was *worse* than no history (train -0.254 [-0.355, -0.152]) (A1b). | **New:** a memoryless pursuer with position + velocity (Roncero, Gavin) is limited by the missing opponent acceleration far more than by opponent sampling. Caveat: AgilePE's window length and architecture are not given, so the history-stack result is not a test of AgilePE itself. |
-| 7 | Future work in Roncero: online adaptation, recurrent policies. | Online RLS adaptation of a learned opponent model (NF-OA), within and across episodes, adds nothing in closed loop (A1b, A2b); a random reservoir (ESN) is worse than no adaptation. Recurrent policies (GRU) **not tested**. | **Answers part of it (negative)** in a noise-free full-state setting. |
-| 8 | Sensor noise: AgilePE reports robustness under real sensor noise (mocap + IMU); Roncero and Gavin assume perfect state. | A3a (offline): with 2 cm position noise, acceleration from position differences is useless (error 28-55 m/s); a noise-augmented learned estimator is the only method better than zero. Closed loop (A3b, pursuers without evader velocity): position differences collapse the policy under noise (train 0.38 -> 0.07); the learned estimator is noise-proof and beats them by +0.23, but is not better than no estimator. A3c (velocity-observing policies under noise) pending. | **Partly new:** an explicit robustness comparison of opponent-acceleration inputs under noise, which none of the three papers makes; the positive claim is limited to "learned > finite difference under noise", not "learned > nothing". |
+| 7 | Future work in Roncero: online adaptation, recurrent policies. | Noise-free, online RLS adaptation of a learned opponent model adds nothing in closed loop (A1b, A2b; within or across episodes); a random reservoir (ESN) is worse than no adaptation. **Under sensor noise it helps**: RLS vs frozen basis +0.09 train, +0.24 exploiters, CIs exclude 0 (A3c, policies trained noise-free). Recurrent policies (GRU) **not tested**. | **New, conditional:** online opponent-model adaptation pays off under sensor noise, not with perfect state (Roncero's setting). |
+| 8 | Sensor noise: AgilePE reports robustness under real sensor noise (mocap + IMU); Roncero and Gavin assume perfect state. | With 2 cm / 8 cm/s noise (eval only, policies trained clean): the finite-difference acceleration input collapses (train 0.94 -> 0.33, below the plain pursuer 0.70); the learned estimator + RLS keeps 0.80 and beats it by +0.47 train / +0.38 held-out RL / +0.49 exploiters (A3c, 5 seeds). Without any evader velocity (A3b), every pursuer is weak (~0.29) and the learned estimator is noise-proof but not better than no estimator. | **New:** opponent-acceleration inputs must be learned, not differenced, once sensing is noisy; the perfect-state results of Roncero and Gavin would not transfer to such inputs. Limited to eval-time noise until F4. |
 | 9 | Real-world transfer (all three), multi-pursuer coordination (Gavin), FOV-limited sensing (AgilePE). | Not studied. | **Not tested.** |
 
 ## X0_replay (done 2026-10-26)
@@ -623,6 +629,49 @@ Seed-paired differences (mean [95 % CI], 3 seeds):
   acceleration estimate, so it tests "acceleration without velocity". It does not test a learned estimator that
   recovers the evader's velocity from noisy positions. The pre-registered F4 campaigns use the same inputs and
   therefore inherit this limitation (see PROGRESS.md, 10-29 02:40).
+
+## A3c_noise_ref (done 2026-10-29 03:47; eval only, 5 seeds)
+
+The velocity-observing policies (all **trained noise-free**) evaluated with the sensor-noise model
+(`observation.include_noise=true`: 2 cm position, 8 cm/s relative velocity, IMU noise; the acceleration inputs are
+computed from the noisy observations). [A3b_posonly/summary.md](A3b_posonly/summary.md) (shared table). Mean J, 95 %
+bootstrap CI over 5 seeds:
+
+| policy | train clean -> noisy | held-out RL clean -> noisy | held-out scripted noisy | exploiters clean -> noisy |
+|---|---|---|---|---|
+| M0 | 0.722 -> 0.695 | 0.634 -> 0.602 | 0.996 | 0.497 -> 0.408 |
+| finite-difference acceleration | 0.940 -> **0.328** | 0.838 -> **0.342** | 0.797 | 0.983 -> 0.450 |
+| NF-acc frozen | 0.909 -> 0.710 | 0.838 -> 0.646 | 0.976 | 0.977 -> 0.697 |
+| NF-acc + RLS (S1) | 0.903 -> **0.796** [0.756, 0.844] | 0.859 -> **0.718** [0.584, 0.840] | 0.993 | 0.987 -> **0.941** [0.913, 0.962] |
+
+Seed-paired differences under noise (mean [95 % CI], 5 seeds):
+
+| comparison (noisy eval) | train | held-out RL | held-out scripted | exploiters |
+|---|---|---|---|---|
+| NF-acc + RLS - finite difference | **+0.468 [+0.360, +0.575]** | **+0.376 [+0.202, +0.557]** | **+0.197 [+0.117, +0.301]** | **+0.492 [+0.376, +0.610]** |
+| NF-acc frozen - finite difference | **+0.382 [+0.346, +0.416]** | **+0.304 [+0.245, +0.360]** | **+0.179 [+0.097, +0.279]** | **+0.247 [+0.075, +0.404]** |
+| NF-acc + RLS - M0 | +0.101 [-0.002, +0.233] | **+0.116 [+0.015, +0.217]** | -0.003 [-0.005, -0.001] | **+0.533 [+0.311, +0.686]** |
+| NF-acc frozen - M0 | +0.015 [-0.084, +0.114] | +0.044 [-0.233, +0.298] | -0.021 [-0.033, -0.009] | +0.289 [-0.064, +0.499] |
+| finite difference - M0 | **-0.367 [-0.492, -0.254]** | **-0.260 [-0.496, -0.038]** | **-0.199 [-0.303, -0.121]** | +0.042 [-0.181, +0.205] |
+| **NF-acc + RLS - NF-acc frozen** (online adaptation) | **+0.086 [+0.008, +0.164]** | +0.072 [-0.134, +0.307] | **+0.018 [+0.007, +0.028]** | **+0.244 [+0.110, +0.395]** |
+
+Degradation noisy - clean (same policy): finite difference train -0.611, held-out RL -0.496, exploiters -0.533;
+NF-acc frozen -0.200 / -0.192 / -0.280; NF-acc + RLS -0.107 / -0.142 / -0.046; M0 -0.027 / -0.032 / -0.089 (all
+CIs exclude 0).
+
+- **The finite-difference acceleration input, the best input noise-free, becomes the worst under noise**: it falls
+  below M0 (-0.37 train, -0.26 held-out RL) and even loses scripted evaders (0.80).
+- **The learned estimator with online RLS is the most robust policy with an acceleration input** and the only one
+  that stays above M0 under noise: held-out RL +0.12 and exploiters +0.53 over M0 (CIs exclude 0); train +0.10
+  (CI touches 0). It beats the finite difference on every split by +0.20 to +0.49.
+- **Online adaptation helps under noise** (RLS - frozen: train +0.09, exploiters +0.24, CIs exclude 0), the first
+  closed-loop gain from online adaptation in this thesis (noise-free it added nothing: A1b, A2b). A plausible
+  reason: the RLS readout is refit on the noisy inputs it actually receives, while the frozen basis was trained on
+  clean ones. This is an interpretation, not tested.
+- M0 itself is nearly noise-proof (-0.03), so the acceleration inputs are where noise robustness is decided.
+- Caveat: all policies were trained without noise; policies trained with noise may learn to discount a noisy
+  finite difference. F4 (self-play with noise in training) is where that is tested.
+- Prediction "finite-difference acceleration degrades most": **held**.
 
 ## F1_final (done 2026-10-28 04:22; 5 seeds, noise-free)
 
