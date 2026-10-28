@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-10-28 19:45; refreshed after every new result)
+## Summary (updated 2026-10-28 23:25; refreshed after every new result)
 
 **How to read the numbers.** J = neutralisation rate. `0.676 [0.533, 0.846]` = mean over training seeds and its
 95 % confidence interval (CI). CIs are percentile bootstraps over seeds (resample the per-seed values with replacement
@@ -54,10 +54,11 @@ J = neutralisation rate (capture, or the evader crashes / leaves the arena). "In
   estimate by 7 % (frozen) to 21 % (online RLS kept across episodes); here online adaptation clearly helps
   (-10 to -15 % error vs frozen). For one step ahead the finite difference is better. A2b (policies with this input)
   is queued.
-- A2b (3 seeds): feeding the policy the **learned estimate of the evader's acceleration** (0.2 s ahead) gives large
-  gains over M0 (+0.25 train, +0.34 held-out RL, +0.67 exploiters; CIs exclude 0) and is on par with the
-  finite-difference acceleration input (held-out RL 0.82-0.88 vs 0.77, n.s.). None of its 6 runs fails on the later
-  v10 evaders (finite difference: 3 of 10 runs fail). Online RLS still adds nothing in closed loop.
+- A2b (5 seeds): feeding the policy the **learned estimate of the evader's acceleration** (0.2 s ahead) gives large
+  gains over M0 (with RLS: +0.18 train, +0.23 held-out RL, +0.49 exploiters; CIs exclude 0) and is **equivalent to
+  the finite-difference acceleration input** (all paired differences within +/- 0.04, all CIs include 0). Fewer severe
+  failures on the later v10 evaders (0 of 10 runs below 0.3 vs 3 of 10 with finite difference; one run degraded to
+  0.34-0.60), not significant. Online RLS still adds nothing in closed loop.
 - A3a (offline, no evader velocity observed): noise-free, the second difference of the evader position
   estimates its acceleration 1.5-2.2x better than a learned estimator. With realistic sensor noise (2 cm) position
   differences are useless (errors 28-55 m/s; even EMA-filtered, worse than predicting zero), and only the
@@ -73,7 +74,7 @@ J = neutralisation rate (capture, or the evader crashes / leaves the arena). "In
   generalisation is bimodal per seed: a policy either handles the later v10 evaders (0.82-0.97) or fails on all of
   them (0.10-0.29).
 
-**Pending**: A2b seeds 3-4 (running, relaunched after an OOM crash on 10-28); A3b (positions-only
+**Pending**: A3b (positions-only
 policies, 3 seeds) and A3c (noise evaluation of the velocity-based policies) queued; final runs F2a (exploitability
 of the acceleration-input pursuer) and F2b/F2c (self-play campaigns with vs without the acceleration input) queued.
 
@@ -109,7 +110,7 @@ disagrees under our protocol, extends the claim, or does not test it.
 | 3 | Our addition: sample by quality *and* diversity (QD-DPP). No reference paper uses diversity in sampling. | D1: QD-DPP beats both hardness samplers (vs S-M held-out RL +0.185 [+0.110, +0.259]; vs S-W +0.131 [+0.038, +0.223]) but is **not** better than uniform (+0.042 [-0.069, +0.131]). D1b: bounds the sampling mass of duplicates but does not protect performance. F1: no sampler effect once the acceleration input is present. D2: not less exploitable. | **New, mostly negative:** diversity repairs the damage hardness prioritisation does in our setting, nothing more. |
 | 4 | Population training generalises to unseen opponents (Roncero: unseen APF evader; Gavin: SP/PFSP pursuers vs other evaders). | Consistent for scripted opponents: held-out scripted evaders (zigzag, fast flee, 4 switching evaders) are neutralised at J 0.99-1.00 by every pursuer. **Not** for learned opponents: against the independent v10 lineage the generalist loses up to 0.37 J to a specialist; fresh exploiters (PPO best responses, 100M frames) reach J 0.22-0.43 against it (X3), and the mean exploitability per sampler is 0.44-0.69 (D2; one failed exploiter included). | **Consistent for scripted, contradicted for learned opponents.** None of the three papers reports exploitability or held-out RL lineages. |
 | 5 | Seeds may converge to different strategies (Roncero, limitations). | Generalist (uniform sampler) train J 0.56-0.87 across 5 seeds; held-out generalisation is **bimodal per seed**: 1-2 of 5 seeds fail on all later v10 evaders (J 0.10-0.29) while the others reach 0.82-0.97 (F1). | **Extends:** quantifies it; with 3 seeds (Roncero) effects of +/- 0.1 can come from one seed. |
-| 6 | Observation design: Roncero and Gavin give the pursuer opponent position + velocity to a memoryless MLP; Gavin leaves "trajectory prediction" out of scope; AgilePE adds a temporal window of opponent state. | Adding the opponent's acceleration (finite difference of two consecutive observations) is the **largest effect in this thesis**: train 0.722 -> 0.940 (+0.199 [+0.128, +0.270]), exploiters 0.497 -> 0.983 (+0.464 [+0.239, +0.638]), held-out RL 0.634 -> 0.838 (CI includes 0 because of the bimodal seeds) (F1, 5 seeds). A learned acceleration estimate does the same (A2b). A raw 10-step history stack (our analogue of a temporal window) was *worse* than no history (train -0.254 [-0.355, -0.152]) (A1b). | **New:** a memoryless pursuer with position + velocity (Roncero, Gavin) is limited by the missing opponent acceleration far more than by opponent sampling. Caveat: AgilePE's window length and architecture are not given, so the history-stack result is not a test of AgilePE itself. |
+| 6 | Observation design: Roncero and Gavin give the pursuer opponent position + velocity to a memoryless MLP; Gavin leaves "trajectory prediction" out of scope; AgilePE adds a temporal window of opponent state. | Adding the opponent's acceleration (finite difference of two consecutive observations) is the **largest effect in this thesis**: train 0.722 -> 0.940 (+0.199 [+0.128, +0.270]), exploiters 0.497 -> 0.983 (+0.464 [+0.239, +0.638]), held-out RL 0.634 -> 0.838 (CI includes 0 because of the bimodal seeds) (F1, 5 seeds). A learned acceleration estimate does the same (A2b, 5 seeds: all paired differences to the finite difference within +/- 0.04, n.s.). A raw 10-step history stack (our analogue of a temporal window) was *worse* than no history (train -0.254 [-0.355, -0.152]) (A1b). | **New:** a memoryless pursuer with position + velocity (Roncero, Gavin) is limited by the missing opponent acceleration far more than by opponent sampling. Caveat: AgilePE's window length and architecture are not given, so the history-stack result is not a test of AgilePE itself. |
 | 7 | Future work in Roncero: online adaptation, recurrent policies. | Online RLS adaptation of a learned opponent model (NF-OA), within and across episodes, adds nothing in closed loop (A1b, A2b); a random reservoir (ESN) is worse than no adaptation. Recurrent policies (GRU) **not tested**. | **Answers part of it (negative)** in a noise-free full-state setting. |
 | 8 | Sensor noise: AgilePE reports robustness under real sensor noise (mocap + IMU); Roncero and Gavin assume perfect state. | A3a (offline): with 2 cm position noise, acceleration from position differences is useless (error 28-55 m/s); a noise-augmented learned estimator is the only method better than zero. Closed loop: A3b / A3c pending. | **Pending.** |
 | 9 | Real-world transfer (all three), multi-pursuer coordination (Gavin), FOV-limited sensing (AgilePE). | Not studied. | **Not tested.** |
@@ -476,49 +477,55 @@ of the O2a input); "zero" = constant velocity.
 - Prediction "learned beats FD for H >= 5, small RLS gain": held at H = 10, marginal at H = 5 (S1 -6 %); the RLS
   gain was larger than "small" (10-15 %).
 
-## A2b_nfacc (done 2026-10-28 11:04; 3 seeds; seeds 3-4 queued)
+## A2b_nfacc (done 2026-10-28 21:10; 5 seeds; 3-seed version 11:04 superseded)
 
 Pursuers on the train pool (uniform, 150M frames, noise-free) whose observation includes the **learned estimate of
 the evader's mean acceleration over the next 0.2 s** (A2a, H* = 10), scaled exactly like the finite-difference input
 O2a. Frozen basis vs basis + online RLS (tuned). [A2b_nfacc/summary.md](A2b_nfacc/summary.md). Mean J, 95 % bootstrap
-CI over 3 seeds:
+CI over 5 seeds:
 
 | method | train | held-out RL | held-out scripted | exploiters* |
 |---|---|---|---|---|
-| M0 | 0.650 [0.562, 0.748] | 0.473 [0.369, 0.604] | 0.998 | 0.309 [0.295, 0.324] |
-| finite-difference acceleration (O2a) | **0.939** [0.915, 0.958] | 0.773 [0.461, 0.933] | 0.992 | 0.973 [0.933, 0.996] |
-| NF-OA displacement target (A1b) | 0.764 [0.732, 0.811] | 0.595 [0.435, 0.887] | 0.997 | 0.515 [0.276, 0.878] |
-| **NF-acc frozen** | 0.878 [0.857, 0.914] | **0.881** [0.801, 0.943] | 0.997 | **0.992** [0.985, 0.996] |
-| NF-acc + RLS (S1) | 0.901 [0.836, 0.955] | 0.817 [0.737, 0.889] | 0.997 | 0.983 [0.966, 0.993] |
-| NF-acc + RLS (S2) | (same policy) | 0.816 [0.739, 0.888] | 0.997 | 0.984 [0.968, 0.993] |
+| M0 | 0.722 [0.625, 0.813] | 0.634 [0.447, 0.824] | 0.997 | 0.497 [0.306, 0.750] |
+| finite-difference acceleration (O2a) | **0.940** [0.926, 0.951] | 0.838 [0.645, 0.942] | 0.993 | 0.983 [0.958, 0.997] |
+| NF-OA displacement target (A1b) | 0.765 [0.736, 0.795] | 0.606 [0.441, 0.781] | 0.997 | 0.549 [0.319, 0.778] |
+| **NF-acc frozen** | 0.909 [0.871, 0.948] | 0.838 [0.739, 0.917] | 0.996 | 0.977 [0.951, 0.993] |
+| NF-acc + RLS (S1) | 0.903 [0.869, 0.936] | **0.859** [0.797, 0.918] | 0.996 | **0.987** [0.976, 0.994] |
+| NF-acc + RLS (S2) | (same policy) | 0.859 [0.799, 0.917] | 0.996 | 0.988 [0.978, 0.995] |
 
 \* exploiters were trained against M0 seed 0.
 
-Seed-paired differences (mean [95 % CI], 3 seeds):
+Seed-paired differences (mean [95 % CI], 5 seeds):
 
 | comparison | train | held-out RL | exploiters |
 |---|---|---|---|
-| NF-acc + RLS - M0 | **+0.251 [+0.164, +0.394]** | **+0.344 [+0.285, +0.378]** | **+0.673 [+0.658, +0.693]** |
-| NF-acc frozen - O2a | **-0.062 [-0.101, -0.032]** | +0.108 [-0.025, +0.341] | +0.018 [-0.001, +0.053] |
-| NF-acc + RLS - O2a | -0.039 [-0.110, +0.040] | +0.044 [-0.196, +0.429] | +0.009 [-0.029, +0.056] |
-| NF-acc + RLS - NF-acc frozen (online adaptation) | +0.023 [-0.078, +0.092] | -0.065 [-0.206, +0.088] | -0.009 [-0.028, +0.003] |
-| S2 - S1 | 0.000 | -0.001 | +0.001 |
+| NF-acc + RLS - M0 | **+0.181 [+0.093, +0.294]** | **+0.225 [+0.091, +0.355]** | **+0.490 [+0.243, +0.677]** |
+| NF-acc frozen - M0 | **+0.188 [+0.111, +0.264]** | +0.204 [-0.060, +0.457] | **+0.480 [+0.199, +0.685]** |
+| NF-acc frozen - O2a | -0.030 [-0.068, +0.007] | +0.001 [-0.167, +0.187] | -0.006 [-0.044, +0.028] |
+| NF-acc + RLS - O2a | -0.037 [-0.077, +0.009] | +0.021 [-0.133, +0.246] | +0.004 [-0.018, +0.033] |
+| NF-acc + RLS - NF-acc frozen (online adaptation) | -0.007 [-0.066, +0.053] | +0.021 [-0.121, +0.181] | +0.010 [-0.014, +0.042] |
+| S2 - S1 | 0.000 | -0.000 | +0.001 |
 
-Held-out v10 evaders s1/s3/s5/s7/s9/s11 per run (S1):
-NF-acc frozen 0.99 0.94 0.57 0.66 0.80 0.85 | 1.00 0.97 0.79 0.84 0.88 0.92 | 0.99 0.96 0.90 0.88 0.97 0.94;
-NF-acc + RLS 0.99 0.95 0.74 0.84 0.91 0.91 | 0.99 0.95 0.71 0.66 0.84 0.80 | 1.00 0.97 0.52 0.62 0.63 0.69.
+Held-out RL per seed: O2a 0.46 0.93 0.93 0.96 0.91; NF-acc frozen 0.80 0.90 0.94 0.90 0.65; NF-acc + RLS 0.89 0.82
+0.74 0.89 0.96. Held-out v10 evaders s1/s3/s5/s7/s9/s11 per run (S1):
+NF-acc frozen 0.99 0.94 0.57 0.66 0.80 0.85 | 1.00 0.97 0.79 0.84 0.88 0.92 | 0.99 0.96 0.90 0.88 0.97 0.94 |
+0.99 0.94 0.80 0.85 0.87 0.93 | 0.99 0.98 0.34 0.60 0.52 0.48;
+NF-acc + RLS 0.99 0.95 0.74 0.84 0.91 0.91 | 0.99 0.95 0.71 0.66 0.84 0.80 | 1.00 0.97 0.52 0.62 0.63 0.69 |
+0.98 0.94 0.78 0.80 0.91 0.89 | 0.99 0.94 0.95 0.93 0.97 0.98.
 
 - Retargeting the learned basis from displacement (A1b) to the evader's acceleration turns it from "no gain" into a
-  **large gain over M0** (+0.25 train, +0.34 held-out RL, +0.67 exploiters).
-- The learned estimate is **on par with the finite-difference input** in this noise-free setting: slightly lower on
-  train (frozen -0.06, significant), higher on held-out RL (+0.11, not significant), equal on exploiters.
-- None of the 6 NF-acc runs falls into the "fails on the later v10 lineage" mode: the lowest value on v10 s5-s11 is
-  0.52. With the finite-difference input 3 of 10 runs (F1) fail there (0.10-0.29). Suggestive, not significant
-  (0/6 vs 3/10, Fisher exact p ~= 0.25).
-- **Online adaptation again adds nothing** (RLS vs frozen n.s.; S2 = S1), although it reduced the open-loop
-  prediction error by 10-15 % in A2a.
-- Prediction "close to O2a (within 0.05) noise-free; RLS gain small": held on held-out RL and exploiters, slightly
-  outside on train for the frozen variant (-0.062); RLS gain small/absent **held**.
+  **large gain over M0** (with RLS: +0.18 train, +0.23 held-out RL, +0.49 exploiters, all CIs exclude 0; frozen: same
+  size, held-out RL CI includes 0 because of seed 4).
+- The learned estimate is **equivalent to the finite-difference input** in this noise-free setting: every paired
+  difference is within +/- 0.04 in the mean and every CI includes 0. (The 3-seed "frozen is lower on train,
+  -0.06 significant" no longer holds with 5 seeds: -0.030 [-0.068, +0.007].)
+- Failure mode on the later v10 lineage: with the finite-difference input 3 of 10 runs (F1) collapse there
+  (0.10-0.29). With the learned estimate none of 10 runs collapses that far, but one (frozen seed 4) is degraded
+  (0.34-0.60). Fewer severe failures, but the 3-seed statement "no failures" is weakened; not significant.
+- **Online adaptation again adds nothing** (RLS vs frozen n.s. on every split; S2 = S1), although it reduced the
+  open-loop prediction error by 10-15 % in A2a.
+- Prediction "close to O2a (within 0.05) noise-free; RLS gain small": **held** on all splits with 5 seeds; RLS
+  gain small/absent **held**.
 
 ## A3a_posonly (done 2026-10-28 18:46; offline, open-loop)
 

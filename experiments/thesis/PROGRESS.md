@@ -42,9 +42,9 @@ the log).
 | D1_sampler / D1b | D1 **done, 5 seeds** (final); D1b **done** (H1b not supported) | `D1_sampler/`, `D1b_duplicates/` | `exps/d_sampling.py`; sampler `omni_drones/utils/selfplay/samplers.py` (tests `tests/test_samplers.py`); in-run refresh `run_stage.py::_OpponentRefresher` (`refresh.*` config) |
 | D2_exploitability | **done, 5 seeds** (final) | `D2_exploitability/` | `exps/d_sampling.py::run_d2` |
 | A1a / A1b | **done** (A1b final, 5 seeds) | `A1a_basis/`, `A1b_policy/` | `exps/a_adapt.py`; adapter `omni_drones/utils/opponent_adapt.py` (tests `tests/test_opponent_adapt.py`), env `task.adapt.*`, eval trajectory recording `eval_traj_out`. Offline pipeline smoke-tested on synthetic data |
-| A2a / A2b (learned accel. estimator) | A2a **done**; A2b **done (3 seeds)**, H*=10; seeds 3-4 killed by OOM 10-28 16:11, **relaunched 18:27** on both lanes | `A2a_nfacc/`, `A2b_nfacc/` | added 10-27 (user choice B) |
+| A2a / A2b (learned accel. estimator) | A2a **done**; A2b **done (5 seeds, 21:10)**, H*=10 | `A2a_nfacc/`, `A2b_nfacc/` | added 10-27 (user choice B) |
 | D1c (exploratory) | **done** (10-28 19:25), in RESULTS.md | `D1c_nofloor/` | |
-| A3a / A3b / A3c (positions-only + sensor noise) | A3a **done** (run 2, float32, 18:46; H*=10, aug basis, EMA 0.05). A3b/A3c queued on both lanes | `A3a_posonly/`, `A3b_posonly/`, `A3c_noise_ref/` | added 10-28 (user request); `exps/a3_posonly.py`; env `observation.agent_rel_vel`, `oracle.accel_source=pos`, `adapt.z_mode=pos` (smoke-tested) |
+| A3a / A3b / A3c (positions-only + sensor noise) | A3a **done** (run 2, float32, 18:46; H*=10, aug basis, EMA 0.05). A3b **running** (seed 0 of all 3 arms done 22:48; seeds 1-2 on both lanes), then A3c | `A3a_posonly/`, `A3b_posonly/`, `A3c_noise_ref/` | added 10-28 (user request); `exps/a3_posonly.py`; env `observation.agent_rel_vel`, `oracle.accel_source=pos`, `adapt.z_mode=pos` (smoke-tested) |
 | F2a / F2b / F2c (final runs) | queued (lanes C/D, start when lanes A and B exit; smoke tests first) | `F2a_exploit_acc/`, `scripts/selfplay/outputs/thesis-F2-{acc,plain}/`, `F2c_final_eval/` | pre-registered 10-28 19:30 (plan Phase F); `exps/f2_final.py`; env flag `oracle.opp_side_accel` |
 | F3 / F3c (samplers in self-play) | queued after F2b on lanes C/D | `scripts/selfplay/outputs/thesis-F3-*`, `F3_sampler_sp/` | pre-registered 10-28 20:30; `exps/f3_sampler_sp.py`; orchestrator `pursuer_sampler: hedge|qd_dpp`, `eval_extra_overrides` |
 | F4 / F4c (learned estimator in self-play, positions only + noise) | queued after F2b | `scripts/selfplay/outputs/thesis-F4-*`, `F4_estimator_sp/` | pre-registered 10-28 21:30; `exps/f4_estimator_sp.py`; env `observation.opp_drop_rel_vel`, `adapt.opp_side`; orchestrator `role_task_overrides` |
@@ -97,6 +97,7 @@ Expected: F2 campaigns ~10-29 16:00, F4 ~10-30 22:00, F3 ~11-01 14:00, final eva
 
 (Timestamps of log entries written on 10-27 before 21:20 are approximate; `driver_log.txt` has exact times.)
 
+- 2026-10-28 23:25: A2b 5 seeds done: learned acceleration estimate = finite-difference input (all paired diffs within +/-0.04, n.s.; the 3-seed 'frozen lower on train' is gone); big gain over M0 holds; one frozen run partly degraded on v10 (0.34-0.60), so 'no v10 failures' weakened. RLS adds nothing. A3b seed 0 done for all 3 arms, seeds 1-2 running (ETA ~01:30), then A3c, then F2a smoke -> finals.
 - 2026-10-28 22:00: user: push to GitHub after every finished experiment. Branch `thesis-experiments` created and pushed (558a8fb); auto-sync hook in `run.py`.
 - 2026-10-28 21:45: D1c done: no floor -> both samplers collapse (train -0.29); duplicates then hurt S-M but not QD-DPP. In RESULTS.md (summary + reference-paper table).
 - 2026-10-28 21:35: user: add the learned-estimator campaign regardless of A3b/A3c (real interceptors rarely measure
