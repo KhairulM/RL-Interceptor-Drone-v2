@@ -72,6 +72,9 @@ J = neutralisation rate (capture, or the evader crashes / leaves the arena). "In
   0.80) and beats the finite difference on every split (+0.20 to +0.49) and M0 on held-out RL (+0.12) and exploiters
   (+0.53), CIs exclude 0. **Online adaptation helps under noise** (+0.09 train, +0.24 exploiters vs frozen), the
   first closed-loop gain from adaptation in this thesis.
+- A3d (offline): a learned estimator recovers the evader's velocity from noisy positions 35-50 % more accurately
+  than a tuned EMA filter on position differences (0.22-0.29 vs 0.44 m/s); noise-free, plain differencing is
+  near-exact (0.01). Closed-loop test queued (start of F4).
 - Overall reading: what the pursuer lacks against unseen evaders is the opponent's current/near-future acceleration.
   A learned opponent model helps when it predicts that quantity. Noise-free it is equivalent to a finite difference
   and online adaptation adds nothing; with realistic sensor noise the learned estimator (especially with online RLS)
@@ -89,8 +92,8 @@ J = neutralisation rate (capture, or the evader crashes / leaves the arena). "In
   -0.275 [-0.522, -0.044] (without one failed exploiter -0.161 [-0.338, -0.005]). Still exploitable (0.28-0.63 on
   4 of 5 seeds).
 
-**Pending**: F2b (self-play campaigns with vs without the acceleration input, running since 06:19); A3d (learned
-velocity estimate from noisy positions; offline running, closed loop queued before F4); F4 v2 (self-play with the
+**Pending**: F2b (self-play campaigns with vs without the acceleration input, running since 06:19); A3d closed loop
+(learned velocity estimate from noisy positions; queued at the start of F4); F4 v2 (self-play with the
 estimated velocity, learned vs EMA filter), F3 (samplers in self-play), final evaluations F2c / F4c / F3c.
 
 ## Relation to the reference papers (updated 2026-10-29 12:00)
@@ -678,6 +681,31 @@ CIs exclude 0).
 - Caveat: all policies were trained without noise; policies trained with noise may learn to discount a noisy
   finite difference. F4 (self-play with noise in training) is where that is tested.
 - Prediction "finite-difference acceleration degrades most": **held**.
+
+## A3d_velest (offline done 2026-10-29 12:20; closed loop queued at the start of F4)
+
+Can a learned estimator recover the evader's **velocity** from noisy positions? A3a trajectories; input = 10-step
+window of [relative position, own position, own velocity] (no evader velocity); target = the evader's current world
+velocity. [A3d_velest/summary_offline.md](A3d_velest/summary_offline.md). Mean error |v - v_hat| in m/s (evader speed
+scale: predicting zero gives 0.87-0.90):
+
+| set | inputs | first difference (raw) | first difference + EMA (alpha 0.1, tuned) | learned, clean basis | learned, noise-aug. basis |
+|---|---|---|---|---|---|
+| val | clean | **0.009** | 0.269 | 0.105 | 0.139 |
+| val | noisy | 3.180 | 0.439 | 0.281 | **0.217** |
+| test | clean | **0.010** | 0.264 | 0.126 | 0.161 |
+| test | noisy | 3.181 | 0.435 | 0.292 | **0.232** |
+
+Reference: the measured relative velocity of A3c (8 cm/s noise per axis) has error 0.128.
+
+- Noise-free, differencing positions is almost exact (0.01 m/s); the learned estimator is worse (0.11-0.13).
+- With 2 cm position noise, raw differencing is useless (3.2 m/s); the EMA filter brings it to 0.43-0.44 m/s
+  (with lag). The learned estimator is **35 % (clean basis) to 50 % (noise-augmented basis) more accurate** than the
+  tuned filter. Both are 2-3x worse than a measured velocity with A3c's noise level.
+- Pre-registered basis rule (A3a's: "aug" only if better on noisy val *and* clean-val error <= 1.1x "clean"):
+  "aug" is better on noisy val but its clean-val error is 1.32x, so the rule selects the **clean basis**. A3d's closed
+  loop and F4 v2 use it as registered, although the augmented basis would be more accurate under noise.
+- Prediction "NF_aug < FD_ema on noisy val/test; noise-free FD_raw best": **held**.
 
 ## F1_final (done 2026-10-28 04:22; 5 seeds, noise-free)
 
