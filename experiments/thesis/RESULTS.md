@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-10-29 12:00; refreshed after every new result)
+## Summary (updated 2026-10-29 11:20; refreshed after every new result)
 
 **How to read the numbers.** J = neutralisation rate. `0.676 [0.533, 0.846]` = mean over training seeds and its
 95 % confidence interval (CI). CIs are percentile bootstraps over seeds (resample the per-seed values with replacement
@@ -96,7 +96,7 @@ J = neutralisation rate (capture, or the evader crashes / leaves the arena). "In
 (learned velocity estimate from noisy positions; queued at the start of F4); F4 v2 (self-play with the
 estimated velocity, learned vs EMA filter), F3 (samplers in self-play), final evaluations F2c / F4c / F3c.
 
-## Relation to the reference papers (updated 2026-10-29 12:00)
+## Relation to the reference papers (updated 2026-10-29 11:10)
 
 Reference papers (the thesis is positioned against these three):
 **[AgilePE]** Tang et al. 2026, arXiv:2608.14135; **[Roncero]** Sanchez Roncero et al. 2026 (AMSPBH),
@@ -682,7 +682,7 @@ CIs exclude 0).
   finite difference. F4 (self-play with noise in training) is where that is tested.
 - Prediction "finite-difference acceleration degrades most": **held**.
 
-## A3d_velest (offline done 2026-10-29 12:20; closed loop queued at the start of F4)
+## A3d_velest (offline done 2026-10-29 11:16; closed loop queued at the start of F4)
 
 Can a learned estimator recover the evader's **velocity** from noisy positions? A3a trajectories; input = 10-step
 window of [relative position, own position, own velocity] (no evader velocity); target = the evader's current world

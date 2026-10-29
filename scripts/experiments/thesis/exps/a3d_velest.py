@@ -1,5 +1,5 @@
 """A3d: learned estimate of the evader's velocity (and acceleration) from noisy positions (user choice 10-29, after
-A3b/A3c; redesign of F4). docs/research_plan.md, pre-registered 2026-10-29 before any A3d result.
+A3b/A3c; redesign of F4). docs/research_plan.md, pre-registered 2026-10-29 ~11:00 before any A3d result.
 
 Offline. A3a trajectories (X3 generalist seed 0, float32). Input window z_pos = [rel_pos, own_pos, own_vel] (K = 10,
 no evader velocity), target = the evader's current world velocity. Learned frozen basis (per-evader heads, shared

@@ -1,5 +1,5 @@
 """F4 v2: learned opponent model in full self-play, realistic sensing (docs/research_plan.md, Phase F; v1 pre-registered
-10-28 21:30, redesigned 10-29 11:30 before any campaign, see plan section 9).
+10-28 21:30, redesigned 10-29 ~11:00 before any campaign, see plan section 9).
 
 The pursuer does not measure the evader's velocity; it observes an estimate from noisy positions in its place, and
 trains and is evaluated with sensor noise (observation.include_noise). Arms (A3d inputs): nf = learned velocity +
