@@ -98,7 +98,7 @@ Expected: F2 campaigns ~10-29 16:00, F4 ~10-30 22:00, F3 ~11-01 14:00, final eva
 
 (Timestamps of log entries written on 10-27 before 21:20 are approximate; `driver_log.txt` has exact times.)
 
-- 2026-10-29 20:15: User: compute Vendi scores under Hedge and PFSP in self-play. Added `evader_vendi` (per-campaign Vendi of the RL evaders, X2-style shared descriptors from the F3c cross-evals) to the F3 analysis; tested on synthetic data (identical evaders -> 1.0, distinct -> 4.0); pre-registered as F3 amendment 2.
+- 2026-10-29 20:13: User: compute Vendi scores under Hedge and PFSP in self-play. Added `evader_vendi` (per-campaign Vendi of the RL evaders, X2-style shared descriptors from the F3c cross-evals) to the F3 analysis; tested on synthetic data (identical evaders -> 1.0, distinct -> 4.0); pre-registered as F3 amendment 2.
 - 2026-10-29 19:40: User: add a PFSP arm to F3 and drop seed 2. pfsp = Hedge with gamma 0 (p ~ (1 - J)^2, no uniform share; AgilePE / Gavin core), 2 seeds x 4 samplers; pre-registered in plan (F3 amendment + §9) before any F3 campaign. Unit test for gamma 0 added. A3d V_ema seed 0 trained (19:03).
 - 2026-10-29 18:40: F2b campaigns finished (acc 18:15, plain 18:33; pushed); no result yet, the comparison is F2c. Lanes C/D started F4 -> A3d closed loop (first Isaac use of `observation.rel_vel_source`; both arms train without errors). RESULTS.md A3b: P_fd noisy+EMA now 3 seeds; added capture / pursuer-crash table (P_fd under noise crashes in ~92 % of episodes).
 - 2026-10-29 11:20: A3d offline done: learned velocity estimate 35-50 % more accurate than the tuned EMA filter under noise; pre-registered rule picks the clean basis (aug better on noisy but 1.32x worse clean). Predictions held. In RESULTS.md.
