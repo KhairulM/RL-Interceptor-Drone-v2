@@ -118,3 +118,9 @@ def test_qd_dpp_with_hedge_quality_keeps_hedge_order_when_dissimilar():
     desc = {"a": [0.0, 0.0], "b": [100.0, 0.0], "c": [0.0, 100.0]}   # far apart -> S ~ I
     p = sm.qd_dpp_probs(sm.hedge_scores(c, 2.0), desc, 1.0, 0.7, sigma=1.0)
     assert p["a"] > p["b"] > p["c"]
+
+
+def test_hedge_gamma_zero_is_pfsp_squared():
+    c = {"a": 0.9, "b": 0.5, "c": 0.0}
+    p = sm.hedge_probs(c, gamma=0.0, eta=2.0)
+    assert abs(p["a"] - 0.81 / 1.06) < 1e-6 and abs(p["b"] - 0.25 / 1.06) < 1e-6 and p["c"] < 1e-9

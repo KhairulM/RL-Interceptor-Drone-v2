@@ -2,7 +2,8 @@
 
 Campaigns as in F2b "plain" (plain obs, 9 stages x 300M, evader side uniform); only the pursuer's opponent sampler
 changes: uniform | hedge (Roncero et al. 2026 eq. 12, gamma 0.7, eta 2) | qd_dpp (Hedge quality x DPP diversity over
-behaviour descriptors). 3 seeds per sampler (campaign seed 0 / 100 / 200); uniform seed 0 is F2b "plain".
+behaviour descriptors) | pfsp (hedge with gamma 0: p ~ (1 - J)^2, no uniform share; the PFSP core of AgilePE / Gavin).
+2 seeds per sampler (campaign seed 0 / 100; seed 2 dropped and pfsp added 10-29, plan §9); uniform seed 0 is F2b "plain".
 F3c: final pursuer of every campaign vs the thesis test set, the train pool and all campaigns' RL evaders, plus one
 fresh exploiter each; seed-paired comparison of the samplers.
 """
@@ -22,8 +23,9 @@ from f2_final import _done, run_campaign
 from x3_gap import load_split
 
 F3C = os.path.join(OUT, "F3_sampler_sp")
-SAMPLERS = {"uniform": {}, "hedge": {"pursuer_sampler": "hedge"}, "qd_dpp": {"pursuer_sampler": "qd_dpp"}}
-SEEDS = [0, 100, 200]
+SAMPLERS = {"uniform": {}, "hedge": {"pursuer_sampler": "hedge"}, "qd_dpp": {"pursuer_sampler": "qd_dpp"},
+            "pfsp": {"pursuer_sampler": "hedge", "hedge_gamma": 0.0}}
+SEEDS = [0, 100]
 
 
 def name(sampler, k):
@@ -132,7 +134,8 @@ def analyse_f3(camps, split, test):
             v = [rows[(s, k)][m] for k in range(len(SEEDS)) if (s, k) in rows and m in rows[(s, k)]]
             if v:
                 agg[s][m] = {"mean": float(np.mean(v)), "ci": list(an.bootstrap_ci(v)[1:]), "per_seed": v}
-    for a, b in (("qd_dpp", "hedge"), ("qd_dpp", "uniform"), ("hedge", "uniform")):
+    for a, b in (("qd_dpp", "hedge"), ("qd_dpp", "uniform"), ("hedge", "uniform"), ("pfsp", "uniform"),
+                 ("qd_dpp", "pfsp")):
         diffs[f"{a}-{b}"] = {}
         for m in metrics[:8]:
             d = [rows[(a, k)][m] - rows[(b, k)][m] for k in range(len(SEEDS))
@@ -141,8 +144,8 @@ def analyse_f3(camps, split, test):
                 diffs[f"{a}-{b}"][m] = {"mean": float(np.mean(d)), "ci": list(an.bootstrap_ci(d)[1:]), "per_seed": d}
     save_json(os.path.join(F3C, "results.json"), {"per_campaign": {f"{s}/{k}": r for (s, k), r in rows.items()},
                                                   "aggregate": agg, "paired": diffs})
-    lines = ["# F3_sampler_sp summary", "", "Final pursuer of each campaign; mean J over 3 campaign seeds [95 % "
-             "bootstrap CI]; per-seed values in results.json. exploitability = 1 - J vs a fresh exploiter.", "",
+    lines = ["# F3_sampler_sp summary", "", "Final pursuer of each campaign; mean J over 2 campaign seeds [95 % "
+             "bootstrap CI; with 2 seeds the CI is only the range of the two values]; per-seed values in results.json. exploitability = 1 - J vs a fresh exploiter.", "",
              "| sampler | " + " | ".join(metrics) + " |", "|---" * (len(metrics) + 1) + "|"]
     for s in SAMPLERS:
         lines.append(f"| {s} | " + " | ".join(
