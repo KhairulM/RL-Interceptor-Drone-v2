@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-10-29 20:40; details in the sections below)
+## Summary (updated 2026-10-29 22:15; details in the sections below)
 
 J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over
 seeds; "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position +
@@ -30,7 +30,9 @@ velocity, no acceleration).
   exploiters): the only closed-loop gain from online adaptation so far.
 - No evader velocity observed (A3b): every pursuer is weak (~0.29 vs 0.65); under noise the finite-difference pursuer
   crashes in ~92 % of episodes; the learned estimator is noise-proof but no better than no estimator. A3d (offline):
-  a learned velocity estimate from noisy positions is 35-50 % more accurate than an EMA filter.
+  a learned velocity estimate from noisy positions is 35-50 % more accurate than an EMA filter. A3d closed loop
+  (3 seeds): an estimated velocity lifts train J from 0.29 to 0.38 (EMA) / 0.40 (learned; true velocity 0.62) but
+  does not help on held-out RL evaders; learned vs EMA +0.02 to +0.04, CI includes 0 except held-out scripted.
 - A3e (offline): a GRU trained on noisy inputs is the best estimator under noise (velocity 0.19 m/s vs 0.29 for the
   MLP used in closed loop, -36 %; acceleration -12 %); a Kalman filter only matches the clean MLP. So A3d / F4 use
   a weaker-than-best estimator.
@@ -39,7 +41,7 @@ velocity, no acceleration).
 - F1 (5 seeds): the acceleration input dominates (train +0.20, exploiters +0.46); held-out results are bimodal per seed.
 - F2a (5 seeds): the acceleration input lowers exploitability 0.672 -> 0.397 (paired -0.275 [-0.522, -0.044]).
 
-**Running / pending**: A3d closed loop (since 18:15) -> F4 v2 -> F3 -> F2c / F4c / F3c. F2b campaigns are done and
+**Running / pending**: F4 v2 (smoke since 21:55) -> F3 -> F2c / F4c / F3c. F2b campaigns are done and
 are compared in F2c.
 
 ## Relation to the reference papers (updated 2026-10-29 11:10)
@@ -76,7 +78,7 @@ disagrees under our protocol, extends the claim, or does not test it.
 | 5 | Seeds may converge to different strategies (Roncero, limitations). | Generalist (uniform sampler) train J 0.56-0.87 across 5 seeds; held-out generalisation is **bimodal per seed**: 1-2 of 5 seeds fail on all later v10 evaders (J 0.10-0.29) while the others reach 0.82-0.97 (F1). | **Extends:** quantifies it; with 3 seeds (Roncero) effects of +/- 0.1 can come from one seed. |
 | 6 | Observation design: Roncero and Gavin give the pursuer opponent position + velocity to a memoryless MLP; Gavin leaves "trajectory prediction" out of scope; AgilePE adds a temporal window of opponent state. | Adding the opponent's acceleration (finite difference of two consecutive observations) is the **largest effect in this thesis**: train 0.722 -> 0.940 (+0.199 [+0.128, +0.270]), exploiters 0.497 -> 0.983 (+0.464 [+0.239, +0.638]), held-out RL 0.634 -> 0.838 (CI includes 0 because of the bimodal seeds) (F1, 5 seeds). A learned acceleration estimate does the same (A2b, 5 seeds: all paired differences to the finite difference within +/- 0.04, n.s.). It also lowers exploitability: 0.672 -> 0.397, paired -0.275 [-0.522, -0.044] (F2a). A raw 10-step history stack (our analogue of a temporal window) was *worse* than no history (train -0.254 [-0.355, -0.152]) (A1b). | **New:** a memoryless pursuer with position + velocity (Roncero, Gavin) is limited by the missing opponent acceleration far more than by opponent sampling. Caveat: AgilePE's window length and architecture are not given, so the history-stack result is not a test of AgilePE itself. |
 | 7 | Future work in Roncero: online adaptation, recurrent policies. | Noise-free, online RLS adaptation of a learned opponent model adds nothing in closed loop (A1b, A2b; within or across episodes); a random reservoir (ESN) is worse than no adaptation. **Under sensor noise it helps**: RLS vs frozen basis +0.09 train, +0.24 exploiters, CIs exclude 0 (A3c, policies trained noise-free). Recurrent policies (GRU) **not tested**; a recurrent *estimator* (GRU, trained on noisy inputs) is the most accurate opponent-state estimator under noise offline (A3e: velocity -36 % vs the MLP used in closed loop). | **New, conditional:** online opponent-model adaptation pays off under sensor noise, not with perfect state (Roncero's setting). |
-| 8 | Sensor noise: AgilePE reports robustness under real sensor noise (mocap + IMU); Roncero and Gavin assume perfect state. | With 2 cm / 8 cm/s noise (eval only, policies trained clean): the finite-difference acceleration input collapses (train 0.94 -> 0.33, below the plain pursuer 0.70); the learned estimator + RLS keeps 0.80 and beats it by +0.47 train / +0.38 held-out RL / +0.49 exploiters (A3c, 5 seeds). Without any evader velocity (A3b), every pursuer is weak (~0.29) and the learned estimator is noise-proof but not better than no estimator. | **New:** opponent-acceleration inputs must be learned, not differenced, once sensing is noisy; the perfect-state results of Roncero and Gavin would not transfer to such inputs. Limited to eval-time noise until F4. |
+| 8 | Sensor noise: AgilePE reports robustness under real sensor noise (mocap + IMU); Roncero and Gavin assume perfect state. | With 2 cm / 8 cm/s noise (eval only, policies trained clean): the finite-difference acceleration input collapses (train 0.94 -> 0.33, below the plain pursuer 0.70); the learned estimator + RLS keeps 0.80 and beats it by +0.47 train / +0.38 held-out RL / +0.49 exploiters (A3c, 5 seeds). Without any evader velocity (A3b), every pursuer is weak (~0.29) and the learned estimator is noise-proof but not better than no estimator. With an *estimated* velocity from noisy positions (A3d, 3 seeds): train 0.29 -> 0.38-0.40 (true velocity 0.62), no gain on held-out RL; the learned estimate is not clearly better than an EMA filter (+0.02 train, n.s.). | **New:** opponent-acceleration inputs must be learned, not differenced, once sensing is noisy; the perfect-state results of Roncero and Gavin would not transfer to such inputs. Limited to eval-time noise until F4. |
 | 9 | Real-world transfer (all three), multi-pursuer coordination (Gavin), FOV-limited sensing (AgilePE). | Not studied. | **Not tested.** |
 
 ## X0_replay (done 2026-10-26)
@@ -645,7 +647,7 @@ CIs exclude 0).
   finite difference. F4 (self-play with noise in training) is where that is tested.
 - Prediction "finite-difference acceleration degrades most": **held**.
 
-## A3d_velest (offline done 2026-10-29 11:16; closed loop queued at the start of F4)
+## A3d_velest (offline done 2026-10-29 11:16; closed loop done 22:00, 3 seeds)
 
 Can a learned estimator recover the evader's **velocity** from noisy positions? A3a trajectories; input = 10-step
 window of [relative position, own position, own velocity] (no evader velocity); target = the evader's current world
@@ -669,6 +671,63 @@ Reference: the measured relative velocity of A3c (8 cm/s noise per axis) has err
   "aug" is better on noisy val but its clean-val error is 1.32x, so the rule selects the **clean basis**. A3d's closed
   loop and F4 v2 use it as registered, although the augmented basis would be more accurate under noise.
 - Prediction "NF_aug < FD_ema on noisy val/test; noise-free FD_raw best": **held**.
+
+### A3d closed loop (done 2026-10-29 22:00; 3 seeds)
+
+Pursuers that observe an **estimated** evader velocity instead of the true one (`observation.rel_vel_source`), train
+pool, uniform, 150M frames, noise-free training. **V_ema**: EMA-filtered first difference (alpha 0.1). **V_nf**:
+frozen learned velocity (clean basis, as the rule chose) **plus** the A3a learned acceleration (one shared noisy
+measurement per step). References: M0 observes the true velocity (A3c; noisy eval adds 8 cm/s velocity noise);
+P_none observes no velocity (A3b). [A3d_velest/summary.md](A3d_velest/summary.md). Mean J [95 % CI over 3 seeds]:
+
+| policy / eval | train | held-out RL | held-out scripted | exploiters* |
+|---|---|---|---|---|
+| M0 noisy (true velocity + noise) | 0.622 [0.529, 0.736] | 0.439 [0.311, 0.589] | 0.996 | 0.273 [0.229, 0.339] |
+| P_none noisy (no velocity) | 0.288 [0.283, 0.293] | 0.291 [0.239, 0.322] | 0.863 [0.825, 0.907] | 0.381 [0.269, 0.530] |
+| V_ema clean | 0.423 [0.380, 0.458] | 0.267 [0.225, 0.313] | 0.992 [0.987, 0.996] | 0.192 [0.137, 0.248] |
+| V_ema noisy | 0.383 [0.344, 0.404] | 0.222 [0.185, 0.259] | 0.959 [0.917, 0.987] | 0.158 [0.124, 0.199] |
+| V_nf clean | 0.431 [0.391, 0.506] | 0.271 [0.251, 0.303] | 0.996 [0.993, 0.998] | 0.277 [0.159, 0.452] |
+| V_nf noisy | 0.402 [0.379, 0.448] | 0.254 [0.233, 0.280] | 0.985 [0.982, 0.988] | 0.195 [0.146, 0.242] |
+
+\* exploiters were trained against M0 seed 0.
+
+Seed-paired differences (noisy eval unless stated):
+
+| comparison | train | held-out RL | held-out scripted | exploiters |
+|---|---|---|---|---|
+| V_nf - V_ema | +0.019 [-0.021, +0.044] | +0.032 [-0.026, +0.096] | **+0.026 [+0.002, +0.068]** | +0.037 [-0.004, +0.119] |
+| V_nf - V_ema (clean) | +0.008 [-0.040, +0.049] | +0.004 [-0.062, +0.078] | **+0.004 [+0.001, +0.011]** | +0.085 [-0.033, +0.315] |
+| V_nf - P_none | **+0.114 [+0.092, +0.155]** | -0.036 [-0.089, +0.041] | **+0.122 [+0.075, +0.160]** | **-0.186 [-0.384, -0.027]** |
+| V_ema - P_none | **+0.095 [+0.056, +0.117]** | **-0.069 [-0.088, -0.055]** | **+0.096 [+0.067, +0.130]** | **-0.224 [-0.380, -0.145]** |
+| V_nf - M0 | **-0.220 [-0.357, -0.149]** | **-0.185 [-0.356, -0.061]** | **-0.011 [-0.014, -0.007]** | **-0.078 [-0.097, -0.055]** |
+| V_ema - M0 | **-0.239 [-0.336, -0.185]** | **-0.217 [-0.330, -0.087]** | **-0.036 [-0.079, -0.009]** | **-0.116 [-0.215, -0.053]** |
+
+Capture rate / evader out-of-bounds rate, noisy eval (mean over 3 seeds, same eval files; outcome flags are not
+mutually exclusive):
+
+| policy | train | held-out RL | held-out scripted | exploiters |
+|---|---|---|---|---|
+| M0 | 0.522 / 0.049 | 0.344 / 0.047 | 0.820 / 0.078 | 0.151 / 0.084 |
+| P_none | 0.178 / 0.084 | 0.186 / 0.084 | 0.678 / 0.081 | **0.027 / 0.297** |
+| V_ema | 0.284 / 0.067 | 0.158 / 0.035 | 0.771 / 0.085 | 0.050 / 0.066 |
+| V_nf | 0.283 / 0.093 | 0.176 / 0.049 | 0.800 / 0.079 | 0.085 / 0.067 |
+
+- An estimated velocity recovers 28-34 % of the gap between no velocity and the true velocity on the training pool
+  (0.29 -> 0.38-0.40 vs 0.62) and most of it on scripted evaders (0.86 -> 0.96-0.99 vs 1.00). It does **not** generalise:
+  on held-out RL evaders neither estimator beats no velocity (EMA is worse, -0.07), and both stay far below M0.
+- The exploiter "loss" against P_none is not a capture loss: P_none captures exploiters in 3 % of episodes (V_nf
+  9 %); its J of 0.38 comes from exploiters leaving the arena (evader OOB 0.30). Those exploiters were trained against
+  a velocity-observing pursuer; P_none behaves differently enough that they fly out of bounds.
+- Learned vs EMA: the learned arm is higher on every split, but the CI excludes 0 only on held-out scripted (+0.03).
+  Offline its velocity error is 33 % lower (0.29 vs 0.44 m/s); in closed loop this gives at most +0.02 to +0.04 J.
+- Noise costs both arms little (clean -> noisy: V_ema -0.04, V_nf -0.03 train); the policies were trained clean.
+- Confound: V_nf also receives the learned acceleration, V_ema does not; V_nf - V_ema is therefore not a pure
+  estimator comparison (it is an upper bound on the effect of the velocity estimator alone). Limitation from A3e: a
+  noise-trained GRU would estimate velocity 36 % better than the MLP used here.
+- Prediction "noisy eval: V_nf > V_ema on train and held-out RL; both far above P_none (0.29); both below M0 noisy":
+  "V_nf > V_ema" **did not hold** (right direction, CIs include 0); "far above P_none" **held only on train /
+  held-out scripted**, not on held-out RL or exploiters; "both below M0" **held** (the plan quoted M0 noisy as 0.70;
+  in these eval files it is 0.62, which does not change the outcome).
 
 ## A3e_estimators (done 2026-10-29 20:28; offline, one training run per model)
 
