@@ -17,7 +17,7 @@ import numpy as np
 
 import common
 from a_adapt import test_set
-from common import OUT, evaluate, log_progress, save_json, train
+from common import MAX_EPISODE_STEPS, OUT, STEP_DT, evaluate, log_progress, save_json, train
 from d_sampling import EXPLOIT_FRAMES
 from f2_final import _done, run_campaign
 from x3_gap import load_split
@@ -94,8 +94,37 @@ def _sampling_stats(c):
     return out
 
 
+def _evader_vendi(camps):
+    """Vendi score (effective number of distinct behaviours) of each campaign's RL evaders. One shared descriptor
+    space as in X2: J and censored time-to-neutralise vs every campaign's final pursuer (the common probe set of F3c)
+    plus mean / std of the behaviour features over those games; one RBF kernel over all F3 evaders."""
+    import analysis as an
+    recs = {}
+    for _, _, c in camps:
+        path = os.path.join(F3C, "evals", f"{c}_final_campaign_evaders.json")
+        if not os.path.isfile(path):
+            return {}
+        with open(path) as f:
+            recs[c] = json.load(f)["matchups"]
+    probes = list(recs)
+    evs = sorted(set.intersection(*(set(m) for m in recs.values())))
+    max_t = MAX_EPISODE_STEPS * STEP_DT
+    resp = [[v for c in probes for v in (recs[c][e]["neutralization_rate"],
+                                         recs[c][e]["time_to_neutralize_censored"] / max_t)] for e in evs]
+    traj = [np.concatenate([np.mean([recs[c][e]["behaviour"]["mean"] for c in probes], 0),
+                            np.mean([recs[c][e]["behaviour"]["std"] for c in probes], 0)]) for e in evs]
+    S, _ = an.rbf_kernel(an.pairwise_dist(an.combine_blocks([np.array(resp), np.array(traj)])))
+    out = {}
+    for c in probes:
+        ix = [i for i, e in enumerate(evs) if e.startswith(c + "/")]
+        if ix:
+            out[c] = {"n": len(ix), "vendi": an.vendi_score(S[np.ix_(ix, ix)])}
+    return out
+
+
 def analyse_f3(camps, split, test):
     import analysis as an
+    vendi = _evader_vendi(camps)
     with open(os.path.join(OUT, "X2_descriptors", "clusters.json")) as f:
         labels = json.load(f)["labels"]
     rows = {}
@@ -120,13 +149,16 @@ def analyse_f3(camps, split, test):
         if ex:
             r["exploitability"] = 1 - next(iter(ex.values()))
         st = _sampling_stats(c)
+        if c in vendi:
+            r["evader_vendi"] = vendi[c]["vendi"]
         if st:
             r["sampling_eff_frac"] = float(np.mean([x["eff"] / x["n"] for x in st]))
             r["sampling_max_prob"] = float(np.mean([x["max"] for x in st]))
         rows[(s, k)] = {m: float(v) for m, v in r.items()}
     metrics = ["train", "heldout_rl", "heldout_worst_cluster", "heldout_scripted", "x3_exploiters",
-               "other_campaign_evaders", "own_campaign_evaders", "exploitability", "sampling_eff_frac",
+               "other_campaign_evaders", "own_campaign_evaders", "exploitability", "evader_vendi", "sampling_eff_frac",
                "sampling_max_prob"]
+    n_diff = 9                                   # paired differences for the first n_diff metrics
     agg, diffs = {}, {}
     for s in SAMPLERS:
         agg[s] = {}
@@ -137,25 +169,26 @@ def analyse_f3(camps, split, test):
     for a, b in (("qd_dpp", "hedge"), ("qd_dpp", "uniform"), ("hedge", "uniform"), ("pfsp", "uniform"),
                  ("qd_dpp", "pfsp")):
         diffs[f"{a}-{b}"] = {}
-        for m in metrics[:8]:
+        for m in metrics[:n_diff]:
             d = [rows[(a, k)][m] - rows[(b, k)][m] for k in range(len(SEEDS))
                  if (a, k) in rows and (b, k) in rows and m in rows[(a, k)] and m in rows[(b, k)]]
             if d:
                 diffs[f"{a}-{b}"][m] = {"mean": float(np.mean(d)), "ci": list(an.bootstrap_ci(d)[1:]), "per_seed": d}
     save_json(os.path.join(F3C, "results.json"), {"per_campaign": {f"{s}/{k}": r for (s, k), r in rows.items()},
-                                                  "aggregate": agg, "paired": diffs})
+                                                  "aggregate": agg, "paired": diffs, "evader_vendi": vendi})
     lines = ["# F3_sampler_sp summary", "", "Final pursuer of each campaign; mean J over 2 campaign seeds [95 % "
-             "bootstrap CI; with 2 seeds the CI is only the range of the two values]; per-seed values in results.json. exploitability = 1 - J vs a fresh exploiter.", "",
+             "bootstrap CI; with 2 seeds the CI is only the range of the two values]; per-seed values in results.json. exploitability = 1 - J vs a fresh exploiter. evader_vendi = "
+             "effective number of distinct RL evaders a campaign produced (max = its number of RL evaders).", "",
              "| sampler | " + " | ".join(metrics) + " |", "|---" * (len(metrics) + 1) + "|"]
     for s in SAMPLERS:
         lines.append(f"| {s} | " + " | ".join(
             f"{agg[s][m]['mean']:.3f} [{agg[s][m]['ci'][0]:.3f}, {agg[s][m]['ci'][1]:.3f}]" if m in agg[s] else "-"
             for m in metrics) + " |")
-    lines += ["", "Seed-paired differences:", "", "| pair | " + " | ".join(metrics[:8]) + " |",
-              "|---" * 9 + "|"]
+    lines += ["", "Seed-paired differences:", "", "| pair | " + " | ".join(metrics[:n_diff]) + " |",
+              "|---" * (n_diff + 1) + "|"]
     for pair, dd in diffs.items():
         lines.append(f"| {pair} | " + " | ".join(
             f"{dd[m]['mean']:+.3f} [{dd[m]['ci'][0]:+.3f}, {dd[m]['ci'][1]:+.3f}]" if m in dd else "-"
-            for m in metrics[:8]) + " |")
+            for m in metrics[:n_diff]) + " |")
     with open(os.path.join(F3C, "summary.md"), "w") as f:
         f.write("\n".join(lines) + "\n")
