@@ -3,7 +3,13 @@
 Single source of truth for the thesis experiments (started 2026-10-26, experiment freeze 2026-11-05, thesis due
 ~2026-11-09). Results go to [experiments/thesis/RESULTS.md](../experiments/thesis/RESULTS.md) and are reported as
 measured, including null and negative results. Predictions below are written **before** running anything, so they
-can be checked against the outcome.
+can be checked against the outcome. Experiment rows are pre-registrations: their predictions are never edited, and
+every later change is logged in §9. Day-to-day status is in
+[experiments/thesis/PROGRESS.md](../experiments/thesis/PROGRESS.md).
+
+Working title (chosen 10-28): *Beyond Hard Opponents: Diversity-Aware Opponent Sampling and Learned Opponent Models
+for Agile Quadrotor Pursuit–Evasion*. Reference papers: AgilePE (Tang et al. 2026), Roncero et al. 2026 (AMSPBH),
+Gavin & Bronz (ICUAS 2026).
 
 ## 0. Starting point (verified in the repo on 2026-10-26)
 
@@ -100,21 +106,25 @@ option; the existing samplers stay as baselines.
 ```
 docs/research_plan.md                    # this file
 scripts/experiments/thesis/
-    run.py                               # resumable driver: python scripts/experiments/thesis/run.py --exp X1 [--seeds 3]
-    common.py                            # pool builders, run_stage wrappers, DONE markers, status.json
-    exps/<id>.py                         # one module per experiment (X0 ... F1)
-    report.py                            # tables + figures -> experiments/thesis/<ID>/summary.md
+    run.py                               # resumable driver: python scripts/experiments/thesis/run.py --exp X1 [--seeds 3] [--smoke]
+    common.py                            # pool builders, run_stage wrappers, locks, Isaac slot cap, progress log
+    analysis.py                          # bootstrap CIs and shared analysis helpers
+    git_sync.sh                          # commit + push after every finished experiment
+    exps/<group>.py                      # x0_replay ... x4_oracles, d_sampling, a_adapt, a2_nfacc, a3_posonly,
+                                         # a3d_velest, f1_final, f2_final, f3_sampler_sp, f4_estimator_sp
 experiments/thesis/
-    RESULTS.md                           # aggregated, truthful results (auto tables + written interpretation)
-    L0_literature/notes.md               # what each paper did, novelty check
+    RESULTS.md                           # aggregated, truthful results (tables + interpretation)
+    PROGRESS.md                          # status, queue and log
+    L0_literature/
     X0_replay/  X1_crossplay/  X2_descriptors/  X3_gap/  X4_oracles/
-    D1_sampler/  D1b_duplicates/  D2_exploitability/  D3_campaign/
-    A1_nfoa/  A2_bayesid/
-    F1_final/
+    D1_sampler/  D1b_duplicates/  D1c_nofloor/  D2_exploitability/
+    A1a_basis/  A1b_policy/  A2a_nfacc/  A2b_nfacc/  A3a_posonly/  A3b_posonly/  A3c_noise_ref/  A3d_velest/
+    F1_final/  F2a_exploit_acc/  F2c_final_eval/  F3_sampler_sp/  F4_estimator_sp/
+scripts/selfplay/outputs/thesis-F*/      # self-play campaigns of F2b / F3 / F4
 ```
 
-Every experiment directory contains `config.json` (exact overrides, git hash), `status.json`, raw `*.json` evals,
-`summary.md` and `fig_*.png`. Checkpoints go to `experiments/thesis/<ID>/ckpt/` (added to `.gitignore` in the first implementation step).
+Every experiment directory contains the raw `*.json` evals (with the exact opponent specs), run logs, `summary.md`
+and figures. Checkpoints (`ckpt/`, `*.pt`) and logs are git-ignored; text results are pushed to GitHub.
 
 ## 4. Experiments
 
@@ -148,6 +158,7 @@ GPU hours are estimates for sequential Isaac runs. "Pred." is the expected outco
 |---|---|---|---|---|---|
 | **D1_sampler** | H1c: does QD-DPP give more robust pursuers? | Train one pursuer per sampler {S-U, S-W, S-M, QD-DPP} on the **fixed** train pool, 150M frames, 3 seeds (5 if time). Sampler re-evaluated every 25M frames (mini-generations), with a cheap 256-episode eval vs the pool to update hardness | `train_curves.json`, `eval_heldout.json`, `fig_sampler_bars.png` (mean, worst-cluster, in-distribution) | QD-DPP >= S-M on held-out worst-cluster by 0.03-0.08; equal mean in-distribution (+/-0.02); S-U worst on hard evaders | 6 |
 | **D1b_duplicates** | H1b: robustness to duplicated opponents | Same as D1 but the train pool has one cluster duplicated 5x (copies of the same checkpoints). Samplers S-M and QD-DPP, 3 seeds | `dup.json`, `fig_dup.png` (capture on non-duplicated clusters, dup vs no-dup) | S-M drops 0.05-0.10 on non-duplicated clusters, QD-DPP drops < 0.02 | 2.5 |
+| **D1c_nofloor** (exploratory, added 10-27 after seeing D1b; see §9) | Is the DPP mechanism duplicate-robust without the uniform floor? | S-M vs QD-DPP with `uniform_mix = 0`, normal and duplicated pool, 3 seeds | `D1c_nofloor/summary.md` | none (exploratory) | - |
 | **D2_exploitability** | Are QD-DPP pursuers harder to exploit? | For each D1 final pursuer (4 samplers x 3 seeds), train a fresh exploiter evader, 50M frames, 1 seed. Exploitability = exploiter's evasion rate (1 - `J`) | `exploit.json`, `fig_exploit.png` | QD-DPP lowest exploitability, but the difference vs S-M may be within the CI | 3 |
 | **D3_campaign** (P1) | Does QD-DPP help in full self-play? | One campaign with `sampler: qd_dpp`, 9 stages x 300M frames, same seeds/heuristics as `v11-uniform-mix` (baseline). Cross-play final pursuers vs the other campaign's evaders, plus a D2-style exploiter each | `campaign_compare.json`, win-rate matrices, per-stage diversity log-det | QD-DPP evader pool has higher log-det (more clusters); final pursuer at least as strong in cross-play | 8 |
 
@@ -172,17 +183,14 @@ Evaluation settings for every A-method:
 
 ### Phase F: final system and write-up (days 10-11 GPU, days 11-14 writing)
 
-| ID | Design | Outputs |
-|---|---|---|
-| **F1_final** (redesigned 10-27, user choice B) | 2x2 factorial {uniform, QD-DPP sampler} x {plain obs, opponent-acceleration input}, 5 seeds, noise-free; existing runs reused (X3, D1, X4 O2a). A QD-DPP + learned-acceleration cell is added only if A2b beats O2a. Main effects, interaction (seed-paired) | `F1_final/summary.md`, `results.json` |
-
+| ID | Question | Design | Outputs | Pred. |
+|---|---|---|---|---|
+| **F1_final** (redesigned 10-27, user choice B) | Final comparison: sampler x opponent-acceleration input | 2x2 factorial {uniform, QD-DPP sampler} x {plain obs, opponent-acceleration input}, 5 seeds, noise-free; existing runs reused (X3, D1, X4 O2a). A QD-DPP + learned-acceleration cell is added only if A2b beats O2a. Main effects, interaction (seed-paired) | `F1_final/summary.md`, `results.json` | - (none recorded) |
 | **F2a_exploit_acc** (added 10-28, user request, pre-registered before A3b/A3c/D1c results) | Is the acceleration-input pursuer less exploitable? | One fresh exploiter (plain-obs evader, PPO, 100M frames, seed 200 + s as in D2) against each F1 `SU + acc` pursuer, seeds 0-4. Exploitability = 1 - J vs its exploiter. Seed-paired comparison with D2 `S-U` (same seeds, plain obs) | `F2a_exploit_acc/summary.md` | Lower than plain (D2 S-U 0.672), mean 0.3-0.5, paired CI excludes 0; still clearly > 0 |
 | **F2b_campaigns** (same) | Does the acceleration input help in co-evolution, the protocol of the reference papers? | Two self-play campaigns (`train_selfplay.py`), identical except the input: **acc** (both roles observe the opponent's finite-difference acceleration; frozen opponents too, `oracle.opp_side_accel`) vs **plain**. Uniform opponent sampling (`uniform_mix: 1`), 9 stages x 300M frames, pursuer first, warm start, seed 0, scripted seeds pursuer {pure_pursuit, apf}, evader {hover, circular, flee, weave} (the thesis train heuristics). Noise-free. 1 seed per arm: descriptive, no significance claim | campaign DBs in `scripts/selfplay/outputs/thesis-F2-{acc,plain}` | - |
 | **F2c_final_eval** (same) | Final comparison | Every RL pursuer of both campaigns vs every RL evader of both campaigns (cross-play matrix, Roncero-style heatmap); final pursuer of each campaign vs train pool and thesis test set (v10, held-out scripted, X3 exploiters); one fresh plain-obs exploiter (100M frames) per final pursuer | `F2c_final_eval/summary.md`, `fig_crossplay.png` | acc final pursuer >= plain final pursuer + 0.1 J on the other campaign's evaders and on the test set, and lower exploitability. Within-campaign J need not rise, since the acc evaders also observe the pursuer's acceleration |
-
 | **F3_sampler_sp** (added 10-28, user request, pre-registered 20:30 before any F2/F3 result) | RQ1 under the reference papers' protocol: do diversity-aware or hardness-prioritised opponent samplers beat uniform in full self-play? | Campaigns as F2b "plain" (plain obs, 9 stages x 300M, evader side uniform, multi-episode evals with behaviour statistics). Only the **pursuer's** opponent sampler changes: **uniform**; **hedge** = Roncero eq. (12) exactly (gamma 0.7, eta 2, challenge c = 1 - J of the latest pursuer); **qd_dpp** = the same Hedge quality re-weighted by a DPP over evader behaviour descriptors (mean/std of the 9 per-step behaviour features over the evader's recorded matchups, z-normalised over the pool; trajectory block only, unlike X2, because the probe set changes during a campaign). 3 seeds each (campaign seed 0/100/200; uniform seed 0 = F2b plain). Final pursuer of each campaign vs train pool, thesis test set, all 36 campaign evaders, and one fresh exploiter. Primary: held-out RL J, worst held-out cluster, J vs other campaigns' evaders, exploitability; seed-paired differences qd_dpp - hedge, qd_dpp - uniform, hedge - uniform | `F3_sampler_sp/summary.md` | Roncero predicts hedge > uniform; D1 predicts hedge <= uniform and qd_dpp ~ uniform. With gamma = 0.7 the three sampling distributions are close (70 % uniform), so all paired differences are expected within +/- 0.05 and mostly not significant with 3 seeds |
-
-| **F4_estimator_sp** (added 10-28, user request, pre-registered 21:30 before A3b/A3c/F2/F3 results) | RQ2 under realistic sensing in full self-play: when the pursuer cannot observe the evader's velocity and its sensors are noisy, does the learned acceleration estimator help? | Campaigns (uniform sampling, 9 stages x 300M, 3 seeds: campaign seed 0/100/200). Pursuer: no evader velocity (`agent_rel_vel=false`), sensor noise in training and eval (`include_noise=true`). Arms: **nf** = + the A3a estimator (frozen, noise-augmented basis, H = 10, as A3b P_nf); **none** = no estimator. Evader: full clean state (as in the reference papers). Frozen pursuers seen by the evader get the same inputs with clean sensors (`opp_drop_rel_vel`, `adapt.opp_side`). F4c: final pursuer of each campaign (noisy) vs train pool, test set, all 6 F4 campaigns' evaders, the test set without noise, and one fresh exploiter. Primary: seed-paired nf - none on held-out RL, X3 exploiters, other campaigns' evaders, exploitability | `F4_estimator_sp/summary.md` | nf > none by >= 0.1 on held-out RL and X3 exploiters, CI excluding 0 (A3a: only the learned estimator carries acceleration information under noise); exploitability lower for nf |
+| ~~**F4_estimator_sp v1**~~ (superseded by v2 before any F4 campaign ran; kept as the original pre-registration; added 10-28, user request, pre-registered 21:30 before A3b/A3c/F2/F3 results) | RQ2 under realistic sensing in full self-play: when the pursuer cannot observe the evader's velocity and its sensors are noisy, does the learned acceleration estimator help? | Campaigns (uniform sampling, 9 stages x 300M, 3 seeds: campaign seed 0/100/200). Pursuer: no evader velocity (`agent_rel_vel=false`), sensor noise in training and eval (`include_noise=true`). Arms: **nf** = + the A3a estimator (frozen, noise-augmented basis, H = 10, as A3b P_nf); **none** = no estimator. Evader: full clean state (as in the reference papers). Frozen pursuers seen by the evader get the same inputs with clean sensors (`opp_drop_rel_vel`, `adapt.opp_side`). F4c: final pursuer of each campaign (noisy) vs train pool, test set, all 6 F4 campaigns' evaders, the test set without noise, and one fresh exploiter. Primary: seed-paired nf - none on held-out RL, X3 exploiters, other campaigns' evaders, exploitability | `F4_estimator_sp/summary.md` | nf > none by >= 0.1 on held-out RL and X3 exploiters, CI excluding 0 (A3a: only the learned estimator carries acceleration information under noise); exploitability lower for nf |
 | **F4_estimator_sp v2** (redesign 10-29 ~11:00, user choice, before any F4 campaign started; replaces the row above) | Same question with a velocity estimate: A3b showed that without the evader velocity every pursuer is weak (~0.29) and an acceleration estimate alone does not help, so v1 would compare two crippled pursuers | As v1 (uniform, 9 stages x 300M, 3 seeds, sensor noise in pursuer training and eval, evader full clean state), but both arms observe an *estimated* evader velocity in place of the true one: **nf** = A3d V_nf inputs (learned velocity + learned acceleration); **ema** = A3d V_ema inputs (tuned EMA finite difference, the classical baseline). Frozen pursuers seen by the evader get the same estimators with clean inputs (`opp_rel_vel_source`, `adapt.opp_side`). F4c and metrics as v1; primary: seed-paired nf - ema | `F4_estimator_sp/summary.md` | nf > ema on held-out RL and X3 exploiters by >= 0.05; exploitability lower for nf. Low confidence (3 seeds, no fixed-pool result yet) |
 
 Final method for F2 = uniform sampling + finite-difference opponent acceleration (velocity source). The learned estimator (A2b) is not used in F2: it is noise-free-equivalent to the finite difference (A2b), and a symmetric learned estimator for the evader role does not exist. Sensor-noise robustness is reported separately (A3b/A3c).
@@ -215,7 +223,7 @@ Total estimated GPU time is about 40 h for P0 plus about 11 h for P1, which fits
   - Inference latency per step.
 - **Observation noise (P2, moved on 10-27).** Evaluation with `task.observation.include_noise=true` (noisy
   finite-difference acceleration, optional EMA `task.oracle.accel_ema`; noisy adapter inputs) is P2, run only if
-  time remains after F1 and A2.
+  time remains after F1 and A2. (Promoted on 10-28/10-29: A3a-A3d and F4; see §9.)
 - **Honesty rules.** No metric or test set is changed after seeing results without saying so in RESULTS.md. Every run that crashed or was excluded is listed. Predictions in this file are not edited after the fact.
 
 ## 6. Code changes
@@ -232,6 +240,8 @@ Total estimated GPU time is about 40 h for P0 plus about 11 h for P1, which fits
 | Experiment driver and report | `scripts/experiments/thesis/` | smoke run of every experiment at 2M frames |
 
 ## 7. Schedule
+
+Original schedule (10-26). The actual order and dates are in PROGRESS.md.
 
 | Day (date) | Work | Gate |
 |---|---|---|
@@ -260,8 +270,6 @@ Total estimated GPU time is about 40 h for P0 plus about 11 h for P1, which fits
 
 | Date | Change | Reason |
 |---|---|---|
-| 10-29 | F4 redesigned (v2) and A3d added, pre-registered ~11:00 (pushed 11:05, commit 55bbbac) before any A3d result and before F4 started (only the 3-stage v1 smoke ran). Env: `observation.rel_vel_source` / `opp_rel_vel_source` (truth / nf / fd_ema), adapter target `vel`. F4 now starts with A3d's closed-loop runs (shared lanes), then a v2 smoke, then the campaigns | A3b: without evader velocity no acceleration input helps; A3c: learned acceleration survives noise. User chose to make the estimator recover the velocity too |
-| 10-29 | F2a analysis rebuilt from the eval files on disk (bug: a lane that found a seed locked by the other lane left it out of its own summary; 3 of 5 seeds were shown) | Bookkeeping fix, no rerun |
 | 10-26 | X4 O3 (future-position oracle) dropped | Needs a delayed-observation mechanism; A1a's offline horizon study answers the same question |
 | 10-26 | X4 O2 split into O2a (measured acceleration) and O2b (latest command) | O2a is computable from consecutive full-state observations, so it doubles as the ESO / finite-difference baseline for A1b |
 | 10-26 | BayesID dropped from P1 to P2 (gate G2) | L0: concept already covered by BPR / Bayes-ToMoP / GSCU |
@@ -276,7 +284,9 @@ Total estimated GPU time is about 40 h for P0 plus about 11 h for P1, which fits
 | 10-27 | F1 redesigned (user choice B): 2x2 {uniform, QD-DPP} x {plain, acceleration input}, 5 seeds, noise-free; new A2a/A2b (learned acceleration estimator, NF target = evader velocity change); sensor-noise tests moved to P2 | A1b showed online adaptation adds nothing reliable while the explicit acceleration input is far better; the user chose option B without noise |
 | 10-27 | D1c interrupted after 2 of 12 runs (kept) and requeued after A2 | Lane A capacity given to F1 / A2 |
 | 10-28 | A3a/A3b/A3c added (positions-only observation; sensor-noise evaluation partly promoted from P2 to P1) | User request after A2b |
-| 10-28 | F4 added (learned-estimator campaigns, user: run it regardless of A3b/A3c, because real interceptors rarely measure the evader's velocity or acceleration), pre-registered 21:30. Env flags `observation.opp_drop_rel_vel`, `adapt.opp_side`; orchestrator `role_task_overrides`. Queue order F2a, F2b, F4, F3, then final evals; if time runs short, F3 seed 2 is dropped first | User request |
-| 10-28 | F3 added (user chose 3 samplers x 3 seeds in self-play), pre-registered 20:30. Campaign evals (F2b too, before it started) use the multi-episode estimator with behaviour statistics (`eval_extra_overrides`). RQ2 in self-play (learned estimator campaign): decided after A3b/A3c | User: compare the diversity sampler with hardness-only samplers under the papers' protocol |
-| 10-28 | F2a/F2b/F2c added ("final run"; user chose exploitability test + two campaigns), pre-registered at 19:30 before A3b/A3c/D1c results. Replaces D3 (QD-DPP campaign): F1 showed no sampler effect, so the campaign tests the acceleration input instead. New env flag `oracle.opp_side_accel` | User request: a final publishable method, compared with the reference papers' co-evolution protocol |
 | 10-28 | A3a re-run (run 1 kept as `A3a_posonly/run1_fp16/`) with trajectories recorded in float32; same pre-registered rule | Run 1's recorder stored positions as float16 (~2 mm steps), which makes the clean second-difference baseline worse than predicting zero (0.26 vs 0.18 m/s at H=5) and also degrades the learned estimator's clean inputs. Found before any A3b run used run 1's choice. A1a/A2a also used float16 recordings (velocity-based; smaller effect, not re-run) |
+| 10-28 | F2a/F2b/F2c added ("final run"; user chose exploitability test + two campaigns), pre-registered at 19:30 before A3b/A3c/D1c results. Replaces D3 (QD-DPP campaign): F1 showed no sampler effect, so the campaign tests the acceleration input instead. New env flag `oracle.opp_side_accel` | User request: a final publishable method, compared with the reference papers' co-evolution protocol |
+| 10-28 | F3 added (user chose 3 samplers x 3 seeds in self-play), pre-registered 20:30. Campaign evals (F2b too, before it started) use the multi-episode estimator with behaviour statistics (`eval_extra_overrides`). RQ2 in self-play (learned estimator campaign): decided after A3b/A3c | User: compare the diversity sampler with hardness-only samplers under the papers' protocol |
+| 10-28 | F4 added (learned-estimator campaigns, user: run it regardless of A3b/A3c, because real interceptors rarely measure the evader's velocity or acceleration), pre-registered 21:30. Env flags `observation.opp_drop_rel_vel`, `adapt.opp_side`; orchestrator `role_task_overrides`. Queue order F2a, F2b, F4, F3, then final evals; if time runs short, F3 seed 2 is dropped first | User request |
+| 10-29 | F4 redesigned (v2) and A3d added, pre-registered ~11:00 (pushed 11:05, commit 55bbbac) before any A3d result and before F4 started (only the 3-stage v1 smoke ran). Env: `observation.rel_vel_source` / `opp_rel_vel_source` (truth / nf / fd_ema), adapter target `vel`. F4 now starts with A3d's closed-loop runs (shared lanes), then a v2 smoke, then the campaigns | A3b: without evader velocity no acceleration input helps; A3c: learned acceleration survives noise. User chose to make the estimator recover the velocity too |
+| 10-29 | F2a analysis rebuilt from the eval files on disk (bug: a lane that found a seed locked by the other lane left it out of its own summary; 3 of 5 seeds were shown) | Bookkeeping fix, no rerun |

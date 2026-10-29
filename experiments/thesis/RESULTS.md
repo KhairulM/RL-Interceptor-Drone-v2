@@ -36,8 +36,7 @@ J = neutralisation rate (capture, or the evader crashes / leaves the arena). "In
 - D1b (3 seeds): the DPP does bound the sampling mass of a duplicated opponent (0.21 vs 0.29), but QD-DPP did
   **not** keep its performance better under duplication (held-out RL -0.23 vs -0.10 for S-M). H1b not supported.
   D1c (exploratory, no uniform floor): both samplers collapse (train J -0.29); in that regime duplication hurts
-  S-M (held-out RL -0.05, worst cluster -0.10, CIs exclude 0) but not QD-DPP, i.e. the duplicate robustness shows only
-  when hardness dominates the sampling.
+  S-M (held-out RL -0.05, worst cluster -0.10, CIs exclude 0) but not QD-DPP, i.e. **the duplicate robustness shows only when hardness dominates the sampling.**
 - D2 (final, 5 seeds): every sampler's pursuer is highly exploitable by a fresh exploiter (mean 0.44-0.69); no
   sampler reduces exploitability reliably (QD-DPP 0.630 vs uniform 0.672, n.s.). One exploiter run failed (S-W seed 4).
 
