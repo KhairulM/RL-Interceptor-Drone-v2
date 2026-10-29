@@ -4,96 +4,40 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-10-29 11:20; refreshed after every new result)
+## Summary (updated 2026-10-29 18:50; details in the sections below)
 
-**How to read the numbers.** J = neutralisation rate. `0.676 [0.533, 0.846]` = mean over training seeds and its
-95 % confidence interval (CI). CIs are percentile bootstraps over seeds (resample the per-seed values with replacement
-2000 times, take the 2.5th / 97.5th percentiles of the mean; `analysis.bootstrap_ci`). For "A minus B" tables the
-per-seed differences (same seed index) are bootstrapped. A difference is called "supported" when its CI excludes 0.
-With 3-5 seeds the bootstrap CI is coarse and tends to be too narrow, so a CI that only just excludes 0 is weak
-evidence.
+J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over
+seeds; "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position +
+velocity, no acceleration).
 
-J = neutralisation rate (capture, or the evader crashes / leaves the arena). "Interim" = fewer seeds than final.
+**Diagnostics (X0-X4)**
+- The game is mostly transitive; self-play pools are redundant (22 RL evaders = 3.8 distinct behaviours).
+- The pursuer loses up to 0.37 J to a specialist on unseen learned evaders. Most of this gap is missing opponent state:
+  adding the evader's acceleration lifts J 0.65 -> 0.94 (train), 0.47 -> 0.77 (held-out RL), 0.31 -> 0.97 (exploiters).
 
-**Setting and diagnostics (final)**
-- Stored self-play checkpoints v9 / v10 / v11 replay correctly; v6 does not under the current env and is excluded (X0).
-- The 1v1 game is mostly transitive: one rating per player explains 78-84 % of the outcome variance (X1).
-- Self-play pools are redundant: 22 RL evaders amount to 3.8 effectively distinct behaviours (Vendi score); there are
-  7 behaviour clusters (X2).
-- A real gap to unseen evaders exists: 7 of 15 test evaders lose by >= 0.15 J to the generalist compared with a
-  specialist (exploiters: 0.57-0.78; held-out v10 evaders: 0.18-0.37) (X3).
-- Most of that gap is **missing opponent state**: adding the evader's acceleration (a finite difference, computable
-  from two observations) raises J from 0.65 to 0.94 on the train pool, from 0.47 to 0.77 on held-out RL and from 0.31
-  to 0.97 on exploiters. Conditioning on an opponent descriptor fails out of distribution (J ~= 0 on 3 novel
-  evaders) (X4).
+**RQ1: opponent sampling**
+- QD-DPP beats hardness-prioritised samplers (held-out RL +0.19 vs multi-metric, +0.13 vs win-rate PFSP) but **not
+  uniform** (+0.04, n.s.); hardness-only prioritisation is worse than uniform (D1, 5 seeds).
+- The DPP caps a duplicated opponent's sampling mass but does not protect performance (D1b); duplication robustness
+  appears only without a uniform floor (D1c, exploratory).
+- No sampler lowers exploitability (0.44-0.69, D2); with the acceleration input the sampler has no effect (F1).
 
-**RQ1: diversity-aware opponent sampling (QD-DPP)**
-- D1 (final, 5 seeds): QD-DPP beats both hardness-prioritised samplers on train and held-out evaders, with paired CIs
-  excluding 0. vs the current multi-metric sampler: held-out RL +0.185 [+0.110, +0.259], worst held-out cluster
-  +0.176 [+0.049, +0.302]. vs win-rate PFSP: +0.131 / +0.116. **Against uniform sampling the gain is small and
-  not significant** (held-out RL +0.042 [-0.069, +0.131]). Hardness-only prioritisation is worse than uniform; the
-  diversity term repairs it.
-- D1b (3 seeds): the DPP does bound the sampling mass of a duplicated opponent (0.21 vs 0.29), but QD-DPP did
-  **not** keep its performance better under duplication (held-out RL -0.23 vs -0.10 for S-M). H1b not supported.
-  D1c (exploratory, no uniform floor): both samplers collapse (train J -0.29); in that regime duplication hurts
-  S-M (held-out RL -0.05, worst cluster -0.10, CIs exclude 0) but not QD-DPP, i.e. **the duplicate robustness shows only when hardness dominates the sampling.**
-- D2 (final, 5 seeds): every sampler's pursuer is highly exploitable by a fresh exploiter (mean 0.44-0.69); no
-  sampler reduces exploitability reliably (QD-DPP 0.630 vs uniform 0.672, n.s.). One exploiter run failed (S-W seed 4).
+**RQ2: opponent model / online adaptation**
+- Noise-free: a learned acceleration estimate equals the finite difference (A2b, n.s.), and both beat M0 (+0.18 train,
+  +0.23 held-out RL, +0.49 exploiters). Online RLS adds nothing (A1b, A2b); ESN and raw history are worse than none.
+- Sensor noise (policies trained clean, A3c): the finite-difference input collapses (train 0.94 -> 0.33); learned +
+  RLS holds (0.80) and beats it on every split (+0.20 to +0.49). **RLS beats the frozen estimator** (+0.09 train, +0.24
+  exploiters): the only closed-loop gain from online adaptation so far.
+- No evader velocity observed (A3b): every pursuer is weak (~0.29 vs 0.65); under noise the finite-difference pursuer
+  crashes in ~92 % of episodes; the learned estimator is noise-proof but no better than no estimator. A3d (offline):
+  a learned velocity estimate from noisy positions is 35-50 % more accurate than an EMA filter.
 
-**RQ2: online opponent adaptation (NF-OA)**
-- A1a (offline): a learned opponent basis halves the prediction error of constant-velocity extrapolation at every
-  horizon. Random-reservoir (ESN) and raw-history RLS are worse than constant velocity beyond 0.1 s. Online RLS on top
-  of the basis adds a small, consistent gain (6-16 %), largest when the readout is kept across episodes. RLS with the
-  pre-registered defaults diverged and had to be bounded and tuned.
-- A1b (final, 5 seeds): in closed loop **no adapter beats M0** (NF-OA: train +0.04, held-out RL -0.03, both n.s.);
-  online adaptation over the frozen basis is not significant and across-episode adaptation changes nothing (<= 0.005).
-  ESN and a raw frame stack are significantly *worse* than M0. The explicit acceleration input is far better than
-  all of them.
-- A2a (offline): a learned estimator of the evader's *future acceleration* (0.2 s ahead) beats the finite-difference
-  estimate by 7 % (frozen) to 21 % (online RLS kept across episodes); here online adaptation clearly helps
-  (-10 to -15 % error vs frozen). For one step ahead the finite difference is better. A2b (policies with this input)
-  is queued.
-- A2b (5 seeds): feeding the policy the **learned estimate of the evader's acceleration** (0.2 s ahead) gives large
-  gains over M0 (with RLS: +0.18 train, +0.23 held-out RL, +0.49 exploiters; CIs exclude 0) and is **equivalent to
-  the finite-difference acceleration input** (all paired differences within +/- 0.04, all CIs include 0). Fewer severe
-  failures on the later v10 evaders (0 of 10 runs below 0.3 vs 3 of 10 with finite difference; one run degraded to
-  0.34-0.60), not significant. Online RLS still adds nothing in closed loop.
-- A3a (offline, no evader velocity observed): noise-free, the second difference of the evader position
-  estimates its acceleration 1.5-2.2x better than a learned estimator. With realistic sensor noise (2 cm) position
-  differences are useless (errors 28-55 m/s; even EMA-filtered, worse than predicting zero), and only the
-  noise-augmented learned estimator beats zero (-13 to -26 %).
-- A3b (closed loop, 3 seeds, no evader velocity observed): removing the evader's velocity cuts train J from 0.65
-  (M0) to 0.29, and neither acceleration estimate replaces it. Under sensor noise the position-difference input
-  destroys the policy (train 0.38 -> 0.07); the learned estimator is unaffected by noise and beats it by +0.23 train /
-  +0.18 held-out RL (CIs exclude 0), but it is **not better than no estimator** (n.s.; worse on exploiters, -0.14).
-- A3c (velocity-observing policies trained noise-free, evaluated with sensor noise, 5 seeds): the finite-difference
-  acceleration input collapses (train 0.94 -> 0.33, below M0 0.70); the learned estimator + online RLS holds (0.90 ->
-  0.80) and beats the finite difference on every split (+0.20 to +0.49) and M0 on held-out RL (+0.12) and exploiters
-  (+0.53), CIs exclude 0. **Online adaptation helps under noise** (+0.09 train, +0.24 exploiters vs frozen), the
-  first closed-loop gain from adaptation in this thesis.
-- A3d (offline): a learned estimator recovers the evader's velocity from noisy positions 35-50 % more accurately
-  than a tuned EMA filter on position differences (0.22-0.29 vs 0.44 m/s); noise-free, plain differencing is
-  near-exact (0.01). Closed-loop test queued (start of F4).
-- Overall reading: what the pursuer lacks against unseen evaders is the opponent's current/near-future acceleration.
-  A learned opponent model helps when it predicts that quantity. Noise-free it is equivalent to a finite difference
-  and online adaptation adds nothing; with realistic sensor noise the learned estimator (especially with online RLS)
-  is the only acceleration input that keeps its benefit. Without any evader velocity, no acceleration input helps.
+**Final runs**
+- F1 (5 seeds): the acceleration input dominates (train +0.20, exploiters +0.46); held-out results are bimodal per seed.
+- F2a (5 seeds): the acceleration input lowers exploitability 0.672 -> 0.397 (paired -0.275 [-0.522, -0.044]).
 
-**Final 2x2 (F1, 5 seeds)**
-- {uniform, QD-DPP} x {plain, acceleration input}: the **acceleration input is the dominant factor** (train +0.20,
-  exploiters +0.46; CIs exclude 0). The sampler has no main effect. With the acceleration input, QD-DPP is not better
-  than uniform (slightly lower on held-out RL, driven by one extra seed that fails on the v10 lineage). Held-out
-  generalisation is bimodal per seed: a policy either handles the later v10 evaders (0.82-0.97) or fails on all of
-  them (0.10-0.29).
-
-**Final runs (F2a, 5 seeds)**
-- The acceleration-input pursuer is **less exploitable** than the plain one: exploitability 0.397 vs 0.672, paired
-  -0.275 [-0.522, -0.044] (without one failed exploiter -0.161 [-0.338, -0.005]). Still exploitable (0.28-0.63 on
-  4 of 5 seeds).
-
-**Pending**: F2b (self-play campaigns with vs without the acceleration input, running since 06:19); A3d closed loop
-(learned velocity estimate from noisy positions; queued at the start of F4); F4 v2 (self-play with the
-estimated velocity, learned vs EMA filter), F3 (samplers in self-play), final evaluations F2c / F4c / F3c.
+**Running / pending**: A3d closed loop (since 18:15) -> F4 v2 -> F3 -> F2c / F4c / F3c. F2b campaigns are done and
+are compared in F2c.
 
 ## Relation to the reference papers (updated 2026-10-29 11:10)
 
