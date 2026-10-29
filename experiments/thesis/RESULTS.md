@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-10-29 18:50; details in the sections below)
+## Summary (updated 2026-10-29 20:40; details in the sections below)
 
 J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over
 seeds; "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position +
@@ -31,6 +31,9 @@ velocity, no acceleration).
 - No evader velocity observed (A3b): every pursuer is weak (~0.29 vs 0.65); under noise the finite-difference pursuer
   crashes in ~92 % of episodes; the learned estimator is noise-proof but no better than no estimator. A3d (offline):
   a learned velocity estimate from noisy positions is 35-50 % more accurate than an EMA filter.
+- A3e (offline): a GRU trained on noisy inputs is the best estimator under noise (velocity 0.19 m/s vs 0.29 for the
+  MLP used in closed loop, -36 %; acceleration -12 %); a Kalman filter only matches the clean MLP. So A3d / F4 use
+  a weaker-than-best estimator.
 
 **Final runs**
 - F1 (5 seeds): the acceleration input dominates (train +0.20, exploiters +0.46); held-out results are bimodal per seed.
@@ -72,7 +75,7 @@ disagrees under our protocol, extends the claim, or does not test it.
 | 4 | Population training generalises to unseen opponents (Roncero: unseen APF evader; Gavin: SP/PFSP pursuers vs other evaders). | Consistent for scripted opponents: held-out scripted evaders (zigzag, fast flee, 4 switching evaders) are neutralised at J 0.99-1.00 by every pursuer. **Not** for learned opponents: against the independent v10 lineage the generalist loses up to 0.37 J to a specialist; fresh exploiters (PPO best responses, 100M frames) reach J 0.22-0.43 against it (X3), and the mean exploitability per sampler is 0.44-0.69 (D2; one failed exploiter included). | **Consistent for scripted, contradicted for learned opponents.** None of the three papers reports exploitability or held-out RL lineages. |
 | 5 | Seeds may converge to different strategies (Roncero, limitations). | Generalist (uniform sampler) train J 0.56-0.87 across 5 seeds; held-out generalisation is **bimodal per seed**: 1-2 of 5 seeds fail on all later v10 evaders (J 0.10-0.29) while the others reach 0.82-0.97 (F1). | **Extends:** quantifies it; with 3 seeds (Roncero) effects of +/- 0.1 can come from one seed. |
 | 6 | Observation design: Roncero and Gavin give the pursuer opponent position + velocity to a memoryless MLP; Gavin leaves "trajectory prediction" out of scope; AgilePE adds a temporal window of opponent state. | Adding the opponent's acceleration (finite difference of two consecutive observations) is the **largest effect in this thesis**: train 0.722 -> 0.940 (+0.199 [+0.128, +0.270]), exploiters 0.497 -> 0.983 (+0.464 [+0.239, +0.638]), held-out RL 0.634 -> 0.838 (CI includes 0 because of the bimodal seeds) (F1, 5 seeds). A learned acceleration estimate does the same (A2b, 5 seeds: all paired differences to the finite difference within +/- 0.04, n.s.). It also lowers exploitability: 0.672 -> 0.397, paired -0.275 [-0.522, -0.044] (F2a). A raw 10-step history stack (our analogue of a temporal window) was *worse* than no history (train -0.254 [-0.355, -0.152]) (A1b). | **New:** a memoryless pursuer with position + velocity (Roncero, Gavin) is limited by the missing opponent acceleration far more than by opponent sampling. Caveat: AgilePE's window length and architecture are not given, so the history-stack result is not a test of AgilePE itself. |
-| 7 | Future work in Roncero: online adaptation, recurrent policies. | Noise-free, online RLS adaptation of a learned opponent model adds nothing in closed loop (A1b, A2b; within or across episodes); a random reservoir (ESN) is worse than no adaptation. **Under sensor noise it helps**: RLS vs frozen basis +0.09 train, +0.24 exploiters, CIs exclude 0 (A3c, policies trained noise-free). Recurrent policies (GRU) **not tested**. | **New, conditional:** online opponent-model adaptation pays off under sensor noise, not with perfect state (Roncero's setting). |
+| 7 | Future work in Roncero: online adaptation, recurrent policies. | Noise-free, online RLS adaptation of a learned opponent model adds nothing in closed loop (A1b, A2b; within or across episodes); a random reservoir (ESN) is worse than no adaptation. **Under sensor noise it helps**: RLS vs frozen basis +0.09 train, +0.24 exploiters, CIs exclude 0 (A3c, policies trained noise-free). Recurrent policies (GRU) **not tested**; a recurrent *estimator* (GRU, trained on noisy inputs) is the most accurate opponent-state estimator under noise offline (A3e: velocity -36 % vs the MLP used in closed loop). | **New, conditional:** online opponent-model adaptation pays off under sensor noise, not with perfect state (Roncero's setting). |
 | 8 | Sensor noise: AgilePE reports robustness under real sensor noise (mocap + IMU); Roncero and Gavin assume perfect state. | With 2 cm / 8 cm/s noise (eval only, policies trained clean): the finite-difference acceleration input collapses (train 0.94 -> 0.33, below the plain pursuer 0.70); the learned estimator + RLS keeps 0.80 and beats it by +0.47 train / +0.38 held-out RL / +0.49 exploiters (A3c, 5 seeds). Without any evader velocity (A3b), every pursuer is weak (~0.29) and the learned estimator is noise-proof but not better than no estimator. | **New:** opponent-acceleration inputs must be learned, not differenced, once sensing is noisy; the perfect-state results of Roncero and Gavin would not transfer to such inputs. Limited to eval-time noise until F4. |
 | 9 | Real-world transfer (all three), multi-pursuer coordination (Gavin), FOV-limited sensing (AgilePE). | Not studied. | **Not tested.** |
 
@@ -666,6 +669,46 @@ Reference: the measured relative velocity of A3c (8 cm/s noise per axis) has err
   "aug" is better on noisy val but its clean-val error is 1.32x, so the rule selects the **clean basis**. A3d's closed
   loop and F4 v2 use it as registered, although the augmented basis would be more accurate under noise.
 - Prediction "NF_aug < FD_ema on noisy val/test; noise-free FD_raw best": **held**.
+
+## A3e_estimators (done 2026-10-29 20:28; offline, one training run per model)
+
+Is the 10-step MLP window the right estimator architecture? Same data, split, noise draws, targets and masks as A3a /
+A3d (the zero-baseline errors match exactly). GRU (hidden 96, 31k parameters) and LSTM (hidden 80, 29k) with memory
+over the whole episode, trained on clean or noise-augmented inputs; constant-acceleration Kalman filter (KF) on the
+evader-position measurement, process noise tuned on noisy val (q = 10 for velocity, 1 for acceleration). MLP (32k),
+FD and FD + EMA reused from A3a / A3d. [A3e_estimators/summary.md](A3e_estimators/summary.md). Mean error in m/s,
+**test** set (val gives the same ordering):
+
+| target / inputs | zero | FD + EMA | KF | MLP clean | MLP aug | GRU clean | GRU aug | LSTM clean | LSTM aug |
+|---|---|---|---|---|---|---|---|---|---|
+| velocity, clean | 0.868 | 0.264 | 0.123 | 0.126 | 0.161 | **0.060** | 0.139 | 0.078 | 0.149 |
+| velocity, noisy | 0.868 | 0.435 | 0.288 | 0.292 | 0.232 | 0.800 | **0.186** | 0.568 | 0.193 |
+| 0.2 s velocity change, clean | 0.340 | - | 0.338 | 0.288 | 0.290 | **0.244** | 0.255 | 0.282 | 0.287 |
+| 0.2 s velocity change, noisy | 0.340 | 1.699 | 0.385 | 0.331 | 0.293 | 0.419 | **0.259** | 0.302 | 0.288 |
+
+(Noise-free, raw FD is still best for velocity: 0.010.)
+
+- **A recurrent estimator trained on noisy inputs is the most accurate under noise**: GRU aug velocity 0.186 vs 0.232
+  for the MLP aug (-20 %) and 0.292 for the MLP clean basis used in the closed loop (-36 %); acceleration 0.259 vs
+  0.293 (-12 %). LSTM aug is close to GRU aug (velocity -17 %, acceleration -2 % vs MLP aug). Noise-free, the GRU is
+  also better (velocity 0.060 vs 0.126).
+- **Recurrent nets trained on clean inputs break under noise** (GRU clean velocity 0.80, worse than the EMA filter's
+  0.43): noise augmentation matters far more for them than for the MLP.
+- **The Kalman filter is no better than the clean MLP** (velocity 0.288 vs 0.292 under noise; 0.123 vs 0.126 clean)
+  and 24 % worse than the MLP aug. For the acceleration target it is worse than predicting zero (0.385 vs 0.340), like
+  every position-differencing method here. It beats the EMA filter (0.288 vs 0.435), so EMA is the weaker classical
+  baseline.
+- Predictions: (1) "noise-free velocity: KF < MLP" **did not hold** (equal: test 0.123 vs 0.126, val 0.118 vs
+  0.105); (2) "best recurrent (aug) beats MLP aug by >= 10 % on noisy velocity" **held** (-20 %); "KF within +/- 20 %
+  of MLP aug" **did not hold** (+24 %); "KF and recurrent nets beat FD_ema" **held** for the KF and the aug nets, not
+  for the clean-trained nets; (3) "noisy acceleration: GRU / LSTM aug <= MLP aug; KF worse than MLP aug" **held**.
+- Pre-registered consequence: GRU aug beats the closed-loop MLP by >= 10 % (velocity -36 %, acceleration -12 %).
+  **This is a limitation of A3d / F4**: their learned arm uses the MLP, not the best available estimator, so
+  closed-loop gains of the learned arm over EMA are a lower bound for a recurrent estimator. Not rerun before the
+  freeze.
+- Caveats: one training run per model (no seed spread); 8 epochs with the last epoch kept, and the clean GRU was
+  still improving at epoch 8; offline error only, not closed-loop performance. A measured velocity with A3c's noise
+  (error 0.128) is still better than every estimator from positions.
 
 ## F1_final (done 2026-10-28 04:22; 5 seeds, noise-free)
 
