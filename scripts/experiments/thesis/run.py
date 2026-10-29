@@ -32,6 +32,7 @@ EXPERIMENTS = {
     "A3a": "a3_posonly:run_a3a",
     "A3b": "a3_posonly:run_a3b",
     "A3c": "a3_posonly:run_a3c",
+    "A3d": "a3d_velest:run_a3d",
     "F2a": "f2_final:run_f2a",
     "F2b": "f2_final:run_f2b",
     "F2c": "f2_final:run_f2c",

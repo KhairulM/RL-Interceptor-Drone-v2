@@ -65,6 +65,12 @@ observation:
   use_rel_dist: true
   agent_rel_vel: true   # false: drop the opponent's relative velocity from the agent's obs (thesis A3, positions-only)
   opp_drop_rel_vel: false  # true: same for the frozen opponent's obs (frozen pursuers trained positions-only, thesis F4)
+  rel_vel_source: truth   # pursuer agent: truth | nf | fd_ema = estimated evader velocity from (noisy) positions
+                          # replaces the true relative velocity (thesis A3d / F4)
+  opp_rel_vel_source: truth  # same for frozen pursuer opponents (evader role, clean inputs)
+  rel_vel_model: null     # nf: velocity basis (exps/a3d_velest.py)
+  rel_vel_history: 10
+  rel_vel_ema: 0.1        # fd_ema: EMA alpha on the first difference of the evader position estimate
   rot_repr: matrix   # attitude obs: matrix (vec(R), 9-D), quat (w>=0, 4-D) or log (log(R) rotation vector, 3-D)
   # Per-component Gaussian noise stds applied to the agent's observation when
   # include_noise is true (sensor-matched defaults, from Intercept).

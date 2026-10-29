@@ -105,7 +105,8 @@ def fd_predictions(p_e, ep, H, alpha=None):
 
 
 # ------------------------------------------------------------------ basis
-def fit_basis(X, Y, heads, val_mask, H, mean, std, out_path, d=32, hidden=128, epochs=8, max_samples=1_500_000, seed=0):
+def fit_basis(X, Y, heads, val_mask, H, mean, std, out_path, d=32, hidden=128, epochs=8, max_samples=1_500_000, seed=0,
+              target="dvel"):
     if os.path.isfile(out_path):
         return torch.load(out_path)
     oa = _adapt_module()
@@ -143,7 +144,7 @@ def fit_basis(X, Y, heads, val_mask, H, mean, std, out_path, d=32, hidden=128, e
         log.append({"epoch": ep, "val_task_mse": vt.item(), "val_shared_mse": vs.item()})
     model = {"phi": {k: v.cpu() for k, v in phi.state_dict().items()}, "theta0": W0.detach().cpu(),
              "z_mean": mean, "z_std": std, "in_dim": X.shape[1], "d": d, "hidden": hidden, "horizon": H,
-             "history": HISTORY, "target": "dvel", "z_mode": "pos", "train_log": log}
+             "history": HISTORY, "target": target, "z_mode": "pos", "train_log": log}
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     torch.save(model, out_path)
     return model

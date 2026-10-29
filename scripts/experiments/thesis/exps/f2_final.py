@@ -65,8 +65,14 @@ def run_f2a(args):
             rows.append({"seed": s, **_match(res, ex["id"])})
         elif args.smoke:
             raise RuntimeError("F2a smoke: eval failed")
-        log_progress(f"F2a seed{s}: {rows[-1] if rows else None}")
+        log_progress(f"F2a seed{s}: {rows[-1] if rows and rows[-1]['seed'] == s else 'run by another lane'}")
     if not args.smoke:
+        rows = []           # rebuild from disk: seeds run by the other lane are missing from this lane's list
+        for s in range(5):
+            path = os.path.join(F2A, "evals", f"SU_acc_seed{s}.json")
+            if os.path.isfile(path):
+                with open(path) as f:
+                    rows.append({"seed": s, **_match(json.load(f), f"f2a/evader:exploit_SU_acc_s{s}")})
         analyse_f2a(rows)
 
 

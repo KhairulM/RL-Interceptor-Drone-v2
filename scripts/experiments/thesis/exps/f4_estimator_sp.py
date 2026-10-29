@@ -1,10 +1,12 @@
-"""F4: learned opponent-acceleration estimator in full self-play, realistic sensing (docs/research_plan.md, Phase F,
-pre-registered 10-28 21:30).
+"""F4 v2: learned opponent model in full self-play, realistic sensing (docs/research_plan.md, Phase F; v1 pre-registered
+10-28 21:30, redesigned 10-29 11:30 before any campaign, see plan section 9).
 
-The pursuer does not observe the evader's velocity (positions only) and trains and is evaluated with sensor noise
-(observation.include_noise). Arms: nf = + the A3a learned acceleration estimator (frozen, noise-augmented basis,
-H = 10); none = no estimator. The evader observes the full clean state (as in the reference papers). Uniform
-sampling, 9 stages x 300M frames, 3 seeds per arm (campaign seed 0 / 100 / 200).
+The pursuer does not measure the evader's velocity; it observes an estimate from noisy positions in its place, and
+trains and is evaluated with sensor noise (observation.include_noise). Arms (A3d inputs): nf = learned velocity +
+learned acceleration estimate (A3d V_nf); ema = EMA-filtered finite-difference velocity (A3d V_ema, classical
+baseline). The evader observes the full clean state (as in the reference papers); frozen pursuers it meets get the same
+estimators on clean inputs. Uniform sampling, 9 stages x 300M frames, 3 seeds per arm (campaign seed 0 / 100 / 200).
+run_f4 first runs A3d's closed-loop policies (shared lanes), then a 3-stage smoke of both arms, then the campaigns.
 F4c: final pursuer of each campaign vs the thesis train pool / test set / all F4 campaign evaders (noisy, as
 trained), vs the test set without noise, and vs one fresh exploiter.
 """
@@ -27,34 +29,46 @@ SEEDS = [0, 100, 200]
 NOISY = "task.observation.include_noise=true"
 
 
-def _adapt_common():
-    with open(os.path.join(OUT, "A3a_posonly", "choice.json")) as f:
-        c = json.load(f)
-    return ["task.adapt.kind=nf", "task.adapt.z_mode=pos", "task.adapt.target=dvel", "task.adapt.freeze=true",
-            f"task.adapt.horizon={c['H_star']}", f"task.adapt.history={HISTORY}", f"task.adapt.model_path={c['model_path']}"]
+def _mirror(pursuer_ov):
+    """Evader-worker overrides that give frozen pursuers the same estimator inputs (clean)."""
+    out = []
+    for o in pursuer_ov:
+        if o.startswith("task.observation.rel_vel_source="):
+            out.append(o.replace("rel_vel_source", "opp_rel_vel_source"))
+        elif o == "task.adapt.enabled=true":
+            out.append("task.adapt.opp_side=true")
+        else:
+            out.append(o)
+    return out
 
 
 def arms():
-    """{arm: (pursuer-worker overrides, evader-worker overrides)}; the evader's frozen pursuers see the same inputs."""
-    a = _adapt_common()
-    return {
-        "nf": (["task.observation.agent_rel_vel=false", NOISY, "task.adapt.enabled=true"] + a,
-               ["task.observation.opp_drop_rel_vel=true", "task.adapt.opp_side=true"] + a),
-        "none": (["task.observation.agent_rel_vel=false", NOISY],
-                 ["task.observation.opp_drop_rel_vel=true"]),
-    }
+    """{arm: (pursuer-worker overrides, evader-worker overrides)}."""
+    from a3d_velest import methods
+    m = methods()
+    return {arm: ([NOISY] + m[src], _mirror(m[src])) for arm, src in (("nf", "V_nf"), ("ema", "V_ema"))}
 
 
 def name(arm, k, smoke=False):
-    return f"thesis-F4-{'smoke-' if smoke else ''}{arm}-s{k}"
+    return f"thesis-F4-{'smoke2-' if smoke else ''}{arm}-s{k}"
 
 
 def run_f4(args):
     A = arms()
+    if not args.smoke:
+        from a3d_velest import run_a3d
+        run_a3d(args)
+    for arm, (p, e) in A.items():
+        run_campaign(name(arm, 0, True), [], {}, smoke_stages=3, role_overrides={"pursuer": p, "evader": e})
+    for arm in A:                    # the other lane may still be running one of the smokes
+        d = _done(name(arm, 0, True))
+        while not os.path.isfile(d) and os.path.isfile(d + ".lock"):
+            time.sleep(60)
+        if not os.path.isfile(d):
+            raise RuntimeError(f"F4 v2 smoke {arm} did not pass; campaigns not started")
     if args.smoke:
-        p, e = A["nf"]
-        run_campaign(name("nf", 0, True), [], {}, smoke_stages=3, role_overrides={"pursuer": p, "evader": e})
         return
+    log_progress("F4 v2 smoke ok (both arms)")
     for k in range(len(SEEDS)):
         for arm, (p, e) in A.items():
             run_campaign(name(arm, k), [], {"seed": SEEDS[k]}, role_overrides={"pursuer": p, "evader": e})

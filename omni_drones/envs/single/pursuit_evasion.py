@@ -145,6 +145,10 @@ class PursuitEvasion(IsaacEnv):
         # Agent only: drop the opponent's relative velocity from the observation (thesis A3, positions-only).
         self.agent_rel_vel = bool(self.obs_cfg.get("agent_rel_vel", True))
         self.include_obs_noise = bool(self.obs_cfg.get("include_noise", False))
+        # Estimated evader velocity in place of the true one, from positions only (thesis A3d / F4): "truth" | "nf" |
+        # "fd_ema". rel_vel_source: the agent (pursuer role); opp_rel_vel_source: frozen pursuer opponents (clean inputs).
+        self.rel_vel_source = str(self.obs_cfg.get("rel_vel_source", "truth"))
+        self.opp_rel_vel_source = str(self.obs_cfg.get("opp_rel_vel_source", "truth"))
         self.use_previous_action = bool(self.obs_cfg.get("use_previous_action", True))
         self.use_time_encoding = bool(self.obs_cfg.get("use_time_encoding", True))
         self.time_encoding_dim = int(self.obs_cfg.get("time_encoding_dim", 4))
@@ -241,6 +245,10 @@ class PursuitEvasion(IsaacEnv):
         if self.opp_adapt and (self.role != EVADER or self.adapt_cfg.get("kind", "nf") == "stack"):
             raise ValueError("adapt.opp_side needs role=evader (frozen pursuer) and a non-stack adapter")
         self.opp_drop_rel_vel = bool(self.obs_cfg.get("opp_drop_rel_vel", False))
+        if self.rel_vel_source != "truth" and (self.role != PURSUER or not self.agent_rel_vel):
+            raise ValueError("observation.rel_vel_source needs role=pursuer and agent_rel_vel=true")
+        if self.opp_rel_vel_source != "truth" and (self.role != EVADER or self.opp_drop_rel_vel):
+            raise ValueError("observation.opp_rel_vel_source needs role=evader and opp_drop_rel_vel=false")
 
         super().__init__(cfg, headless)
 
@@ -364,11 +372,24 @@ class PursuitEvasion(IsaacEnv):
                 p_max_ratio=a.get("p_max_ratio", 1.0), target=a.get("target", "disp"),
                 seed=a.get("seed", 0), device=self.device)
             self._opp_adapt_step = torch.full_like(self.progress_buf, -1)
+        self.vel_est = self._make_vel_est(self.rel_vel_source)
+        self.opp_vel_est = self._make_vel_est(self.opp_rel_vel_source)
+        self._vel_est_step = torch.full_like(self.progress_buf, -1)
+        self._opp_vel_est_step = torch.full_like(self.progress_buf, -1)
 
         # Draw the confined arena boundary (visible only when not headless).
         self._init_arena_draw()
 
     # --------------------------------------------------------------- setup
+    def _make_vel_est(self, source):
+        if source == "truth":
+            return None
+        from omni_drones.utils.opponent_adapt import EvaderVelEstimator
+        return EvaderVelEstimator(self.num_envs, source, self.dt * self.substeps,
+                                  model_path=self.obs_cfg.get("rel_vel_model", None),
+                                  history=int(self.obs_cfg.get("rel_vel_history", 10)),
+                                  ema_alpha=float(self.obs_cfg.get("rel_vel_ema", 0.1)), device=self.device)
+
     def _make_esn(self):
         from omni_drones.utils.esn import BatchedESN
 
@@ -722,6 +743,10 @@ class PursuitEvasion(IsaacEnv):
         if self.opp_adapter is not None:
             self.opp_adapter.reset(env_ids)
             self._opp_adapt_step[env_ids] = -1
+        for est, step in ((self.vel_est, self._vel_est_step), (self.opp_vel_est, self._opp_vel_est_step)):
+            if est is not None:
+                est.reset(env_ids)
+                step[env_ids] = -1
 
     # ------------------------------------------------------------ sim step
     def _pre_sim_step(self, tensordict: TensorDictBase):
@@ -986,7 +1011,7 @@ class PursuitEvasion(IsaacEnv):
 
     # ------------------------------------------------------ obs and reward
     def _agent_observation(self, self_drone, other_drone, prev_action, obs_config,
-                           esn=None, esn_mask=None, esn_fit=False, drop_rel_vel=False):
+                           esn=None, esn_mask=None, esn_fit=False, drop_rel_vel=False, rel_vel_w=None):
         """Symmetric observation for ``self_drone``, in its own body frame."""
         self_pos = self_drone.pos
         self_rot_quat = self_drone.rot
@@ -1023,6 +1048,8 @@ class PursuitEvasion(IsaacEnv):
             rel_dist = rel_dist + torch.randn_like(rel_dist) * self.obs_noise_rel_dist_std
             rel_hdg = normalize(rel_dist)
             rel_vel = rel_vel + torch.randn_like(rel_vel) * self.obs_noise_rel_lin_vel_std
+        if rel_vel_w is not None:      # estimated relative velocity (already from noisy inputs when noise is on)
+            rel_vel = quat_rotate_inverse(self_rot_quat, rel_vel_w)
 
         obs = [
             self_pos_obs,
@@ -1053,11 +1080,28 @@ class PursuitEvasion(IsaacEnv):
         second = (e.vel_w[..., :3] - p.vel_w[..., :3])[:, 0] if mode == "vel" else p.pos[:, 0]
         return torch.cat([(e.pos - p.pos)[:, 0], second, p.vel_w[:, 0, :3]], dim=-1)
 
-    def _adapt_features(self) -> torch.Tensor:
-        """Advance the opponent adapter for envs that stepped; returns its output, [N, 1, adapt_out_dim]."""
+    def _pos_z_noise_std(self) -> torch.Tensor:
+        return torch.tensor([self.obs_noise_rel_dist_std] * 3 + [self.obs_noise_pos_std] * 3
+                            + [self.obs_noise_lin_vel_std] * 3, device=self.device)
+
+    def _est_rel_vel(self, est, step_attr, noisy, z=None):
+        """Advance a velocity estimator; returns (estimated evader - pursuer velocity [N, 1, 3] world, z used)."""
+        if z is None:
+            z = self.opponent_z("pos")
+            if noisy:
+                z = z + torch.randn_like(z) * self._pos_z_noise_std()
+        mask = self.progress_buf != getattr(self, step_attr)
+        v_e = est.step(z, mask)
+        setattr(self, step_attr, self.progress_buf.clone())
+        return (v_e - z[:, 6:9]).unsqueeze(1), z
+
+    def _adapt_features(self, z_noisy=None) -> torch.Tensor:
+        """Advance the opponent adapter for envs that stepped; returns its output, [N, 1, adapt_out_dim].
+
+        ``z_noisy``: pos-mode input already drawn this step (shared with the velocity estimator)."""
         mask = self.progress_buf != self._adapt_step
-        z = self.opponent_z(self.adapt_z_mode)
-        if self.include_obs_noise:
+        z = self.opponent_z(self.adapt_z_mode) if z_noisy is None else z_noisy
+        if self.include_obs_noise and z_noisy is None:
             second = self.obs_noise_rel_lin_vel_std if self.adapt_z_mode == "vel" else self.obs_noise_pos_std
             std = torch.tensor([self.obs_noise_rel_dist_std] * 3 + [second] * 3
                                + [self.obs_noise_lin_vel_std] * 3, device=self.device)
@@ -1149,15 +1193,21 @@ class PursuitEvasion(IsaacEnv):
 
         esn_mask = ~self._esn_stepped if self._any_esn else None
 
+        rel_vel_w, z_noisy = None, None
+        if self.vel_est is not None:
+            rel_vel_w, z_noisy = self._est_rel_vel(self.vel_est, "_vel_est_step", self.include_obs_noise)
+        opp_rel_vel_w = None
+        if self.opp_vel_est is not None:
+            opp_rel_vel_w, _ = self._est_rel_vel(self.opp_vel_est, "_opp_vel_est_step", False)
         obs = self._agent_observation(
             self.agent_drone, self.opp_drone, self.current_action, self.obs_cfg,
             self.esn, esn_mask,
             esn_fit=self.training and self.esn is not None and self.esn.readout != "per_env",
-            drop_rel_vel=not self.agent_rel_vel)
+            drop_rel_vel=not self.agent_rel_vel, rel_vel_w=rel_vel_w)
         # Opponent observation for the frozen policy on the next pre-sim step.
         self._opp_obs = self._agent_observation(
             self.opp_drone, self.agent_drone, self.opp_prev_action, self.obs_cfg,
-            self.opp_esn, esn_mask, drop_rel_vel=self.opp_drop_rel_vel)
+            self.opp_esn, esn_mask, drop_rel_vel=self.opp_drop_rel_vel, rel_vel_w=opp_rel_vel_w)
         if self.opp_adapter is not None:
             self._opp_obs = torch.cat([self._opp_obs, self._opp_adapt_features()], dim=-1)
         if self.oracle_opp_side_accel:
@@ -1175,7 +1225,8 @@ class PursuitEvasion(IsaacEnv):
 
         state = obs
         if self.adapter is not None:
-            obs = torch.cat([obs, self._adapt_features()], dim=-1)
+            share = z_noisy if (self.adapt_z_mode == "pos" and self.include_obs_noise) else None
+            obs = torch.cat([obs, self._adapt_features(share)], dim=-1)
             state = obs
         if self.oracle_dim:
             obs = torch.cat([obs, self._oracle_features()], dim=-1)

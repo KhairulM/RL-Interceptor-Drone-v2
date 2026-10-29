@@ -12,7 +12,8 @@ RLS with forgetting. Feature kinds (only the features differ; the RLS core is sh
   stack  no predictor: outputs the normalised history (frame-stack control)
 
 ``target``: "disp" = relative displacement over H (above); "dvel" = change of the evader's own velocity
-(rel_vel + own_vel) over H, i.e. H dt x its mean acceleration (thesis A2: learned acceleration estimator).
+(rel_vel + own_vel) over H, i.e. H dt x its mean acceleration (thesis A2: learned acceleration estimator);
+"vel" = the evader's current velocity itself (frozen nf only; thesis A3d: velocity from noisy positions).
 
 ``freeze`` disables the RLS update (theta stays at its initial value). The covariance trace is capped at
 ``p_max_ratio`` x its initial value (bounded-covariance RLS), which prevents 1/lambda wind-up in directions the
@@ -54,8 +55,10 @@ class OpponentAdapter:
                  p_max_ratio: float = 1.0, target: str = "disp", seed: int = 0, device="cpu"):
         if kind not in ("nf", "esn", "raw", "stack"):
             raise ValueError(f"unknown adapter kind {kind!r}")
-        if target not in ("disp", "dvel"):
+        if target not in ("disp", "dvel", "vel"):
             raise ValueError(f"unknown adapter target {target!r}")
+        if target == "vel" and not (kind == "nf" and freeze):
+            raise ValueError("target=vel needs kind=nf and freeze=true (the true velocity is never observed)")
         self.target = target
         self.n, self.kind, self.K, self.H = num_envs, kind, int(history), int(horizon)
         self.lam, self.delta, self.freeze, self.reset_on_episode = float(forgetting), float(delta), freeze, reset_on_episode
@@ -155,6 +158,10 @@ class OpponentAdapter:
             return self.pred
 
         f = self._features(rows, zn)
+        if self.target == "vel":
+            self.pred[rows] = torch.bmm(self.theta[rows], f.unsqueeze(-1)).squeeze(-1)
+            self.t[rows] = t + 1
+            return self.pred
         rel_pos = tgt[rows] if tgt is not None else target_signal(z[rows], self.target)
         slot = t % (self.H + 1)
         old = (t - self.H) % (self.H + 1)
@@ -185,3 +192,44 @@ class OpponentAdapter:
         if bool(bad.any()):
             self.reset_adaptation(bad.nonzero().squeeze(-1))
         return self.pred
+
+
+class EvaderVelEstimator:
+    """Estimate of the evader's world velocity from (possibly noisy) z_pos = [rel_pos, own_pos, own_vel] (thesis A3d).
+
+    source "nf": frozen learned basis (OpponentAdapter, target "vel"); "fd_ema": first difference of the evader
+    position estimate own_pos + rel_pos, EMA-filtered: v(1) = raw(1), v(t) = v(t-1) + alpha (raw(t) - v(t-1));
+    0 at the first step of an episode. Same formulas as the offline evaluation in exps/a3d_velest.py.
+    """
+
+    def __init__(self, num_envs, source, dt, model_path=None, history=10, ema_alpha=0.1, device="cpu"):
+        if source not in ("nf", "fd_ema"):
+            raise ValueError(f"unknown velocity estimator source {source!r}")
+        self.source, self.dt, self.alpha = source, float(dt), float(ema_alpha)
+        self.nf = (OpponentAdapter(num_envs, kind="nf", history=history, horizon=0, model_path=model_path,
+                                   freeze=True, target="vel", device=device) if source == "nf" else None)
+        self.p_prev = torch.zeros(num_envs, 3, device=device)
+        self.v = torch.zeros(num_envs, 3, device=device)
+        self.t = torch.zeros(num_envs, dtype=torch.long, device=device)
+
+    def reset(self, env_ids):
+        if self.nf is not None:
+            self.nf.reset(env_ids)
+        self.v[env_ids] = 0.0
+        self.t[env_ids] = 0
+
+    @torch.no_grad()
+    def step(self, z, mask=None):
+        """Advance envs in ``mask`` with z_pos [N, 9]; returns the current estimate [N, 3] for all envs."""
+        if self.nf is not None:
+            return self.nf.step(z, mask)
+        rows = torch.arange(z.shape[0], device=z.device) if mask is None else mask.nonzero().squeeze(-1)
+        p = z[rows, 0:3] + z[rows, 3:6]
+        t = self.t[rows].unsqueeze(-1)
+        raw = (p - self.p_prev[rows]) / self.dt
+        v = self.v[rows]
+        v = torch.where(t == 0, torch.zeros_like(v), torch.where(t == 1, raw, v + self.alpha * (raw - v)))
+        self.v[rows] = v
+        self.p_prev[rows] = p
+        self.t[rows] += 1
+        return self.v

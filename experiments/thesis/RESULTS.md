@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-10-29 04:00; refreshed after every new result)
+## Summary (updated 2026-10-29 12:00; refreshed after every new result)
 
 **How to read the numbers.** J = neutralisation rate. `0.676 [0.533, 0.846]` = mean over training seeds and its
 95 % confidence interval (CI). CIs are percentile bootstraps over seeds (resample the per-seed values with replacement
@@ -84,10 +84,16 @@ J = neutralisation rate (capture, or the evader crashes / leaves the arena). "In
   generalisation is bimodal per seed: a policy either handles the later v10 evaders (0.82-0.97) or fails on all of
   them (0.10-0.29).
 
-**Pending**: final runs F2a (exploitability
-of the acceleration-input pursuer) and F2b/F2c (self-play campaigns with vs without the acceleration input) queued.
+**Final runs (F2a, 5 seeds)**
+- The acceleration-input pursuer is **less exploitable** than the plain one: exploitability 0.397 vs 0.672, paired
+  -0.275 [-0.522, -0.044] (without one failed exploiter -0.161 [-0.338, -0.005]). Still exploitable (0.28-0.63 on
+  4 of 5 seeds).
 
-## Relation to the reference papers (updated 2026-10-29 04:00)
+**Pending**: F2b (self-play campaigns with vs without the acceleration input, running since 06:19); A3d (learned
+velocity estimate from noisy positions; offline running, closed loop queued before F4); F4 v2 (self-play with the
+estimated velocity, learned vs EMA filter), F3 (samplers in self-play), final evaluations F2c / F4c / F3c.
+
+## Relation to the reference papers (updated 2026-10-29 12:00)
 
 Reference papers (the thesis is positioned against these three):
 **[AgilePE]** Tang et al. 2026, arXiv:2608.14135; **[Roncero]** Sanchez Roncero et al. 2026 (AMSPBH),
@@ -119,7 +125,7 @@ disagrees under our protocol, extends the claim, or does not test it.
 | 3 | Our addition: sample by quality *and* diversity (QD-DPP). No reference paper uses diversity in sampling. | D1: QD-DPP beats both hardness samplers (vs S-M held-out RL +0.185 [+0.110, +0.259]; vs S-W +0.131 [+0.038, +0.223]) but is **not** better than uniform (+0.042 [-0.069, +0.131]). D1b: bounds the sampling mass of duplicates but does not protect performance. F1: no sampler effect once the acceleration input is present. D2: not less exploitable. | **New, mostly negative:** diversity repairs the damage hardness prioritisation does in our setting, nothing more. |
 | 4 | Population training generalises to unseen opponents (Roncero: unseen APF evader; Gavin: SP/PFSP pursuers vs other evaders). | Consistent for scripted opponents: held-out scripted evaders (zigzag, fast flee, 4 switching evaders) are neutralised at J 0.99-1.00 by every pursuer. **Not** for learned opponents: against the independent v10 lineage the generalist loses up to 0.37 J to a specialist; fresh exploiters (PPO best responses, 100M frames) reach J 0.22-0.43 against it (X3), and the mean exploitability per sampler is 0.44-0.69 (D2; one failed exploiter included). | **Consistent for scripted, contradicted for learned opponents.** None of the three papers reports exploitability or held-out RL lineages. |
 | 5 | Seeds may converge to different strategies (Roncero, limitations). | Generalist (uniform sampler) train J 0.56-0.87 across 5 seeds; held-out generalisation is **bimodal per seed**: 1-2 of 5 seeds fail on all later v10 evaders (J 0.10-0.29) while the others reach 0.82-0.97 (F1). | **Extends:** quantifies it; with 3 seeds (Roncero) effects of +/- 0.1 can come from one seed. |
-| 6 | Observation design: Roncero and Gavin give the pursuer opponent position + velocity to a memoryless MLP; Gavin leaves "trajectory prediction" out of scope; AgilePE adds a temporal window of opponent state. | Adding the opponent's acceleration (finite difference of two consecutive observations) is the **largest effect in this thesis**: train 0.722 -> 0.940 (+0.199 [+0.128, +0.270]), exploiters 0.497 -> 0.983 (+0.464 [+0.239, +0.638]), held-out RL 0.634 -> 0.838 (CI includes 0 because of the bimodal seeds) (F1, 5 seeds). A learned acceleration estimate does the same (A2b, 5 seeds: all paired differences to the finite difference within +/- 0.04, n.s.). A raw 10-step history stack (our analogue of a temporal window) was *worse* than no history (train -0.254 [-0.355, -0.152]) (A1b). | **New:** a memoryless pursuer with position + velocity (Roncero, Gavin) is limited by the missing opponent acceleration far more than by opponent sampling. Caveat: AgilePE's window length and architecture are not given, so the history-stack result is not a test of AgilePE itself. |
+| 6 | Observation design: Roncero and Gavin give the pursuer opponent position + velocity to a memoryless MLP; Gavin leaves "trajectory prediction" out of scope; AgilePE adds a temporal window of opponent state. | Adding the opponent's acceleration (finite difference of two consecutive observations) is the **largest effect in this thesis**: train 0.722 -> 0.940 (+0.199 [+0.128, +0.270]), exploiters 0.497 -> 0.983 (+0.464 [+0.239, +0.638]), held-out RL 0.634 -> 0.838 (CI includes 0 because of the bimodal seeds) (F1, 5 seeds). A learned acceleration estimate does the same (A2b, 5 seeds: all paired differences to the finite difference within +/- 0.04, n.s.). It also lowers exploitability: 0.672 -> 0.397, paired -0.275 [-0.522, -0.044] (F2a). A raw 10-step history stack (our analogue of a temporal window) was *worse* than no history (train -0.254 [-0.355, -0.152]) (A1b). | **New:** a memoryless pursuer with position + velocity (Roncero, Gavin) is limited by the missing opponent acceleration far more than by opponent sampling. Caveat: AgilePE's window length and architecture are not given, so the history-stack result is not a test of AgilePE itself. |
 | 7 | Future work in Roncero: online adaptation, recurrent policies. | Noise-free, online RLS adaptation of a learned opponent model adds nothing in closed loop (A1b, A2b; within or across episodes); a random reservoir (ESN) is worse than no adaptation. **Under sensor noise it helps**: RLS vs frozen basis +0.09 train, +0.24 exploiters, CIs exclude 0 (A3c, policies trained noise-free). Recurrent policies (GRU) **not tested**. | **New, conditional:** online opponent-model adaptation pays off under sensor noise, not with perfect state (Roncero's setting). |
 | 8 | Sensor noise: AgilePE reports robustness under real sensor noise (mocap + IMU); Roncero and Gavin assume perfect state. | With 2 cm / 8 cm/s noise (eval only, policies trained clean): the finite-difference acceleration input collapses (train 0.94 -> 0.33, below the plain pursuer 0.70); the learned estimator + RLS keeps 0.80 and beats it by +0.47 train / +0.38 held-out RL / +0.49 exploiters (A3c, 5 seeds). Without any evader velocity (A3b), every pursuer is weak (~0.29) and the learned estimator is noise-proof but not better than no estimator. | **New:** opponent-acceleration inputs must be learned, not differenced, once sensing is noisy; the perfect-state results of Roncero and Gavin would not transfer to such inputs. Limited to eval-time noise until F4. |
 | 9 | Real-world transfer (all three), multi-pursuer coordination (Gavin), FOV-limited sensing (AgilePE). | Not studied. | **Not tested.** |
@@ -717,3 +723,31 @@ Held-out RL is **bimodal** for the acceleration-input policies. Each seed either
   setting.
 - Generalisation to the v10 lineage is a seed-level, all-or-nothing property: about 1 in 3-5 runs fails on it,
   regardless of sampler.
+## F2a_exploit_acc (done 2026-10-29 06:19; 5 seeds)
+
+Is the pursuer with the opponent-acceleration input harder to exploit? One fresh exploiter evader (PPO from
+scratch, 100M frames, plain observation, seed 200 + s as in D2) against each F1 "uniform + acceleration" pursuer;
+compared seed-paired with D2's uniform plain-observation pursuers (same seeds, same exploiter seeds).
+[F2a_exploit_acc/summary.md](F2a_exploit_acc/summary.md).
+
+| seed | plain exploitability (D2 S-U) | acc exploitability | acc: capture / timeout vs exploiter |
+|---|---|---|---|
+| 0 | 0.697 | 0.632 | 0.33 / 0.63 |
+| 1 | 0.803 | 0.070 | 0.24 / 0.07 (exploiter mostly crashes / leaves the arena) |
+| 2 | 0.513 | 0.569 | 0.37 / 0.53 |
+| 3 | 0.644 | 0.439 | 0.49 / 0.42 |
+| 4 | 0.705 | 0.276 | 0.70 / 0.27 |
+| mean [95 % CI] | 0.672 [0.586, 0.745] | **0.397 [0.218, 0.568]** | |
+
+Seed-paired acc - plain: **-0.275 [-0.522, -0.044]** (n = 5). Without seed 1, where the exploiter failed to learn to
+fly safely (J 0.93 although it is captured only 24 % of the time): -0.161 [-0.338, -0.005] (n = 4).
+
+- The acceleration input **lowers exploitability** (CI excludes 0, also without the failed exploiter), in addition
+  to its gains on train / held-out / X3 exploiters (F1). It is the only intervention in this thesis that reduced
+  exploitability; no sampler did (D2).
+- The pursuer stays exploitable: a fresh exploiter still escapes neutralisation in 28-63 % of episodes on 4 of 5
+  seeds, mostly by surviving to timeout.
+- Prediction "lower than plain (0.672), mean 0.3-0.5, paired CI excludes 0; still clearly > 0": **held**
+  (0.397; one seed's exploiter failed, as one of 20 did in D2).
+- Bookkeeping: the driver's first summary showed 3 of 5 seeds (lane-lock bug); rebuilt from the eval files on disk.
+

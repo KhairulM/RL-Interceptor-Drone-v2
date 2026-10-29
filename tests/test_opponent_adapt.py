@@ -98,3 +98,41 @@ class OpponentAdapterTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_fd_ema_velocity_estimator_exact_for_constant_velocity():
+    # Evader at p_e = p0 + v t dt, pursuer still at the origin: z_pos = [rel_pos, own_pos, own_vel].
+    g = torch.Generator().manual_seed(1)
+    v, p0 = torch.randn(4, 3, generator=g), torch.randn(4, 3, generator=g)
+    est = oa.EvaderVelEstimator(4, "fd_ema", DT, ema_alpha=0.3)
+    zero = torch.zeros(4, 3)
+    out0 = est.step(torch.cat([p0, zero, zero], -1)).clone()
+    torch.testing.assert_close(out0, zero)
+    for t in range(1, 20):
+        out = est.step(torch.cat([p0 + v * t * DT, zero, zero], -1))
+        torch.testing.assert_close(out, v, rtol=1e-4, atol=1e-4)
+    est.reset(torch.tensor([0, 2]))
+    out = est.step(torch.cat([p0, zero, zero], -1), mask=torch.tensor([True, False, True, False]))
+    torch.testing.assert_close(out[[0, 2]], torch.zeros(2, 3))
+    torch.testing.assert_close(out[[1, 3]], v[[1, 3]], rtol=1e-4, atol=1e-4)
+
+
+def test_nf_velocity_target_is_frozen_readout_of_history(tmp_path):
+    K, d, hidden = 3, 4, 8
+    phi = oa.BasisNet(K * oa.Z_DIM, d, hidden)
+    theta0 = torch.randn(3, d + 1)
+    path = tmp_path / "vel.pt"
+    torch.save({"phi": phi.state_dict(), "theta0": theta0, "z_mean": torch.zeros(9), "z_std": torch.ones(9),
+                "in_dim": K * oa.Z_DIM, "d": d, "hidden": hidden, "horizon": 0, "history": K, "target": "vel"}, path)
+    est = oa.EvaderVelEstimator(2, "nf", DT, model_path=str(path), history=K)
+    zs = [torch.randn(2, 9) for _ in range(4)]
+    for z in zs:
+        out = est.step(z)
+    f = phi(torch.stack(zs[-K:], 1).flatten(1))
+    f = torch.cat([f, torch.ones_like(f[:, :1])], -1)
+    torch.testing.assert_close(out, f @ theta0.T)
+    try:
+        oa.OpponentAdapter(2, kind="nf", history=K, horizon=0, model_path=str(path), target="vel")
+        raise AssertionError("target=vel without freeze must fail")
+    except ValueError:
+        pass
