@@ -593,7 +593,7 @@ train pool, uniform, 150M frames, noise-free training. P_none: nothing added. P_
 position (`oracle.accel_source=pos`). P_nf: frozen learned estimator from A3a (aug basis, H = 10, 10-step window of
 relative position / own position / own velocity). Note: both estimators give the evader's **acceleration**, not its
 velocity; the policy is memoryless. Eval noise-free ("clean") and with the sensor-noise model ("noisy"); P_fd also
-with the tuned EMA ("noisyema", 2 of 3 seeds at write-up, last eval still running).
+with the tuned EMA ("noisyema"; 3 seeds, third seed added 10-29 18:40).
 [A3b_posonly/summary.md](A3b_posonly/summary.md). Mean J, 95 % bootstrap CI over 3 seeds:
 
 | policy / eval | train | held-out RL | held-out scripted | exploiters* |
@@ -603,11 +603,28 @@ with the tuned EMA ("noisyema", 2 of 3 seeds at write-up, last eval still runnin
 | P_none noisy | 0.288 [0.283, 0.293] | 0.291 [0.239, 0.322] | 0.863 [0.825, 0.907] | 0.381 [0.269, 0.530] |
 | P_fd clean | **0.378** [0.342, 0.413] | 0.215 [0.200, 0.223] | **0.984** [0.982, 0.987] | 0.268 [0.261, 0.281] |
 | P_fd noisy | 0.073 [0.043, 0.113] | 0.084 [0.042, 0.140] | 0.086 [0.073, 0.099] | 0.343 [0.221, 0.470] |
-| P_fd noisy + EMA (n=2) | 0.254 [0.248, 0.260] | 0.167 [0.153, 0.181] | 0.863 [0.819, 0.907] | 0.328 [0.278, 0.378] |
+| P_fd noisy + EMA | 0.254 [0.248, 0.260] | 0.162 [0.152, 0.181] | 0.874 [0.819, 0.907] | 0.341 [0.278, 0.378] |
 | P_nf clean | 0.303 [0.269, 0.321] | 0.269 [0.252, 0.278] | 0.902 [0.850, 0.936] | 0.233 [0.222, 0.253] |
 | P_nf noisy | 0.302 [0.269, 0.321] | 0.263 [0.255, 0.268] | 0.898 [0.852, 0.928] | 0.229 [0.222, 0.239] |
 
 \* exploiters were trained against M0 seed 0 (a velocity-observing pursuer).
+
+Capture rate / pursuer crash rate (mean over 3 seeds; added 10-29 18:40 from the same eval files). J also counts
+evader crashes and evader out-of-bounds, so J can be well above the capture rate:
+
+| policy / eval | train | held-out RL | held-out scripted | exploiters |
+|---|---|---|---|---|
+| P_none clean | 0.177 / 0.010 | 0.187 / 0.009 | 0.676 / 0.016 | 0.026 / 0.005 |
+| P_none noisy | 0.178 / 0.010 | 0.186 / 0.010 | 0.678 / 0.017 | 0.027 / 0.004 |
+| P_fd clean | 0.286 / 0.013 | 0.132 / 0.011 | 0.796 / 0.014 | 0.076 / 0.008 |
+| P_fd noisy | **0.001 / 0.928** | **0.001 / 0.917** | **0.001 / 0.915** | 0.001 / 0.664 |
+| P_fd noisy + EMA | 0.168 / 0.014 | 0.085 / 0.014 | 0.627 / 0.021 | 0.139 / 0.016 |
+| P_nf clean | 0.198 / 0.004 | 0.171 / 0.004 | 0.700 / 0.004 | 0.035 / 0.002 |
+| P_nf noisy | 0.198 / 0.004 | 0.170 / 0.005 | 0.698 / 0.004 | 0.038 / 0.001 |
+
+- The P_fd noisy collapse is a **crash** failure, not a missed-intercept failure: the pursuer crashes in ~92 % of
+  episodes and captures almost never (0.001). Its J of 0.34 against the exploiters therefore comes from evader
+  crashes / out-of-bounds, not from captures.
 
 Seed-paired differences (mean [95 % CI], 3 seeds):
 
