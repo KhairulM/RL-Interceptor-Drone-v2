@@ -8,7 +8,7 @@ the log).
 
 1. Read section "Current state" below, then the plan's section for the active experiment.
 2. Check whether a job is still running: `nvidia-smi` and `ps aux | grep -E "run_stage|thesis/run.py" | grep -v grep`.
-   Only one Isaac job may run at a time (single RTX 5090).
+   At most two Isaac jobs may run at once (GPU fits two; host RAM is the limit, see "Running jobs").
 3. Every run writes a `DONE` marker in its directory. The driver skips finished runs, so re-running the same command
    resumes where it stopped: `python scripts/experiments/thesis/run.py --exp <ID>` (from the repo root, inside the
    project's Python env; see "Environment").
@@ -47,22 +47,29 @@ the log).
 | A3a / A3b / A3c (positions-only + sensor noise) | A3a **done** (run 2, float32, 18:46; H*=10, aug basis, EMA 0.05). A3b **done** (02:15, 3 seeds); A3c **done** (03:47, 5 seeds) | `A3a_posonly/`, `A3b_posonly/`, `A3c_noise_ref/` | added 10-28 (user request); `exps/a3_posonly.py`; env `observation.agent_rel_vel`, `oracle.accel_source=pos`, `adapt.z_mode=pos` (smoke-tested) |
 | A3d (learned velocity estimate from noisy positions) | offline **done** (11:16: learned 0.29 vs EMA 0.44 m/s noisy; rule chose the clean basis); closed loop **done** 22:00 (3 seeds; V_nf - V_ema n.s. except held-out scripted) | `A3d_velest/` | added 10-29 (user choice after A3b/A3c), pre-registered ~11:00 (pushed 11:05); `exps/a3d_velest.py`; env `observation.rel_vel_source`, adapter target `vel` (unit-tested; first Isaac use = A3d closed loop) |
 | A3e (estimator architectures, offline) | **done** 20:28 (pre-registered 20:19) | `A3e_estimators/` | `exps/a3e_estimators.py` |
-| F2a / F2b / F2c (final runs) | F2a **done** (06:19, 5 seeds); smoke tests F2a/F2b/F3/F4v1 passed 03:48-04:51; F2b **done** (campaigns finished 18:15 acc / 18:33 plain; evaluated in F2c) | `F2a_exploit_acc/`, `scripts/selfplay/outputs/thesis-F2-{acc,plain}/`, `F2c_final_eval/` | pre-registered 10-28 19:30 (plan Phase F); `exps/f2_final.py`; env flag `oracle.opp_side_accel` |
+| F2a / F2b / F2c (final runs) | F2a **done** (06:19, 5 seeds); smoke tests F2a/F2b/F3/F4v1 passed 03:48-04:51; F2b **done** (campaigns finished 18:15 acc / 18:33 plain); F2c **moved forward** (10-30): starts when campaign nf-s0 frees its slot (~11:40) | `F2a_exploit_acc/`, `scripts/selfplay/outputs/thesis-F2-{acc,plain}/`, `F2c_final_eval/` | pre-registered 10-28 19:30 (plan Phase F); `exps/f2_final.py`; env flag `oracle.opp_side_accel` |
 | F3 / F3c (samplers in self-play) | queued after F4 on lanes C/D; amended 10-29 19:40: uniform / hedge / qd_dpp / **pfsp**, 2 seeds (7 new campaigns) | `scripts/selfplay/outputs/thesis-F3-*`, `F3_sampler_sp/` | pre-registered 10-28 20:30; `exps/f3_sampler_sp.py`; orchestrator `pursuer_sampler: hedge|qd_dpp`, `eval_extra_overrides` |
 | F4 / F4c **v2** (learned opponent model in self-play, estimated velocity + noise) | redesigned 10-29 ~11:00 (user choice): A3d closed loop done 22:00; v2 smoke **ok** 22:24 (both arms); 6 campaigns **running** since 22:24 (nf-s0, ema-s0 first) | `scripts/selfplay/outputs/thesis-F4-*`, `F4_estimator_sp/` | pre-registered 10-28 21:30; `exps/f4_estimator_sp.py`; env `observation.opp_drop_rel_vel`, `adapt.opp_side`; orchestrator `role_task_overrides` |
 | D3 campaign (QD-DPP), BayesID | dropped (D3 replaced by F2b/F3) | | |
 | F1_final | **done** (10-28 04:22, 5 seeds) | `F1_final/` | 2x2 factorial, 5 seeds, `exps/f1_final.py` (reuses X3 / D1 / X4 runs) |
 
-Running jobs (relaunched 10-28 18:27, detached with `nohup setsid`, stdout in `laneA_out.txt` / `laneB_out.txt`):
-lane A = `D1c --seeds 3` -> `A2b --seeds 5` -> (waits for `A3a_posonly/choice.json`) -> `A3b` -> `A3c`;
-lane B = `A3a` -> `A2b --seeds 5` -> `A3b` -> `A3c`. Runs are shared via per-run lock files. **At most 2 Isaac
-processes run at once across all drivers** (`common.MAX_ISAAC`, slot files in `.isaac_slots/`): each needs ~17.5 GB
-of host RAM on the 62 GB machine. If anything died, re-run `run.py --exp <ID>` (resumable, concurrency-safe).
-lane C = waits for lanes A and B to exit -> smoke tests `F2a`, `F2b`, `F3`, `F4` (`--smoke`, chained with &&) && touch
-`F2a_exploit_acc/smoke/PASSED` -> `F2a` -> `F2b` -> `F4` -> `F3` -> `F2c` -> `F4c` -> `F3c`; lane D = waits for A/B and the PASSED marker,
-then the same chain (stdout `laneC_out.txt`, `laneD_out.txt`). Campaigns (F2b: 2, F4: 6, F3: 7 new) are shared between lanes via
-`<campaign>/DONE.lock`; each holds one Isaac slot for ~10 h. If a smoke test fails, both lanes stop: fix, rerun the chains.
-Expected: F2 campaigns ~10-29 16:00, F4 ~10-30 22:00, F3 ~11-01 14:00, final evals ~11-01 night. If late, drop F3 seed 2.
+Running jobs (re-chained 10-30 11:23, see log). **At most 2 Isaac processes run at once across all drivers**
+(`common.MAX_ISAAC`, slot files in `.isaac_slots/`; each process needs ~17.5 GB of host RAM on the 62 GB machine).
+Experiments are shared between drivers via lock files (`<ckpt>.lock`, `<eval json>.lock`, `<campaign>/DONE.lock`,
+holding the driver PID; stale locks of dead PIDs are taken over).
+- F4 driver PID 853068 (stdout `laneD_out.txt`): finishing campaign thesis-F4-nf-s0, then exits (the remaining F4
+  campaigns ema-s1 / nf-s2 / ema-s2 are held by placeholder locks of PID 2104746 = `sleep infinity`, PID also in
+  `.f4_hold.pid`).
+- F4 driver PID 877989 (stdout `laneC_out.txt`): running campaign thesis-F4-nf-s1 (started 10:58), then continues with
+  any free F4 campaign.
+- **New lane-D chain** (detached shell `laneD2`): waits for 853068 to exit -> `F2c` (F2b campaigns are done since
+  10-29 18:33) -> removes the placeholder locks and kills 2104746 -> `F4 -> F3 -> F2c -> F4c -> F3c`.
+- **New lane-C chain** (detached shell `laneC2`): waits for 877989 and 2104746 to exit -> `F4 -> F3 -> F2c -> F4c -> F3c`.
+- If a chain died: re-run `run.py --exp <ID>` for the remaining IDs in that order (resumable, concurrency-safe). If
+  2104746 died before F2c finished, nothing breaks: the F4 campaigns just start earlier.
+- Expected (12.5 h per campaign): F2c ~10-30 15:00; F4 campaigns done ~10-31 15:00; F3 (7 campaigns) ~11-02 15:00;
+  F4c / F3c evals ~11-02 night - 11-03. Freeze 11-05. No further fallback is pre-registered (F3 seed 2 was already
+  dropped on 10-29); if F3 runs late, ask the user before cutting anything.
 
 ## Decisions taken
 
@@ -98,6 +105,13 @@ Expected: F2 campaigns ~10-29 16:00, F4 ~10-30 22:00, F3 ~11-01 14:00, final eva
 ## Log
 
 (Timestamps of log entries written on 10-27 before 21:20 are approximate; `driver_log.txt` has exact times.)
+
+- 2026-10-30 11:25: Status check: all healthy (F4 nf-s0 at stage 8/9, ema-s0 done 10:58, nf-s1 running; 2 Isaac
+  processes, 10 GB RAM free). Campaigns take ~12.5 h, so the old chain order would have delivered F2c (inputs ready
+  since 10-29 18:33) only ~11-02. Re-chained without changing any experiment: placeholder locks keep the nf-s0 driver
+  from starting another F4 campaign, so its slot runs F2c first (~3 h); F4 / F3 / F4c / F3c keep their order.
+  F4 campaigns finish ~3 h later than they would have. Old chain wrappers 3223187 / 3223203 stopped (their F4 drivers
+  and campaigns untouched). Details in "Running jobs".
 
 - 2026-10-29 22:26: F4 v2 smoke passed (both arms, 22:24); campaigns thesis-F4-nf-s0 (lane C) and thesis-F4-ema-s0 (lane D) started 22:24 / 22:25.
 - 2026-10-29 22:15: A3d closed loop done (3 seeds, noisy eval): estimated velocity lifts train J 0.29 (none) -> 0.38 (EMA) / 0.40 (learned + learned acc.), true velocity 0.62; held-out RL no gain (EMA -0.07 vs none); V_nf - V_ema +0.02 train / +0.03 held-out RL (n.s.), +0.03 held-out scripted (supported). Prediction V_nf > V_ema did not hold; "far above P_none" only on train / scripted; "below M0" held. P_none's higher exploiter J is evader out-of-bounds, not capture. Confound (V_nf also gets acceleration) and A3e limitation recorded. Lanes C/D moved to the F4 v2 smoke at 21:55.
