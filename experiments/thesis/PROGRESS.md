@@ -106,6 +106,11 @@ holding the driver PID; stale locks of dead PIDs are taken over).
 
 (Timestamps of log entries written on 10-27 before 21:20 are approximate; `driver_log.txt` has exact times.)
 
+- 2026-10-30 11:47: Handover worked: nf-s0 finished 11:42 (exit 0), its driver skipped the 4 locked F4 campaigns and
+  exited; F2c started 11:43 (holds slot 0; nf-s1 holds slot 1). Note: the auto-sync commit 7fbb72a is titled
+  "thesis: F4 finished", but only the nf-s0 driver ended; F4 still has ema-s1 / nf-s2 / ema-s2 to run (+ nf-s1 running).
+  The F4 `=== done F4` line at 11:42:26 in `driver_log.txt` has the same meaning. GitHub reports the repository moved to
+  `git@github.com:KhairulM/RL-Interceptor-Drone-v2.git`; pushes to the old URL are redirected and succeed.
 - 2026-10-30 11:25: Status check: all healthy (F4 nf-s0 at stage 8/9, ema-s0 done 10:58, nf-s1 running; 2 Isaac
   processes, 10 GB RAM free). Campaigns take ~12.5 h, so the old chain order would have delivered F2c (inputs ready
   since 10-29 18:33) only ~11-02. Re-chained without changing any experiment: placeholder locks keep the nf-s0 driver
