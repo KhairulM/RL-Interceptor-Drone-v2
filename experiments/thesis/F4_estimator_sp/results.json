@@ -1,0 +1,121 @@
+{
+  "per_campaign": {
+    "nf/0": {
+      "train": 0.36413110569119456,
+      "heldout_rl": 0.31871774544318515,
+      "heldout_scripted": 0.8609158992767334,
+      "x3_exploiters": 0.9528876344362894,
+      "heldout_rl_clean": 0.3610332136352857,
+      "x3_exploiters_clean": 0.9648241400718689,
+      "other_campaign_evaders": 0.5811513364315033,
+      "own_campaign_evaders": 0.86295485496521,
+      "exploitability": 0.8286300003528595
+    },
+    "ema/0": {
+      "train": 0.3017829687101766,
+      "heldout_rl": 0.24272802161673704,
+      "heldout_scripted": 0.8343755304813385,
+      "x3_exploiters": 0.41147221128145856,
+      "heldout_rl_clean": 0.24879523925483227,
+      "x3_exploiters_clean": 0.4743363857269287,
+      "other_campaign_evaders": 0.4149918995797634,
+      "own_campaign_evaders": 0.7786539494991302,
+      "exploitability": 0.5518858134746552
+    },
+    "nf/1": {
+      "train": 0.37784375697374345,
+      "heldout_rl": 0.3019259683787823,
+      "heldout_scripted": 0.8246993025143942,
+      "x3_exploiters": 0.7909010847409567,
+      "heldout_rl_clean": 0.3105650159219901,
+      "x3_exploiters_clean": 0.804300049940745,
+      "other_campaign_evaders": 0.6744918242096901,
+      "own_campaign_evaders": 0.6990839689970016,
+      "exploitability": 0.9109523817896843
+    },
+    "ema/1": {
+      "train": 0.45893664211034774,
+      "heldout_rl": 0.3109831965217988,
+      "heldout_scripted": 0.9311739305655161,
+      "x3_exploiters": 0.2623049318790436,
+      "heldout_rl_clean": 0.3209870035449664,
+      "x3_exploiters_clean": 0.321184237798055,
+      "other_campaign_evaders": 0.5427615530788898,
+      "own_campaign_evaders": 0.7360401302576065,
+      "exploitability": 0.7861127555370331
+    },
+    "nf/2": {
+      "train": 0.6125822952017188,
+      "heldout_rl": 0.5617844810088476,
+      "heldout_scripted": 0.9492921034495035,
+      "x3_exploiters": 0.9566378196080526,
+      "heldout_rl_clean": 0.5715774397055308,
+      "x3_exploiters_clean": 0.9646571278572083,
+      "other_campaign_evaders": 0.8303811728954316,
+      "own_campaign_evaders": 0.7473497614264488,
+      "exploitability": 0.8767275884747505
+    },
+    "ema/2": {
+      "train": 0.4270763097330928,
+      "heldout_rl": 0.2612690906971693,
+      "heldout_scripted": 0.9744381010532379,
+      "x3_exploiters": 0.7030663887659708,
+      "heldout_rl_clean": 0.27140450042982894,
+      "x3_exploiters_clean": 0.7551489075024923,
+      "other_campaign_evaders": 0.538953716494143,
+      "own_campaign_evaders": 0.7185542210936546,
+      "exploitability": 0.6871611475944519
+    }
+  },
+  "aggregate": {
+    "nf": {
+      "exploitability": {
+        "mean": 0.8721033235390981,
+        "lo": 0.8286300003528595,
+        "hi": 0.9109523817896843
+      },
+      "heldout_rl": {
+        "mean": 0.39414273161027163,
+        "lo": 0.3019259683787823,
+        "hi": 0.5617844810088476
+      },
+      "heldout_rl_clean": {
+        "mean": 0.4143918897542688,
+        "lo": 0.3105650159219901,
+        "hi": 0.5715774397055308
+      },
+      "heldout_scripted": {
+        "mean": 0.8783024350802103,
+        "lo": 0.8246993025143942,
+        "hi": 0.9492921034495035
+      },
+      "other_campaign_evaders": {
+        "mean": 0.6953414445122084,
+        "lo": 0.5811513364315033,
+        "hi": 0.8303811728954317
+      },
+      "own_campaign_evaders": {
+        "mean": 0.7697961951295534,
+        "lo": 0.6990839689970016,
+        "hi": 0.86295485496521
+      },
+      "train": {
+        "mean": 0.451519052622219,
+        "lo": 0.3641311056911946,
+        "hi": 0.6125822952017188
+      },
+      "x3_exploiters": {
+        "mean": 0.9001421795950996,
+        "lo": 0.7909010847409567,
+        "hi": 0.9566378196080526
+      },
+      "x3_exploiters_clean": {
+        "mean": 0.9112604392899407,
+        "lo": 0.804300049940745,
+        "hi": 0.9648241400718689
+      }
+    },
+    "none": {}
+  },
+  "paired_nf_minus_none": {}
+}
