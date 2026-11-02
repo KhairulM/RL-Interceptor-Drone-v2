@@ -49,7 +49,7 @@ the log).
 | A3e (estimator architectures, offline) | **done** 20:28 (pre-registered 20:19) | `A3e_estimators/` | `exps/a3e_estimators.py` |
 | F2a / F2b / F2c (final runs) | F2a **done** (06:19, 5 seeds); smoke tests F2a/F2b/F3/F4v1 passed 03:48-04:51; F2b **done** (campaigns finished 18:15 acc / 18:33 plain); F2c **done** (10-30 14:29, moved forward; in RESULTS.md) | `F2a_exploit_acc/`, `scripts/selfplay/outputs/thesis-F2-{acc,plain}/`, `F2c_final_eval/` | pre-registered 10-28 19:30 (plan Phase F); `exps/f2_final.py`; env flag `oracle.opp_side_accel` |
 | F3 / F3c (samplers in self-play) | queued after F4 on lanes C/D; amended 10-29 19:40: uniform / hedge / qd_dpp / **pfsp**, 2 seeds (7 new campaigns) | `scripts/selfplay/outputs/thesis-F3-*`, `F3_sampler_sp/` | pre-registered 10-28 20:30; `exps/f3_sampler_sp.py`; orchestrator `pursuer_sampler: hedge|qd_dpp`, `eval_extra_overrides` |
-| F4 / F4c **v2** (learned opponent model in self-play, estimated velocity + noise) | 6 campaigns **done** (10-31 16:36); F4c **running** (moved forward, 16:39) | `scripts/selfplay/outputs/thesis-F4-*`, `F4_estimator_sp/` | pre-registered 10-28 21:30; `exps/f4_estimator_sp.py`; env `observation.opp_drop_rel_vel`, `adapt.opp_side`; orchestrator `role_task_overrides` |
+| F4 / F4c **v2** (learned opponent model in self-play, estimated velocity + noise) | **done** (F4c 10-31 22:09; analysis fixed and written up 11-02) | `scripts/selfplay/outputs/thesis-F4-*`, `F4_estimator_sp/` | pre-registered 10-28 21:30; `exps/f4_estimator_sp.py`; env `observation.opp_drop_rel_vel`, `adapt.opp_side`; orchestrator `role_task_overrides` |
 | D3 campaign (QD-DPP), BayesID | dropped (D3 replaced by F2b/F3) | | |
 | F1_final | **done** (10-28 04:22, 5 seeds) | `F1_final/` | 2x2 factorial, 5 seeds, `exps/f1_final.py` (reuses X3 / D1 / X4 runs) |
 
@@ -57,13 +57,16 @@ Running jobs (re-chained 10-30 11:23, see log). **At most 2 Isaac processes run 
 (`common.MAX_ISAAC`, slot files in `.isaac_slots/`; each process needs ~17.5 GB of host RAM on the 62 GB machine).
 Experiments are shared between drivers via lock files (`<ckpt>.lock`, `<eval json>.lock`, `<campaign>/DONE.lock`,
 holding the driver PID; stale locks of dead PIDs are taken over).
-- **Lane-C chain** (detached shell `laneC2`, bash PID 2105521, stdout `laneC_out.txt`): F4 done; now `F3` (campaign
-  thesis-F3-hedge-s0 since 14:18 on 10-31) -> `F2c` (skips, done) -> `F4c` -> `F3c`.
-- **Lane-D chain v3** (detached shell `laneD3`, stdout `laneD_out.txt`, started 10-31 16:39): `F4c` (running) -> `F3` ->
-  `F2c` (skips) -> `F4c` -> `F3c`.
+- **Lane-C chain v4** (detached shell `laneC4`, stdout `laneC_out.txt`, started 11-02 10:22): `F3 -> F3c`.
+- **Lane-D chain v4** (detached shell `laneD4`, stdout `laneD_out.txt`, started 11-02 10:22): `F3 -> F3c`.
+- F3 status: hedge-s0 done (11-01 02:32), qd_dpp-s0 resumed at stage 7, pfsp-s0 resumed at stage 4; then the 4 seed-1
+  campaigns (uniform / hedge / qd_dpp / pfsp, campaign seed 100). F3c waits until all F3 campaigns are DONE.
+- **After a reboot**: all lock files are stale and PIDs get reused, so delete them first
+  (`find experiments/thesis scripts/selfplay/outputs -name "*.lock" -delete`), then relaunch the two chains; campaigns
+  resume from their last finished stage (`fresh_start` is off).
 - If a chain died: re-run `run.py --exp <ID>` for the remaining IDs in that order (resumable, concurrency-safe). If
   2104746 died before F2c finished, nothing breaks: the F4 campaigns just start earlier.
-- Expected (12.5 h per campaign): F4c ~10-31 22:00; F3 (7 campaigns) ~11-02 19:00; F3c ~11-03. Freeze 11-05. No further fallback is pre-registered (F3 seed 2 was already
+- Expected (12.5 h per campaign): F3 ~11-03 18:30; F3c ~11-04 morning. Freeze 11-05. Freeze 11-05. No further fallback is pre-registered (F3 seed 2 was already
   dropped on 10-29); if F3 runs late, ask the user before cutting anything.
 
 ## Decisions taken
@@ -101,6 +104,12 @@ holding the driver PID; stale locks of dead PIDs are taken over).
 
 (Timestamps of log entries written on 10-27 before 21:20 are approximate; `driver_log.txt` has exact times.)
 
+- 2026-11-02 10:30: Power loss / hard hang: the previous boot ends 11-01 08:48:32 with no shutdown, OOM or kernel error
+  in the journal; machine back 11-02 10:19. Lost ~25.5 h. F3 qd_dpp-s0 (stage 7 of 9) and pfsp-s0 (stage 4 of 9)
+  resumed correctly after deleting all stale locks; chains v4 launched 10:22. F4c (done 10-31 22:09) was not yet in
+  RESULTS.md: its driver summary used the v1 arm names and omitted ema; analysis fixed and rerun (no Isaac), F4 written
+  up (section, summary, claim 8). nf generalises better (+0.20 other campaigns, +0.44 X3 exploiters) but is more
+  exploitable (+0.20). Oct 31 22:07 systemd OOM notice: some other user process, no thesis job killed (no -9 in logs).
 - 2026-10-31 16:45: All 6 F4 campaigns done (16:36, exit 0). F4c moved forward like F2c: with 7 F3 campaigns on 2
   lanes one lane idles ~12.5 h at the end anyway, so running F4c (~5 h) now does not delay the overall end. Stopped the
   lane-D chain and its 2.5-min-old campaign thesis-F3-qd_dpp-s0 (driver 4023766, run_stage 4023835); its directory was

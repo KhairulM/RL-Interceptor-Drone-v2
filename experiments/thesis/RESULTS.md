@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-10-30 14:32; details in the sections below)
+## Summary (updated 2026-11-02 10:30; details in the sections below)
 
 J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over
 seeds; "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position +
@@ -47,10 +47,16 @@ velocity, no acceleration).
   by making the pursuer crash (97 %)**, unlike the timeout-based exploits of pool-trained pursuers (0.40-0.69). The
   plain campaign shows the stage-to-stage cycling reported by the reference papers; the acc campaign barely cycles.
 
-**Running / pending**: F4 campaigns (2 of 6 done; nf-s1 and ema-s1 running, ~10-31 15:00) -> F3 (7 campaigns,
-~11-02 15:00) -> F4c / F3c evals (~11-03).
+- F4 (self-play, no true evader velocity, sensor noise; 3 seeds per arm): learned estimators (nf) vs EMA finite
+  difference (ema). nf generalises better: other campaigns' evaders +0.196 [+0.132, +0.291], X3 exploiters +0.441
+  [+0.254, +0.541], held-out RL +0.122 (n.s.). But nf is **more** exploitable (0.872 vs 0.675, +0.197 [+0.125, +0.277]):
+  in 2 of 3 nf campaigns the exploiter makes the pursuer crash (88-92 %). Prediction held for X3 exploiters, not for
+  exploitability.
 
-## Relation to the reference papers (updated 2026-10-30 14:32)
+**Running / pending**: F3 (samplers in self-play): 1 of 7 new campaigns done, 2 resumed after a power loss
+(machine down 11-01 08:48 - 11-02 10:19), 4 to go -> F3c. Expected F3 ~11-03 18:30, F3c ~11-04 morning.
+
+## Relation to the reference papers (updated 2026-11-02 10:30)
 
 Reference papers (the thesis is positioned against these three):
 **[AgilePE]** Tang et al. 2026, arXiv:2608.14135; **[Roncero]** Sanchez Roncero et al. 2026 (AMSPBH),
@@ -84,7 +90,7 @@ disagrees under our protocol, extends the claim, or does not test it.
 | 5 | Seeds may converge to different strategies (Roncero, limitations). | Generalist (uniform sampler) train J 0.56-0.87 across 5 seeds; held-out generalisation is **bimodal per seed**: 1-2 of 5 seeds fail on all later v10 evaders (J 0.10-0.29) while the others reach 0.82-0.97 (F1). | **Extends:** quantifies it; with 3 seeds (Roncero) effects of +/- 0.1 can come from one seed. |
 | 6 | Observation design: Roncero and Gavin give the pursuer opponent position + velocity to a memoryless MLP; Gavin leaves "trajectory prediction" out of scope; AgilePE adds a temporal window of opponent state. | Adding the opponent's acceleration (finite difference of two consecutive observations) is the **largest effect in this thesis**: train 0.722 -> 0.940 (+0.199 [+0.128, +0.270]), exploiters 0.497 -> 0.983 (+0.464 [+0.239, +0.638]), held-out RL 0.634 -> 0.838 (CI includes 0 because of the bimodal seeds) (F1, 5 seeds). A learned acceleration estimate does the same (A2b, 5 seeds: all paired differences to the finite difference within +/- 0.04, n.s.). It also lowers exploitability: 0.672 -> 0.397, paired -0.275 [-0.522, -0.044] (F2a). A raw 10-step history stack (our analogue of a temporal window) was *worse* than no history (train -0.254 [-0.355, -0.152]) (A1b). Under co-evolution (F2c, 1 seed per arm, descriptive) the gain is smaller: final pursuer +0.12 on held-out RL, +0.07 on the whole test set, but worse on the other campaign's evaders (0.74 vs 0.86) and no lower exploitability (0.965 vs 0.974); the acc campaign also cycles much less. | **New:** a memoryless pursuer with position + velocity (Roncero, Gavin) is limited by the missing opponent acceleration far more than by opponent sampling, when trained against a fixed pool; under co-evolution the evidence is weaker (one campaign per arm, mixed). Caveat: AgilePE's window length and architecture are not given, so the history-stack result is not a test of AgilePE itself. |
 | 7 | Future work in Roncero: online adaptation, recurrent policies. | Noise-free, online RLS adaptation of a learned opponent model adds nothing in closed loop (A1b, A2b; within or across episodes); a random reservoir (ESN) is worse than no adaptation. **Under sensor noise it helps**: RLS vs frozen basis +0.09 train, +0.24 exploiters, CIs exclude 0 (A3c, policies trained noise-free). Recurrent policies (GRU) **not tested**; a recurrent *estimator* (GRU, trained on noisy inputs) is the most accurate opponent-state estimator under noise offline (A3e: velocity -36 % vs the MLP used in closed loop). | **New, conditional:** online opponent-model adaptation pays off under sensor noise, not with perfect state (Roncero's setting). |
-| 8 | Sensor noise: AgilePE reports robustness under real sensor noise (mocap + IMU); Roncero and Gavin assume perfect state. | With 2 cm / 8 cm/s noise (eval only, policies trained clean): the finite-difference acceleration input collapses (train 0.94 -> 0.33, below the plain pursuer 0.70); the learned estimator + RLS keeps 0.80 and beats it by +0.47 train / +0.38 held-out RL / +0.49 exploiters (A3c, 5 seeds). Without any evader velocity (A3b), every pursuer is weak (~0.29) and the learned estimator is noise-proof but not better than no estimator. With an *estimated* velocity from noisy positions (A3d, 3 seeds): train 0.29 -> 0.38-0.40 (true velocity 0.62), no gain on held-out RL; the learned estimate is not clearly better than an EMA filter (+0.02 train, n.s.). | **New:** opponent-acceleration inputs must be learned, not differenced, once sensing is noisy; the perfect-state results of Roncero and Gavin would not transfer to such inputs. Limited to eval-time noise until F4. |
+| 8 | Sensor noise: AgilePE reports robustness under real sensor noise (mocap + IMU); Roncero and Gavin assume perfect state. | With 2 cm / 8 cm/s noise (eval only, policies trained clean): the finite-difference acceleration input collapses (train 0.94 -> 0.33, below the plain pursuer 0.70); the learned estimator + RLS keeps 0.80 and beats it by +0.47 train / +0.38 held-out RL / +0.49 exploiters (A3c, 5 seeds). Without any evader velocity (A3b), every pursuer is weak (~0.29) and the learned estimator is noise-proof but not better than no estimator. With an *estimated* velocity from noisy positions (A3d, 3 seeds): train 0.29 -> 0.38-0.40 (true velocity 0.62), no gain on held-out RL; the learned estimate is not clearly better than an EMA filter (+0.02 train, n.s.). In self-play with noise in training and evaluation (F4, 3 seeds per arm, estimated velocity only), learned estimators generalise better than the EMA filter (other campaigns' evaders +0.196, X3 exploiters +0.441, CIs exclude 0) but make the pursuer more exploitable (+0.197; crash-inducing exploits in 2 of 3 seeds). | **New:** opponent-acceleration inputs must be learned, not differenced, once sensing is noisy; the perfect-state results of Roncero and Gavin would not transfer to such inputs. Under co-evolution with noisy sensing the learned estimator trades better generalisation for higher exploitability. |
 | 9 | Real-world transfer (all three), multi-pursuer coordination (Gavin), FOV-limited sensing (AgilePE). | Not studied. | **Not tested.** |
 
 ## X0_replay (done 2026-10-26)
@@ -893,3 +899,52 @@ Findings:
   only the held-out RL subset passes, +0.116). Exploitability: 0.965 vs 0.974 is no meaningful difference.
 - Limitation: one seed per arm. In F1 the acceleration result was bimodal across seeds, so a single campaign per arm
   cannot separate an input effect from a seed effect.
+
+## F4_estimator_sp v2 (campaigns done 2026-10-31 16:36; F4c done 22:09; analysis fixed 2026-11-02 10:25; 3 seeds per arm)
+
+Self-play campaigns (reference papers' protocol: uniform sampling, 9 stages x 300M frames, pursuer first) in which
+the pursuer **never observes the true evader velocity** and is trained and evaluated with sensor noise. Both arms get
+an *estimated* evader velocity: **ema** = EMA-filtered finite difference of noisy positions (A3d V_ema, the classical
+baseline); **nf** = learned velocity estimate + learned acceleration estimate (A3d V_nf). Frozen pursuers seen by the
+evader get the same estimators with clean inputs. 3 campaign seeds per arm (0 / 100 / 200), final pursuer (stage 8)
+of each. [F4_estimator_sp/summary.md](F4_estimator_sp/summary.md), per-campaign values in `results.json`.
+
+Bookkeeping: the driver's first summary (10-31 22:09) still used the v1 arm names ("none" vs "nf"), so the ema arm was
+missing; rebuilt from the eval files on disk with the pre-registered contrast nf - ema (no data changed).
+
+| final pursuer vs | ema | nf | nf - ema (seed-paired) |
+|---|---|---|---|
+| thesis train pool | 0.396 [0.302, 0.459] | 0.452 [0.364, 0.613] | +0.056 [-0.081, +0.186] |
+| held-out RL (v10) | 0.272 [0.243, 0.311] | 0.394 [0.302, 0.562] | +0.122 [-0.009, +0.301] |
+| held-out RL, noise-free eval | 0.280 [0.249, 0.321] | 0.414 [0.311, 0.572] | +0.134 [-0.010, +0.300] |
+| held-out scripted | 0.913 [0.834, 0.974] | 0.878 [0.825, 0.949] | -0.035 [-0.106, +0.027] |
+| X3 exploiters | 0.459 [0.262, 0.703] | **0.900** [0.791, 0.957] | **+0.441 [+0.254, +0.541]** |
+| X3 exploiters, noise-free eval | 0.517 [0.321, 0.755] | 0.911 [0.804, 0.965] | **+0.394 [+0.210, +0.490]** |
+| own campaign's RL evaders | 0.744 [0.719, 0.779] | 0.770 [0.699, 0.863] | +0.025 [-0.037, +0.084] |
+| other F4 campaigns' RL evaders | 0.499 [0.415, 0.543] | **0.695** [0.581, 0.830] | **+0.196 [+0.132, +0.291]** |
+| exploitability (fresh exploiter, 100M frames) | **0.675** [0.552, 0.786] | 0.872 [0.829, 0.911] | **+0.197 [+0.125, +0.277]** (nf worse) |
+
+How the fresh exploiters win (fractions of episodes):
+
+| campaign | J vs exploiter | capture | pursuer crash | timeout | evader crash / OOB |
+|---|---|---|---|---|---|
+| ema-s0 / s1 / s2 | 0.448 / 0.214 / 0.313 | 0.13 / 0.12 / 0.14 | 0.00 / 0.00 / 0.00 | 0.55 / 0.78 / 0.68 | 0.32 / 0.09 / 0.17 |
+| nf-s0 / s1 / s2 | 0.171 / 0.089 / 0.123 | 0.13 / 0.05 / 0.09 | 0.01 / **0.92 / 0.88** | 0.82 / 0.00 / 0.00 | 0.04 / 0.04 / 0.03 |
+
+- With learned estimators the self-play pursuer **generalises better**: to the other campaigns' evaders (+0.196) and
+  to the X3 exploiters (+0.441), both CIs exclude 0. On held-out RL it is +0.122 (CI just includes 0). Train pool and
+  held-out scripted: no difference. Noise-free evaluation gives the same picture, so this is not only noise robustness.
+- But the nf pursuers are **more exploitable** (+0.197, CI excludes 0). In 2 of 3 nf campaigns the exploiter makes the
+  pursuer crash into the ground (88-92 %), the failure mode already seen in the F2c self-play pursuers. The ema
+  exploiters win by survival to timeout, and partly fail themselves (evader crash / OOB 9-32 %), which lowers the ema
+  arm's exploitability. Captures against the exploiter are similarly low in both arms (0.05-0.14).
+- Absolute level: without the true evader velocity both arms remain far below the full-state pursuers (held-out RL
+  0.27-0.39 vs 0.63-0.84 in F1), consistent with A3b / A3d.
+- On the fixed pool (A3d closed loop) nf and ema did not differ (+0.02 to +0.03, n.s.); under co-evolution nf is
+  clearly better at generalisation. The co-evolving opponents (evaders trained against the nf / ema pursuers) differ
+  between arms, so the arms are compared on the shared test sets and on each other's evaders, not on their own pool.
+- Prediction "nf > ema on held-out RL and X3 exploiters by >= 0.05; exploitability lower for nf (low confidence)":
+  X3 exploiters **held** (+0.441); held-out RL **held in direction and size, not significant** (+0.122, CI includes 0);
+  exploitability **did not hold** (nf higher by +0.197).
+- Limitation: 3 seeds, one exploiter per pursuer; the estimator is the clean-trained MLP chosen by the A3d rule, not the
+  better noise-trained GRU found later (A3e).

@@ -140,21 +140,23 @@ def analyse_f4(camps, split, test):
     agg = {a: {m: dict(zip(("mean", "lo", "hi"), an.bootstrap_ci([rows[(a, k)][m] for k in range(len(SEEDS))
                                                                     if (a, k) in rows and m in rows[(a, k)]])))
                for m in metrics if any((a, k) in rows and m in rows[(a, k)] for k in range(len(SEEDS)))}
-           for a in ("nf", "none")}
+           for a in ("nf", "ema")}
     diff = {}
     for m in metrics:
-        d = [rows[("nf", k)][m] - rows[("none", k)][m] for k in range(len(SEEDS))
-             if ("nf", k) in rows and ("none", k) in rows and m in rows[("nf", k)] and m in rows[("none", k)]]
+        d = [rows[("nf", k)][m] - rows[("ema", k)][m] for k in range(len(SEEDS))
+             if ("nf", k) in rows and ("ema", k) in rows and m in rows[("nf", k)] and m in rows[("ema", k)]]
         if d:
             diff[m] = dict(zip(("mean", "lo", "hi"), an.bootstrap_ci(d)), per_seed=d)
     save_json(os.path.join(F4C, "results.json"), {"per_campaign": {f"{a}/{k}": r for (a, k), r in rows.items()},
-                                                  "aggregate": agg, "paired_nf_minus_none": diff})
-    lines = ["# F4_estimator_sp summary", "", "Pursuer without evader velocity, trained and evaluated with sensor "
-             "noise (except *_clean). nf = + learned acceleration estimator. Mean over 3 campaign seeds [95 % CI].",
-             "", "| metric | none | nf | nf - none (paired) |", "|---|---|---|---|"]
+                                                  "aggregate": agg, "paired_nf_minus_ema": diff})
+    lines = ["# F4_estimator_sp summary (v2)", "", "Pursuer observes an *estimated* evader velocity (no true velocity), "
+             "trained and evaluated with sensor noise (except *_clean). ema = EMA-filtered finite-difference velocity "
+             "(A3d V_ema); nf = learned velocity + learned acceleration estimate (A3d V_nf). Mean over 3 campaign seeds "
+             "[95 % bootstrap CI]; paired = same campaign seed.",
+             "", "| metric | ema | nf | nf - ema (paired) |", "|---|---|---|---|"]
     f = lambda x: f"{x['mean']:.3f} [{x['lo']:.3f}, {x['hi']:.3f}]"
     for m in metrics:
-        lines.append(f"| {m} | {f(agg['none'][m]) if m in agg['none'] else '-'} | "
+        lines.append(f"| {m} | {f(agg['ema'][m]) if m in agg['ema'] else '-'} | "
                      f"{f(agg['nf'][m]) if m in agg['nf'] else '-'} | "
                      + (f"{diff[m]['mean']:+.3f} [{diff[m]['lo']:+.3f}, {diff[m]['hi']:+.3f}]" if m in diff else "-") + " |")
     with open(os.path.join(F4C, "summary.md"), "w") as fh:
