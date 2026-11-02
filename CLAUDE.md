@@ -1,5 +1,15 @@
 # CLAUDE.md
 
+## 0. Thesis and paper (read first)
+
+When working on the thesis or the IEEE RA-L paper (`/home/user/Projects/IEEE RA-L Paper/main.tex`), start
+from the thesis experiments, in this order:
+
+1. [docs/research_plan.md](docs/research_plan.md): research questions, methods, baselines, pre-registered predictions.
+2. [experiments/thesis/RESULTS.md](experiments/thesis/RESULTS.md): measured results (the only source for numbers).
+3. [experiments/thesis/PROGRESS.md](experiments/thesis/PROGRESS.md): status, running jobs, how to resume.
+4. [experiments/thesis/L0_literature/notes.md](experiments/thesis/L0_literature/notes.md): literature and novelty notes.
+
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.

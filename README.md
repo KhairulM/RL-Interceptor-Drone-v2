@@ -8,6 +8,14 @@ A fork of [OmniDrones](https://github.com/btx0424/OmniDrones) focused on trainin
 
 > Heavy lifting (simulation, robot models, RL stack) comes from upstream OmniDrones. This README only covers what is needed to install the environment and train/play the `Intercept` task.
 
+## Thesis experiments and RA-L paper
+
+The thesis experiments (QD-DPP opponent sampling, learned opponent-acceleration model with online RLS) live
+on branch `thesis-experiments`. Start with [docs/research_plan.md](docs/research_plan.md), then
+[experiments/thesis/RESULTS.md](experiments/thesis/RESULTS.md) and
+[experiments/thesis/PROGRESS.md](experiments/thesis/PROGRESS.md). The IEEE RA-L paper is written from these
+results.
+
 ## Prerequisites
 
 - Linux (tested on Ubuntu) with an NVIDIA RTX 5090
