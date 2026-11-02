@@ -59,7 +59,7 @@ Experiments are shared between drivers via lock files (`<ckpt>.lock`, `<eval jso
 holding the driver PID; stale locks of dead PIDs are taken over).
 - **Lane-C chain v4** (detached shell `laneC4`, stdout `laneC_out.txt`, started 11-02 10:22): `F3 -> F3c`.
 - **Lane-D chain v4** (detached shell `laneD4`, stdout `laneD_out.txt`, started 11-02 10:22): `F3 -> F3c`.
-- F3 status (11-03 00:10): hedge-s0, qd_dpp-s0, pfsp-s0 DONE; uniform-s1 (lane C, 23:52) and hedge-s1 (lane D, 23:54)
+- F3 status (11-02 23:59): hedge-s0, qd_dpp-s0, pfsp-s0 DONE; uniform-s1 (lane C, 23:52) and hedge-s1 (lane D, 23:54)
   running; qd_dpp-s1 and pfsp-s1 next. F3c waits until all F3 campaigns are DONE and uses stages 0-8 only.
 - **After a reboot**: all lock files are stale and PIDs get reused, so delete them first
   (`find experiments/thesis scripts/selfplay/outputs -name "*.lock" -delete`), then relaunch the two chains; campaigns
@@ -106,7 +106,7 @@ holding the driver PID; stale locks of dead PIDs are taken over).
 
 (Timestamps of log entries written on 10-27 before 21:20 are approximate; `driver_log.txt` has exact times.)
 
-- 2026-11-03 00:10: qd_dpp-s0 and pfsp-s0 finished 23:50 / 23:48, ~10 h later than expected: after the resume they
+- 2026-11-02 23:59: qd_dpp-s0 and pfsp-s0 finished 23:50 / 23:48, ~10 h later than expected: after the resume they
   ran 9 *further* stages (to stage 15 / 12) because `n_stages` counts from the resume point (orchestrator's documented
   extend-on-resume behaviour). Stages 0-8 are unaffected; F3c now uses stages 0-8 only (`MAX_STAGE`), checked on the
   real DBs (all F3 campaigns: pursuers 0-8, evaders 1-7). Guard `max_total_stages` (opt-in, default off) added to
