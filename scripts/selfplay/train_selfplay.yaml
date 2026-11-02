@@ -28,6 +28,9 @@ n_stages: 13
 start_role: pursuer                # side trained first
 frames_per_stage: 500_000_000
 warm_start: true                   # init each policy from latest same-role policy
+# Optional cap on the absolute stage index (null = off). On resume, n_stages counts the stages to run *from the resume
+# point*; set max_total_stages to stop a resumed campaign at a fixed total instead (thesis campaigns: 9).
+max_total_stages: null
 seed: 0
 wandb_mode: online                 # per-stage wandb logging; set 'disabled' to turn off
 # Opponent sampling (this method's extension of the paper's win-rate Hedge):

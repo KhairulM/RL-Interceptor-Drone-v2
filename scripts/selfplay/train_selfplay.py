@@ -251,8 +251,12 @@ def main():
             f"incomplete_policy={incomplete_policy['id'] if incomplete_policy else 'none'}"
         )
 
+    max_total = cfg.get("max_total_stages", None)
     for stage_offset in range(int(cfg.n_stages)):
         current_stage = stage + stage_offset
+        if max_total is not None and current_stage >= int(max_total):
+            print(f"[max_total_stages] reached stage {current_stage} >= {int(max_total)}; stopping")
+            break
         opp_role = _other(role)
         print(f"\n===== stage {current_stage}: train {role} vs {opp_role} pool =====")
 

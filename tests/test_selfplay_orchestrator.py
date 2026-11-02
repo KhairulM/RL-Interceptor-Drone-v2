@@ -114,6 +114,17 @@ class SelfplayOrchestratorTests(unittest.TestCase):
                     orchestrator._resume_point(db), (6, start_role, None)
                 )
 
+    def test_max_total_stages_caps_a_resumed_campaign(self):
+        self.cfg.n_stages = 3
+        self.run_campaign()                     # fresh: stages 0-2
+        self.cfg.fresh_start = False
+        self.cfg.max_total_stages = 5
+        self.calls.clear()
+        self.run_campaign()                     # resume at 3: without the cap it would run 3-5
+        trained = [int(a["stage"]) for a, _ in self.calls if a["mode"] == "train"]
+        self.assertEqual(trained, [3, 4])
+        self.assertEqual(orchestrator._resume_point(self.database())[0], 5)
+
     def test_resuming_first_generation_still_uses_heuristics(self):
         for start_role in (orchestrator.PURSUER, orchestrator.EVADER):
             with self.subTest(start_role=start_role):

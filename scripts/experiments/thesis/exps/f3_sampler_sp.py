@@ -47,9 +47,14 @@ def run_f3(args):
             run_campaign(name(s, k), [], dict(extra, seed=SEEDS[k]))
 
 
+# The pre-registered protocol is 9 stages (0-8). Campaigns resumed after the 11-01 power loss ran 9 *further* stages
+# (qd_dpp-s0 to stage 15, pfsp-s0 to stage 12); stages 0-8 are unaffected by later stages, so the analysis uses them only.
+MAX_STAGE = 8
+
+
 def _policies(campaign, role):
     common.CAMPAIGNS[campaign] = campaign
-    return common.rl_policies(campaign, role)
+    return [p for p in common.rl_policies(campaign, role) if int(p["metadata"]["stage"]) <= MAX_STAGE]
 
 
 def run_f3c(args):
@@ -85,7 +90,7 @@ def _sampling_stats(c):
     d = os.path.join(common.SELFPLAY_OUT, c, "stages")
     out = []
     for fn in sorted(os.listdir(d)) if os.path.isdir(d) else []:
-        if fn.endswith("_pursuer_train_opp.json"):
+        if fn.endswith("_pursuer_train_opp.json") and int(fn.split("_")[0][len("stage"):]) <= MAX_STAGE:
             with open(os.path.join(d, fn)) as f:
                 spec = json.load(f)
             if any(p["kind"] == "rl" for p in spec["policies"]):

@@ -27,7 +27,7 @@ ACC = ["task.oracle.opp_accel=true"]           # the agent observes its opponent
 OPP_ACC = ["task.oracle.opp_side_accel=true"]  # frozen RL opponents observe theirs (they were trained with it)
 ARMS = {"acc": ACC + OPP_ACC, "plain": []}
 CAMPAIGN = {
-    "n_stages": 9, "frames_per_stage": 300_000_000, "uniform_mix": 1.0, "seed": 0, "start_role": "pursuer",
+    "n_stages": 9, "max_total_stages": 9, "frames_per_stage": 300_000_000, "uniform_mix": 1.0, "seed": 0, "start_role": "pursuer",
     "warm_start": "true", "wandb_mode": "disabled",
     "seed_heuristics.pursuer": "[pure_pursuit,apf]", "seed_heuristics.evader": "[hover,circular,flee,weave]",
 }
@@ -129,7 +129,7 @@ def run_campaign(name, task_overrides, extra_cfg=None, smoke_stages=None, role_o
     try:
         cfg = dict(CAMPAIGN, run_name=name, **(extra_cfg or {}))
         if smoke_stages:
-            cfg.update(n_stages=smoke_stages, frames_per_stage=2_000_000, num_envs=256)
+            cfg.update(n_stages=smoke_stages, max_total_stages=smoke_stages, frames_per_stage=2_000_000, num_envs=256)
         cli = [f"{k}={v}" for k, v in cfg.items()]
         cli.append("task_overrides=[" + ",".join(task_overrides) + "]")
         cli.append("eval_extra_overrides=[eval_cutoff_steps=1500]")   # behaviour stats + multi-episode estimator

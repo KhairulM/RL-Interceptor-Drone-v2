@@ -59,14 +59,16 @@ Experiments are shared between drivers via lock files (`<ckpt>.lock`, `<eval jso
 holding the driver PID; stale locks of dead PIDs are taken over).
 - **Lane-C chain v4** (detached shell `laneC4`, stdout `laneC_out.txt`, started 11-02 10:22): `F3 -> F3c`.
 - **Lane-D chain v4** (detached shell `laneD4`, stdout `laneD_out.txt`, started 11-02 10:22): `F3 -> F3c`.
-- F3 status: hedge-s0 done (11-01 02:32), qd_dpp-s0 resumed at stage 7, pfsp-s0 resumed at stage 4; then the 4 seed-1
-  campaigns (uniform / hedge / qd_dpp / pfsp, campaign seed 100). F3c waits until all F3 campaigns are DONE.
+- F3 status (11-03 00:10): hedge-s0, qd_dpp-s0, pfsp-s0 DONE; uniform-s1 (lane C, 23:52) and hedge-s1 (lane D, 23:54)
+  running; qd_dpp-s1 and pfsp-s1 next. F3c waits until all F3 campaigns are DONE and uses stages 0-8 only.
 - **After a reboot**: all lock files are stale and PIDs get reused, so delete them first
   (`find experiments/thesis scripts/selfplay/outputs -name "*.lock" -delete`), then relaunch the two chains; campaigns
-  resume from their last finished stage (`fresh_start` is off).
+  resume from their last finished stage (`fresh_start` is off). The two F3 drivers running since 11-02 10:22 hold the
+  old launcher code (no `max_total_stages`): harmless for fresh campaigns, but if a campaign has to be resumed, relaunch
+  the chains (new processes load the guard) instead of relying on those drivers.
 - If a chain died: re-run `run.py --exp <ID>` for the remaining IDs in that order (resumable, concurrency-safe). If
   2104746 died before F2c finished, nothing breaks: the F4 campaigns just start earlier.
-- Expected (12.5 h per campaign): F3 ~11-03 18:30; F3c ~11-04 morning. Freeze 11-05. Freeze 11-05. No further fallback is pre-registered (F3 seed 2 was already
+- Expected (13.3 h per campaign, 1.5 h per stage): F3 ~11-04 02:40; F3c ~11-04 06:00-08:00. Freeze 11-05. Freeze 11-05. No further fallback is pre-registered (F3 seed 2 was already
   dropped on 10-29); if F3 runs late, ask the user before cutting anything.
 
 ## Decisions taken
@@ -104,6 +106,11 @@ holding the driver PID; stale locks of dead PIDs are taken over).
 
 (Timestamps of log entries written on 10-27 before 21:20 are approximate; `driver_log.txt` has exact times.)
 
+- 2026-11-03 00:10: qd_dpp-s0 and pfsp-s0 finished 23:50 / 23:48, ~10 h later than expected: after the resume they
+  ran 9 *further* stages (to stage 15 / 12) because `n_stages` counts from the resume point (orchestrator's documented
+  extend-on-resume behaviour). Stages 0-8 are unaffected; F3c now uses stages 0-8 only (`MAX_STAGE`), checked on the
+  real DBs (all F3 campaigns: pursuers 0-8, evaders 1-7). Guard `max_total_stages` (opt-in, default off) added to
+  `train_selfplay` + thesis launcher; test added (52 pass). New ETA F3c ~11-04 06:00-08:00.
 - 2026-11-02 10:30: Power loss / hard hang: the previous boot ends 11-01 08:48:32 with no shutdown, OOM or kernel error
   in the journal; machine back 11-02 10:19. Lost ~25.5 h. F3 qd_dpp-s0 (stage 7 of 9) and pfsp-s0 (stage 4 of 9)
   resumed correctly after deleting all stale locks; chains v4 launched 10:22. F4c (done 10-31 22:09) was not yet in
