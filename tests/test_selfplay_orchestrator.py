@@ -114,6 +114,57 @@ class SelfplayOrchestratorTests(unittest.TestCase):
                     orchestrator._resume_point(db), (6, start_role, None)
                 )
 
+    def test_evader_hedge_upweights_pursuers_that_neutralise_the_reference_evader(self):
+        db = self.database()
+        P, E = orchestrator.PURSUER, orchestrator.EVADER
+        hard = db.add_policy(P, "p0.pt", metadata={"stage": 0})
+        easy = db.add_policy(P, "p2.pt", metadata={"stage": 2})
+        ref = db.add_policy(E, "e1.pt", metadata={"stage": 1})
+        metrics = {k: 0.5 for k in orchestrator._policy_db.METRIC_KEYS}
+        db.record_matchup(hard, ref, dict(metrics, neutralization_rate=0.9))
+        db.record_matchup(easy, ref, dict(metrics, neutralization_rate=0.1))
+        self.cfg.evader_sampler = "hedge"
+        self.cfg.hedge_gamma = 0.0                      # pfsp: p ~ c^2, c = J(pursuer, reference evader)
+        probs = orchestrator._opponent_probs(db, E, ref, self.cfg)
+        self.assertAlmostEqual(probs[hard], 0.81 / 0.82)
+        self.assertAlmostEqual(probs[easy], 0.01 / 0.82)
+
+    def test_two_sided_qd_dpp_samples_both_roles_from_behaviour(self):
+        self.cfg.pursuer_sampler = self.cfg.evader_sampler = "qd_dpp"
+        nf = 9
+
+        def worker(cfg, overrides):
+            args = dict(value.split("=", 1) for value in overrides)
+            with open(args["opponent_spec_path"]) as f:
+                spec = json.load(f)
+            self.calls.append((args, spec))
+            if args["mode"] == "train":
+                result = {"checkpoint_path": args["stage_ckpt"]}
+            else:
+                result = {"matchups": {}}
+                for i, p in enumerate(spec["policies"]):
+                    m = {k: 0.5 for k in orchestrator._policy_db.METRIC_KEYS}
+                    m["neutralization_rate"] = (i + 1) / (len(spec["policies"]) + 1)
+                    beh = {"mean": [float(i)] * nf, "std": [1.0] * nf}
+                    m["behaviour"] = m["behaviour_pursuer"] = beh
+                    result["matchups"][p["id"]] = m
+            with open(args["stage_out"], "w") as f:
+                json.dump(result, f)
+
+        original = orchestrator._opponent_probs
+        with (patch.object(self, "worker", side_effect=worker),
+              patch.object(orchestrator, "_opponent_probs", side_effect=original) as spy):
+            self.run_campaign()
+        self.assertEqual({c.args[1] for c in spy.call_args_list}, {orchestrator.PURSUER, orchestrator.EVADER})
+        trains = [(a, s) for a, s in self.calls if a["mode"] == "train"]
+        for args, spec in trains:
+            if int(args["stage"]) >= 3:
+                self.assert_pool(spec, "rl")
+                self.assertGreater(len(set(spec["probs"].values())), 1)
+        self.assertRaises(ValueError, orchestrator._opponent_probs, self.database(), orchestrator.EVADER,
+                          self.database().list_policies(orchestrator.EVADER)[-1]["id"],
+                          OmegaConf.merge(self.cfg, {"evader_sampler": "bogus"}))
+
     def test_max_total_stages_caps_a_resumed_campaign(self):
         self.cfg.n_stages = 3
         self.run_campaign()                     # fresh: stages 0-2

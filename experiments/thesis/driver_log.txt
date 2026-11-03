@@ -693,3 +693,29 @@
 2026-11-03 12:54:51 campaign thesis-F3-hedge-s1 exit 0
 2026-11-03 12:54:51 [skip: campaign thesis-F3-qd_dpp-s1 run by another lane]
 2026-11-03 12:54:51 campaign thesis-F3-pfsp-s1 start: n_stages=9 frames_per_stage=300000000 uniform_mix=1.0 seed=100 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F3-pfsp-s1 pursuer_sampler=hedge hedge_gamma=0.0 task_overrides=[] eval_extra_overrides=[eval_cutoff_steps=1500]
+2026-11-03 14:15:09 === start F3 (--exp F3 --smoke)
+2026-11-03 14:15:09 campaign thesis-F3-smoke-qd_dpp-both start: n_stages=5 max_total_stages=5 frames_per_stage=2000000 uniform_mix=1.0 seed=0 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F3-smoke-qd_dpp-both pursuer_sampler=qd_dpp evader_sampler=qd_dpp num_envs=256 task_overrides=[] eval_extra_overrides=[eval_cutoff_steps=1500]
+2026-11-03 14:15:14 === start F3 (--exp F3)
+2026-11-03 14:15:14 campaign thesis-F3-hedge-both-s0 start: n_stages=9 max_total_stages=9 frames_per_stage=300000000 uniform_mix=1.0 seed=0 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F3-hedge-both-s0 pursuer_sampler=hedge evader_sampler=hedge task_overrides=[] eval_extra_overrides=[eval_cutoff_steps=1500]
+2026-11-03 14:27:31 === start A3f (--exp A3f --smoke)
+2026-11-03 14:27:41 A3f acc spec_clean: beta* 0.001, noisy test 0.2827 vs MLP 0.2827
+2026-11-03 14:27:43 A3f acc frob_clean: beta* 0.0001, noisy test 0.2832 vs MLP 0.2827
+2026-11-03 14:27:48 A3f acc spec_aug: beta* 0.001, noisy test 0.2828 vs MLP 0.2828
+2026-11-03 14:27:50 A3f acc frob_aug: beta* 0.0001, noisy test 0.2833 vs MLP 0.2828
+2026-11-03 14:27:55 A3f vel spec_clean: beta* 0.01, noisy test 0.7743 vs MLP 0.7783
+2026-11-03 14:27:58 A3f vel frob_clean: beta* 0.0001, noisy test 0.7815 vs MLP 0.7783
+2026-11-03 14:28:02 A3f vel spec_aug: beta* 0.01, noisy test 0.7743 vs MLP 0.7782
+2026-11-03 14:28:04 A3f vel frob_aug: beta* 0.0001, noisy test 0.7814 vs MLP 0.7782
+2026-11-03 14:28:04 A3f smoke ok: 144 errors
+2026-11-03 14:28:04 === done A3f
+2026-11-03 14:28:25 === start A3f (--exp A3f)
+2026-11-03 14:31:15 A3f acc spec_clean: beta* 0.0001, noisy test 0.3276 vs MLP 0.3309
+2026-11-03 14:31:42 A3f acc frob_clean: beta* 0.0001, noisy test 0.3244 vs MLP 0.3309
+2026-11-03 14:34:25 A3f acc spec_aug: beta* 0.0001, noisy test 0.2921 vs MLP 0.2931
+2026-11-03 14:34:54 A3f acc frob_aug: beta* 0.0001, noisy test 0.2922 vs MLP 0.2931
+2026-11-03 14:37:43 A3f vel spec_clean: beta* 0.0001, noisy test 0.2905 vs MLP 0.2918
+2026-11-03 14:38:11 A3f vel frob_clean: beta* 0.0001, noisy test 0.2881 vs MLP 0.2918
+2026-11-03 14:40:57 A3f vel spec_aug: beta* 0.001, noisy test 0.2347 vs MLP 0.2324
+2026-11-03 14:41:24 A3f vel frob_aug: beta* 0.0001, noisy test 0.2347 vs MLP 0.2324
+2026-11-03 14:41:24 A3f done
+2026-11-03 14:41:24 === done A3f

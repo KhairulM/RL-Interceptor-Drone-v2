@@ -47,8 +47,9 @@ the log).
 | A3a / A3b / A3c (positions-only + sensor noise) | A3a **done** (run 2, float32, 18:46; H*=10, aug basis, EMA 0.05). A3b **done** (02:15, 3 seeds); A3c **done** (03:47, 5 seeds) | `A3a_posonly/`, `A3b_posonly/`, `A3c_noise_ref/` | added 10-28 (user request); `exps/a3_posonly.py`; env `observation.agent_rel_vel`, `oracle.accel_source=pos`, `adapt.z_mode=pos` (smoke-tested) |
 | A3d (learned velocity estimate from noisy positions) | offline **done** (11:16: learned 0.29 vs EMA 0.44 m/s noisy; rule chose the clean basis); closed loop **done** 22:00 (3 seeds; V_nf - V_ema n.s. except held-out scripted) | `A3d_velest/` | added 10-29 (user choice after A3b/A3c), pre-registered ~11:00 (pushed 11:05); `exps/a3d_velest.py`; env `observation.rel_vel_source`, adapter target `vel` (unit-tested; first Isaac use = A3d closed loop) |
 | A3e (estimator architectures, offline) | **done** 20:28 (pre-registered 20:19) | `A3e_estimators/` | `exps/a3e_estimators.py` |
+| A3f (spectral-norm regularised estimator, offline) | **running** (started 11-03 ~15:10, GPU next to the F3 lanes, no Isaac slot) | `A3f_specnorm/` | added 11-03 (user, after Pan et al. RA-L 2026), pre-registered before any run; `exps/a3f_specnorm.py`; `fit_basis(reg=spec|frob, beta)` in `a3_posonly.py`; stdout `A3f_out.txt` |
 | F2a / F2b / F2c (final runs) | F2a **done** (06:19, 5 seeds); smoke tests F2a/F2b/F3/F4v1 passed 03:48-04:51; F2b **done** (campaigns finished 18:15 acc / 18:33 plain); F2c **done** (10-30 14:29, moved forward; in RESULTS.md) | `F2a_exploit_acc/`, `scripts/selfplay/outputs/thesis-F2-{acc,plain}/`, `F2c_final_eval/` | pre-registered 10-28 19:30 (plan Phase F); `exps/f2_final.py`; env flag `oracle.opp_side_accel` |
-| F3 / F3c (samplers in self-play) | queued after F4 on lanes C/D; amended 10-29 19:40: uniform / hedge / qd_dpp / **pfsp**, 2 seeds (7 new campaigns) | `scripts/selfplay/outputs/thesis-F3-*`, `F3_sampler_sp/` | pre-registered 10-28 20:30; `exps/f3_sampler_sp.py`; orchestrator `pursuer_sampler: hedge|qd_dpp`, `eval_extra_overrides` |
+| F3 / F3c (samplers in self-play) | **redo started 11-03 14:15 (amendment 3: sampler on both roles)**; seed 0 of hedge / qd_dpp / pfsp `-both` first, seed 1 only if started before 11-04 08:00; uniform s0/s1 reused; pursuer-only campaigns kept, not analysed | `scripts/selfplay/outputs/thesis-F3-*`, `F3_sampler_sp/` | pre-registered 10-28 20:30; `exps/f3_sampler_sp.py`; orchestrator `pursuer_sampler: hedge|qd_dpp`, `eval_extra_overrides` |
 | F4 / F4c **v2** (learned opponent model in self-play, estimated velocity + noise) | **done** (F4c 10-31 22:09; analysis fixed and written up 11-02) | `scripts/selfplay/outputs/thesis-F4-*`, `F4_estimator_sp/` | pre-registered 10-28 21:30; `exps/f4_estimator_sp.py`; env `observation.opp_drop_rel_vel`, `adapt.opp_side`; orchestrator `role_task_overrides` |
 | D3 campaign (QD-DPP), BayesID | dropped (D3 replaced by F2b/F3) | | |
 | F1_final | **done** (10-28 04:22, 5 seeds) | `F1_final/` | 2x2 factorial, 5 seeds, `exps/f1_final.py` (reuses X3 / D1 / X4 runs) |
@@ -57,10 +58,9 @@ Running jobs (re-chained 10-30 11:23, see log). **At most 2 Isaac processes run 
 (`common.MAX_ISAAC`, slot files in `.isaac_slots/`; each process needs ~17.5 GB of host RAM on the 62 GB machine).
 Experiments are shared between drivers via lock files (`<ckpt>.lock`, `<eval json>.lock`, `<campaign>/DONE.lock`,
 holding the driver PID; stale locks of dead PIDs are taken over).
-- **Lane-C chain v4** (detached shell `laneC4`, stdout `laneC_out.txt`, started 11-02 10:22): `F3 -> F3c`.
-- **Lane-D chain v4** (detached shell `laneD4`, stdout `laneD_out.txt`, started 11-02 10:22): `F3 -> F3c`.
-- F3 status (11-03 13:00): hedge-s0, qd_dpp-s0, pfsp-s0, uniform-s1, hedge-s1 DONE; qd_dpp-s1 (lane C, 12:51) and
-  pfsp-s1 (lane D, 12:54) running, the last two. F3c waits until all F3 campaigns are DONE and uses stages 0-8 only.
+- **Lane-C chain v5** (detached `setsid` shell, stdout `laneC_out.txt`, started 11-03 14:15): `F3 --smoke` (thesis-F3-smoke-qd_dpp-both; checks stage-3 evader and stage-4 pursuer probs) `-> F3 -> F3c`; stops if the smoke fails.
+- **Lane-D chain v5** (same, `laneD_out.txt`, 14:15): `F3 -> F3c` (started with thesis-F3-hedge-both-s0).
+- F3 order (seed-major): hedge-both-s0, qd_dpp-both-s0, pfsp-both-s0, then seed 1 only if started before 11-04 08:00 (`S1_START_DEADLINE`; expected: hedge-both-s1 only). F3c waits for all seed-0 campaigns + uniform s0/s1 and for any running campaign, then uses every finished one (stages 0-8).
 - **After a reboot**: all lock files are stale and PIDs get reused, so delete them first
   (`find experiments/thesis scripts/selfplay/outputs -name "*.lock" -delete`), then relaunch the two chains; campaigns
   resume from their last finished stage (`fresh_start` is off). The two F3 drivers running since 11-02 10:22 hold the
@@ -68,7 +68,7 @@ holding the driver PID; stale locks of dead PIDs are taken over).
   the chains (new processes load the guard) instead of relying on those drivers.
 - If a chain died: re-run `run.py --exp <ID>` for the remaining IDs in that order (resumable, concurrency-safe). If
   2104746 died before F2c finished, nothing breaks: the F4 campaigns just start earlier.
-- Expected (13.3 h per campaign, 1.5 h per stage): F3 ~11-04 02:15; F3c ~11-04 06:00-08:00. Freeze 11-05. Freeze 11-05. No further fallback is pre-registered (F3 seed 2 was already
+- Expected (13.3 h per campaign, 1.5 h per stage): seed-0 campaigns ~11-04 04:00 / 17:30, hedge-both-s1 ~11-04 18:00; F3c ~11-04 21:00-23:00. Freeze 11-05. No further fallback is pre-registered (F3 seed 2 was already
   dropped on 10-29); if F3 runs late, ask the user before cutting anything.
 
 ## Decisions taken
@@ -106,6 +106,8 @@ holding the driver PID; stale locks of dead PIDs are taken over).
 
 (Timestamps of log entries written on 10-27 before 21:20 are approximate; `driver_log.txt` has exact times.)
 
+- 2026-11-03 15:10: User asked to try Pan et al.'s spectral-norm regularisation on the estimator network. A3f pre-registered (offline only: both Isaac slots are busy with F3 until the freeze): A3a/A3d MLP + beta * sum ||W||_2^2 vs Frobenius weight decay (control), beta in {1e-4, 1e-3, 1e-2}, acc and vel targets, clean / aug bases. Smoke ok (34 s); full run started.
+- 2026-11-03 14:15: **F3 amendment 3 (user)**: F3 must give the reference papers' baselines under our settings, and those papers use the sampler for whichever agent trains, so hedge / pfsp / qd_dpp now apply to both roles. Stopped the two running pursuer-only campaigns (qd_dpp-s1, pfsp-s1, ~45 min in; moved to `aborted/`). Code: `evader_sampler` + role-generic `_opponent_probs` in `train_selfplay` (evader Hedge challenge = J(pursuer j, latest evader)); evals record `behaviour_pursuer` (same 9 features, pursuer as subject) for the evader-side qd_dpp; F3 driver: `-both` campaigns, seed-1 start deadline, F3c uses finished campaigns. Tests 55 pass (3 new; the 2 orchestrator tests fail on the old code). Pre-registered in plan (F3 row amendment 3, §9) before launch. User chose 1 seed per arm (seed 1 if time).
 - 2026-11-03 13:00: uniform-s1 (12:51) and hedge-s1 (12:54) done, 9 stages each; last two F3 campaigns started.
 - 2026-11-02 23:59: qd_dpp-s0 and pfsp-s0 finished 23:50 / 23:48, ~10 h later than expected: after the resume they
   ran 9 *further* stages (to stage 15 / 12) because `n_stages` counts from the resume point (orchestrator's documented

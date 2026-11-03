@@ -1,13 +1,17 @@
 """F3: opponent samplers in full self-play (docs/research_plan.md, Phase F, pre-registered 10-28 20:30).
 
-Campaigns as in F2b "plain" (plain obs, 9 stages x 300M, evader side uniform); only the pursuer's opponent sampler
-changes: uniform | hedge (Roncero et al. 2026 eq. 12, gamma 0.7, eta 2) | qd_dpp (Hedge quality x DPP diversity over
-behaviour descriptors) | pfsp (hedge with gamma 0: p ~ (1 - J)^2, no uniform share; the PFSP core of AgilePE / Gavin).
-2 seeds per sampler (campaign seed 0 / 100; seed 2 dropped and pfsp added 10-29, plan §9); uniform seed 0 is F2b "plain".
+Campaigns as in F2b "plain" (plain obs, 9 stages x 300M). The opponent sampler changes: uniform | hedge (Roncero et
+al. 2026 eq. 12, gamma 0.7, eta 2) | qd_dpp (Hedge quality x DPP diversity over behaviour descriptors) | pfsp (hedge
+with gamma 0: p ~ c^2, no uniform share; the PFSP core of AgilePE / Gavin).
+Amendment 3 (11-03, user, before any F3 result): the sampler is used by BOTH roles, as in the reference papers
+("-both" campaigns). The pursuer-only campaigns of amendments 1-2 (thesis-F3-{hedge,qd_dpp,pfsp}-s*) are kept on disk
+but not analysed. Seed 0 of every arm first; seed-1 campaigns start only before S1_START_DEADLINE (11-05 freeze).
+uniform is the same on both sides already, so uniform seed 0 (F2b "plain") and seed 1 are reused.
 F3c: final pursuer of every campaign vs the thesis test set, the train pool and all campaigns' RL evaders, plus one
 fresh exploiter each; seed-paired comparison of the samplers.
 """
 
+import datetime
 import json
 import math
 import os
@@ -23,28 +27,50 @@ from f2_final import _done, run_campaign
 from x3_gap import load_split
 
 F3C = os.path.join(OUT, "F3_sampler_sp")
-SAMPLERS = {"uniform": {}, "hedge": {"pursuer_sampler": "hedge"}, "qd_dpp": {"pursuer_sampler": "qd_dpp"},
-            "pfsp": {"pursuer_sampler": "hedge", "hedge_gamma": 0.0}}
+SAMPLERS = {"uniform": {},
+            "hedge": {"pursuer_sampler": "hedge", "evader_sampler": "hedge"},
+            "qd_dpp": {"pursuer_sampler": "qd_dpp", "evader_sampler": "qd_dpp"},
+            "pfsp": {"pursuer_sampler": "hedge", "evader_sampler": "hedge", "hedge_gamma": 0.0}}
 SEEDS = [0, 100]
+S1_START_DEADLINE = datetime.datetime(2026, 11, 4, 8, 0)    # a campaign takes ~13.3 h; F3c must end before 11-05
 
 
 def name(sampler, k):
-    return "thesis-F2-plain" if (sampler, k) == ("uniform", 0) else f"thesis-F3-{sampler}-s{k}"
+    if sampler == "uniform":
+        return "thesis-F2-plain" if k == 0 else f"thesis-F3-uniform-s{k}"
+    return f"thesis-F3-{sampler}-both-s{k}"
+
+
+def _running(c):
+    """True while another driver holds the campaign lock with a live PID."""
+    lock = _done(c) + ".lock"
+    try:
+        pid = int(open(lock).read().strip() or 0)
+    except (OSError, ValueError):
+        return False
+    return bool(pid) and common._pid_alive(pid)
 
 
 def run_f3(args):
     if args.smoke:
-        n = "thesis-F3-smoke-qd_dpp"
+        n = "thesis-F3-smoke-qd_dpp-both"
         run_campaign(n, [], dict(SAMPLERS["qd_dpp"]), smoke_stages=5)
-        with open(os.path.join(common.SELFPLAY_OUT, n, "stages", "stage4_pursuer_train_opp.json")) as f:
-            probs = json.load(f)["probs"]
-        if len(probs) != 2 or abs(sum(probs.values()) - 1) > 1e-6:
-            raise RuntimeError(f"F3 smoke: unexpected stage-4 pursuer probs {probs}")
-        log_progress(f"F3 smoke ok: stage-4 pursuer probs {probs}")
+        for stage, role in ((3, "evader"), (4, "pursuer")):     # first stages with 2 RL opponents per role
+            with open(os.path.join(common.SELFPLAY_OUT, n, "stages", f"stage{stage}_{role}_train_opp.json")) as f:
+                spec = json.load(f)
+            probs = spec["probs"]
+            if len(probs) != 2 or abs(sum(probs.values()) - 1) > 1e-6 or any(
+                    p["kind"] != "rl" for p in spec["policies"]):
+                raise RuntimeError(f"F3 smoke: unexpected stage-{stage} {role} probs {probs}")
+            log_progress(f"F3 smoke ok: stage-{stage} {role} probs {probs}")
         return
     for k in range(len(SEEDS)):                 # seed-major order keeps partial results balanced across samplers
         for s, extra in SAMPLERS.items():
-            run_campaign(name(s, k), [], dict(extra, seed=SEEDS[k]))
+            c = name(s, k)
+            if k > 0 and not os.path.isfile(_done(c)) and datetime.datetime.now() > S1_START_DEADLINE:
+                log_progress(f"[skip: {c} not started, past the seed-1 start deadline {S1_START_DEADLINE}]")
+                continue
+            run_campaign(c, [], dict(extra, seed=SEEDS[k]))
 
 
 # The pre-registered protocol is 9 stages (0-8). Campaigns resumed after the 11-01 power loss ran 9 *further* stages
@@ -58,9 +84,13 @@ def _policies(campaign, role):
 
 
 def run_f3c(args):
-    camps = [(s, k, name(s, k)) for k in range(len(SEEDS)) for s in SAMPLERS]
-    while not all(os.path.isfile(_done(c)) for _, _, c in camps):
+    # Seed 0 of every arm (and uniform seed 1) is required; other seed-1 campaigns are used if they finished.
+    allc = [(s, k, name(s, k)) for k in range(len(SEEDS)) for s in SAMPLERS]
+    required = [x for x in allc if x[1] == 0 or x[0] == "uniform"]
+    while not all(os.path.isfile(_done(c)) for _, _, c in required) or any(_running(c) for _, _, c in allc):
         time.sleep(60)
+    camps = [x for x in allc if os.path.isfile(_done(x[2]))]
+    log_progress(f"F3c campaigns: {[c for _, _, c in camps]}")
     split = load_split()
     test = test_set(split)
     all_ev = [e for _, _, c in camps for e in _policies(c, "evader")]
@@ -181,8 +211,9 @@ def analyse_f3(camps, split, test):
                 diffs[f"{a}-{b}"][m] = {"mean": float(np.mean(d)), "ci": list(an.bootstrap_ci(d)[1:]), "per_seed": d}
     save_json(os.path.join(F3C, "results.json"), {"per_campaign": {f"{s}/{k}": r for (s, k), r in rows.items()},
                                                   "aggregate": agg, "paired": diffs, "evader_vendi": vendi})
-    lines = ["# F3_sampler_sp summary", "", "Final pursuer of each campaign; mean J over 2 campaign seeds [95 % "
-             "bootstrap CI; with 2 seeds the CI is only the range of the two values]; per-seed values in results.json. exploitability = 1 - J vs a fresh exploiter. evader_vendi = "
+    lines = ["# F3_sampler_sp summary", "", "Samplers used by both roles (amendment 3). Final pursuer of each "
+             "campaign; mean J over the finished campaign seeds (1-2, see per_seed in results.json) [95 % "
+             "bootstrap CI; with 2 seeds the CI is only the range of the two values; 1 seed: no CI]. exploitability = 1 - J vs a fresh exploiter. evader_vendi = "
              "effective number of distinct RL evaders a campaign produced (max = its number of RL evaders).", "",
              "| sampler | " + " | ".join(metrics) + " |", "|---" * (len(metrics) + 1) + "|"]
     for s in SAMPLERS:

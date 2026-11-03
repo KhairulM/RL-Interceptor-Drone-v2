@@ -126,36 +126,45 @@ def _seed_pool(db, role, heuristics):
         print(f"[seed] {role} heuristic '{name}'")
 
 
-def _pursuer_opponent_probs(db, reference_id, cfg):
-    """Thesis F3 samplers for the pursuer's evader opponents (RL evaders only).
+def _opponent_probs(db, role, reference_id, cfg):
+    """Thesis F3 samplers for the RL opponents of ``role`` (``pursuer_sampler`` / ``evader_sampler``).
 
-    hedge:  Roncero et al. 2026 eq. (12), challenge c_j = 1 - J(reference pursuer, evader j).
-    qd_dpp: the same Hedge quality, re-weighted by a DPP over behaviour descriptors (mean and std of the per-step
-            behaviour features over all recorded matchups of evader j, z-normalised over the pool).
+    hedge:  Roncero et al. 2026 eq. (12), challenge c_j = 1 - win rate of the reference (latest) learner vs opponent
+            j. J = neutralisation rate (the pursuer's success), so c_j = 1 - J(ref pursuer, evader j) when the pursuer
+            trains and c_j = J(pursuer j, ref evader) when the evader trains. Unknown matchups count as c_j = 1.
+    qd_dpp: the same Hedge quality, re-weighted by a DPP over behaviour descriptors of the opponents (mean and std of
+            the per-step behaviour features over all recorded matchups of opponent j, z-normalised over the pool;
+            "behaviour" for evaders, "behaviour_pursuer" for pursuers).
     """
-    sampler = str(cfg.pursuer_sampler)
-    evaders = [p["id"] for p in db.list_policies(EVADER) if p["kind"] == "rl"]
+    sampler = str(cfg.get(f"{role}_sampler"))
+    opp_role = _other(role)
+    opps = [p["id"] for p in db.list_policies(opp_role) if p["kind"] == "rl"]
+
+    def matchup(learner_id, opp_id):
+        pair = (learner_id, opp_id) if role == PURSUER else (opp_id, learner_id)
+        return db.get_matchup(*pair) or {}
+
     challenge = {}
-    for e in evaders:
-        m = db.get_matchup(reference_id, e) or {}
+    for o in opps:
+        m = matchup(reference_id, o)
         j = m.get("neutralization_rate", m.get("win_rate"))
-        challenge[e] = 1.0 - (float(j) if j is not None else 0.0)
+        challenge[o] = 1.0 if j is None else (1.0 - float(j) if role == PURSUER else float(j))
     gamma, eta = float(cfg.hedge_gamma), float(cfg.hedge_eta)
-    if sampler == "hedge" or len(evaders) < 2:
+    if sampler == "hedge" or len(opps) < 2:
         return _samplers.hedge_probs(challenge, gamma, eta)
     if sampler != "qd_dpp":
-        raise ValueError(f"unknown pursuer_sampler {sampler!r}")
+        raise ValueError(f"unknown {role}_sampler {sampler!r}")
+    key = "behaviour" if opp_role == EVADER else "behaviour_pursuer"
     desc = {}
-    for e in evaders:
+    for o in opps:
         rows = []
-        for p in db.list_policies(PURSUER):
-            m = db.get_matchup(p["id"], e) or {}
-            b = m.get("behaviour")
+        for p in db.list_policies(role):
+            b = matchup(p["id"], o).get(key)
             if b:
                 rows.append(list(b["mean"]) + list(b["std"]))
         if not rows:
-            raise ValueError(f"qd_dpp: no behaviour statistics for {e} (needs eval_cutoff_steps)")
-        desc[e] = [sum(col) / len(col) for col in zip(*rows)]
+            raise ValueError(f"qd_dpp: no {key} statistics for {o} (needs eval_cutoff_steps)")
+        desc[o] = [sum(col) / len(col) for col in zip(*rows)]
     keys = list(desc)
     mu = [sum(desc[k][i] for k in keys) / len(keys) for i in range(len(desc[keys[0]]))]
     sd = [max((sum((desc[k][i] - mu[i]) ** 2 for k in keys) / len(keys)) ** 0.5, 1e-6) for i in range(len(mu))]
@@ -263,8 +272,8 @@ def main():
         # 1) Scripted opponents bootstrap each role's first RL policy only.
         retry_id = incomplete_policy["id"] if incomplete_policy else None
         reference = _previous_rl_policy(db, role, retry_id)
-        if reference and role == PURSUER and str(cfg.get("pursuer_sampler", "default")) != "default":
-            probs = _pursuer_opponent_probs(db, reference["id"], cfg)
+        if reference and str(cfg.get(f"{role}_sampler", "default")) != "default":
+            probs = _opponent_probs(db, role, reference["id"], cfg)
         elif reference:
             probs = db.compute_sampling_probs(
                 role, temperature=temperature, metric_weights=metric_weights,

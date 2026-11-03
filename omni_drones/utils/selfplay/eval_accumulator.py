@@ -6,7 +6,8 @@ outcome, so pooled outcome rates are consistent estimates of the per-episode rat
 classic "first episode of every env" evaluation.
 
 Also accumulates per-step evader behaviour features, summarised per episode as mean and std. They are the
-trajectory part of the opponent behaviour descriptors (diversity analysis).
+trajectory part of the opponent behaviour descriptors (diversity analysis). If the features carry a second block
+(the same features with the pursuer as the subject), matchups also get "behaviour_pursuer" (F3 two-sided samplers).
 
 Pure torch on purpose: tests load this file by path without importing Isaac Sim.
 """
@@ -63,11 +64,11 @@ def behaviour_step_features(e_pos, e_vel, p_pos, prev_e_vel, step_dt: float) -> 
 class EpisodeAccumulator:
     """Collects every counted episode's outcome stats and behaviour summary."""
 
-    def __init__(self, num_envs: int, cutoff_step: int, device):
+    def __init__(self, num_envs: int, cutoff_step: int, device, n_features: int = len(BEHAVIOUR_FEATURES)):
         self.num_envs = num_envs
         self.cutoff_step = int(cutoff_step)
         self.device = device
-        nf = len(BEHAVIOUR_FEATURES)
+        nf = int(n_features)
         self.ep_start = torch.zeros(num_envs, dtype=torch.long, device=device)
         self.ep_index = torch.zeros(num_envs, dtype=torch.long, device=device)
         self.f_sum = torch.zeros(num_envs, nf, device=device)
@@ -168,11 +169,12 @@ def summarize_matchups(episodes: Dict[str, torch.Tensor], assignment: Dict[str, 
             "pursuer_crash_rate": float(flag["pursuer_crash"].float().mean()),
             "outcomes": {"capture": float(cap.float().mean()),
                          **{k: float(f.float().mean()) for k, f in flag.items()}},
-            "behaviour": {
-                "features": list(BEHAVIOUR_FEATURES),
-                "mean": episodes["feat_mean"][sel].mean(0).tolist(),
-                "std": episodes["feat_std"][sel].mean(0).tolist(),
-            },
         }
+        nf = len(BEHAVIOUR_FEATURES)
+        mean, std = episodes["feat_mean"][sel].mean(0), episodes["feat_std"][sel].mean(0)
+        blocks = [("behaviour", 0)] + ([("behaviour_pursuer", nf)] if mean.numel() == 2 * nf else [])
+        for key, o in blocks:
+            record[key] = {"features": list(BEHAVIOUR_FEATURES),
+                           "mean": mean[o:o + nf].tolist(), "std": std[o:o + nf].tolist()}
         out[opp_id] = record
     return out

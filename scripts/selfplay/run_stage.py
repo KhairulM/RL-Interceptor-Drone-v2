@@ -391,16 +391,19 @@ def _run_eval(cfg, env, base_env, policy):
 def _run_eval_multi(cfg, env, base_env, policy):
     """Count every episode that starts before ``eval_cutoff_steps`` (thesis evals), plus behaviour features."""
     from omni_drones.utils.selfplay.eval_accumulator import (
-        EpisodeAccumulator, behaviour_step_features, summarize_matchups)
+        BEHAVIOUR_FEATURES, EpisodeAccumulator, behaviour_step_features, summarize_matchups)
 
     cutoff = int(cfg.eval_cutoff_steps)
     max_len = int(base_env.max_episode_length)
     step_dt = float(cfg.sim.dt) * int(cfg.sim.substeps)
-    acc = EpisodeAccumulator(base_env.num_envs, cutoff, base_env.device)
+    # Features: [evader block | pursuer block]; the pursuer block (same features, pursuer as subject) gives the
+    # pursuer descriptors of the F3 two-sided samplers.
+    acc = EpisodeAccumulator(base_env.num_envs, cutoff, base_env.device, n_features=2 * len(BEHAVIOUR_FEATURES))
     pursuer, evader = base_env.pursuer, base_env.evader
 
     td = env.reset()
     prev_vel = evader.vel_w[:, 0, :3].clone()
+    prev_pvel = pursuer.vel_w[:, 0, :3].clone()
     traj_out = cfg.get("eval_traj_out", None)
     if traj_out:
         # float32: float16 positions (~2 mm steps) ruin second differences / dt^2 (A3a run 1).
@@ -416,14 +419,17 @@ def _run_eval_multi(cfg, env, base_env, policy):
             td, td_next = env.step_and_maybe_reset(td)
             stats = {k: v for k, v in td.get(("next", "stats")).items()}
             e_vel = evader.vel_w[:, 0, :3]
-            feats = behaviour_step_features(
-                evader.pos[:, 0], e_vel, pursuer.pos[:, 0], prev_vel, step_dt)
+            p_vel = pursuer.vel_w[:, 0, :3]
+            feats = torch.cat([
+                behaviour_step_features(evader.pos[:, 0], e_vel, pursuer.pos[:, 0], prev_vel, step_dt),
+                behaviour_step_features(pursuer.pos[:, 0], p_vel, evader.pos[:, 0], prev_pvel, step_dt)], dim=-1)
             acc.step(t, td.get(("next", "done")), stats, feats)
             if traj_out:
                 z_rec.append(base_env.opponent_z()[rec].float().cpu())
                 pos_rec.append(pursuer.pos[rec, 0].float().cpu())
                 d_rec.append(td.get(("next", "done")).reshape(-1)[rec].cpu())
             prev_vel = e_vel.clone()
+            prev_pvel = p_vel.clone()
             td = td_next
             steps = t + 1
             if acc.all_counted_done():

@@ -105,8 +105,15 @@ def fd_predictions(p_e, ep, H, alpha=None):
 
 
 # ------------------------------------------------------------------ basis
+def weight_mats(phi, W0):
+    """Weight matrices of the deployed estimator: the basis' linear layers and the shared head (bias column dropped)."""
+    return [m.weight for m in phi.net if isinstance(m, torch.nn.Linear)] + [W0[:, :-1]]
+
+
 def fit_basis(X, Y, heads, val_mask, H, mean, std, out_path, d=32, hidden=128, epochs=8, max_samples=1_500_000, seed=0,
-              target="dvel"):
+              target="dvel", reg=None, beta=0.0):
+    """reg (A3f): None, "spec" (beta * sum of squared largest singular values, Pan et al. 2026) or "frob" (weight
+    decay control: beta * sum of squared Frobenius norms), over weight_mats."""
     if os.path.isfile(out_path):
         return torch.load(out_path)
     oa = _adapt_module()
@@ -136,8 +143,12 @@ def fit_basis(X, Y, heads, val_mask, H, mean, std, out_path, d=32, hidden=128, e
         perm = tr[torch.randperm(len(tr))]
         for b in range(0, len(perm), 4096):
             lt, ls = losses(perm[b:b + 4096].to(dev))
+            loss = lt + ls
+            if reg:
+                ord_ = 2 if reg == "spec" else "fro"
+                loss = loss + beta * sum(torch.linalg.matrix_norm(M, ord=ord_) ** 2 for M in weight_mats(phi, W0))
             opt.zero_grad()
-            (lt + ls).backward()
+            loss.backward()
             opt.step()
         with torch.no_grad():
             vt, vs = losses(va.to(dev))
@@ -145,6 +156,8 @@ def fit_basis(X, Y, heads, val_mask, H, mean, std, out_path, d=32, hidden=128, e
     model = {"phi": {k: v.cpu() for k, v in phi.state_dict().items()}, "theta0": W0.detach().cpu(),
              "z_mean": mean, "z_std": std, "in_dim": X.shape[1], "d": d, "hidden": hidden, "horizon": H,
              "history": HISTORY, "target": target, "z_mode": "pos", "train_log": log}
+    if reg:
+        model["reg"] = {"kind": reg, "beta": beta}
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     torch.save(model, out_path)
     return model

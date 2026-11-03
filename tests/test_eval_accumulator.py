@@ -86,6 +86,20 @@ class EvalAccumulatorTests(unittest.TestCase):
         self.assertAlmostEqual(out_e["outcomes"]["evader_crash"], 0.25)
         self.assertAlmostEqual(out_e["outcomes"]["pursuer_crash"], 0.25)
 
+    def test_second_feature_block_gives_pursuer_behaviour(self):
+        acc = ea.EpisodeAccumulator(1, 1, "cpu", n_features=2 * NF)
+        feats = torch.cat([torch.full((1, NF), 1.0), torch.full((1, NF), 5.0)], dim=-1)
+        acc.step(0, torch.tensor([False]), _stats(1), feats)
+        acc.step(1, torch.tensor([True]), _stats(1, capture=[1.0], episode_len=[2.0]), feats)
+        out = ea.summarize_matchups(acc.episodes(), {"opp": torch.tensor([0])}, "evader",
+                                    step_dt=0.02, max_episode_steps=100)["opp"]
+        self.assertEqual(out["behaviour"]["mean"], [1.0] * NF)
+        self.assertEqual(out["behaviour_pursuer"]["mean"], [5.0] * NF)
+        # One block only (older evals): no pursuer behaviour.
+        one = _simulate([3], 1, 10)
+        self.assertNotIn("behaviour_pursuer", ea.summarize_matchups(
+            one, {"opp": torch.tensor([0])}, "pursuer", step_dt=0.02, max_episode_steps=100)["opp"])
+
     def test_behaviour_features_straight_flight_away(self):
         e_pos = torch.tensor([[1.0, 0.0, 1.5]])
         e_vel = torch.tensor([[2.0, 0.0, 0.0]])
