@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-11-02 23:59; details in the sections below)
+## Summary (updated 2026-11-03 13:00; details in the sections below)
 
 J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over
 seeds; "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position +
@@ -53,10 +53,10 @@ velocity, no acceleration).
   in 2 of 3 nf campaigns the exploiter makes the pursuer crash (88-92 %). Prediction held for X3 exploiters, not for
   exploitability.
 
-**Running / pending**: F3 (samplers in self-play): 3 of 7 new campaigns done (hedge-s0, qd_dpp-s0, pfsp-s0),
-uniform-s1 and hedge-s1 running, qd_dpp-s1 and pfsp-s1 to go -> F3c. Expected F3 ~11-04 02:40, F3c ~11-04 06:00-08:00.
-Delays: power loss (machine down 11-01 08:48 - 11-02 10:19) and a resume bug (two resumed campaigns ran extra stages;
-the analysis uses stages 0-8 only, plan §9).
+**Running / pending**: F3 (samplers in self-play): 5 of 7 new campaigns done (hedge-s0, qd_dpp-s0, pfsp-s0,
+uniform-s1, hedge-s1); the last two (qd_dpp-s1, pfsp-s1) started 11-03 12:51 / 12:54 -> F3c. Expected F3 ~11-04 02:15,
+F3c ~11-04 06:00-08:00. Delays: power loss (machine down 11-01 08:48 - 11-02 10:19) and a resume bug (two resumed
+campaigns ran extra stages; the analysis uses stages 0-8 only, plan §9).
 
 ## Relation to the reference papers (updated 2026-11-02 10:30)
 
