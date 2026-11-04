@@ -54,16 +54,21 @@ def run_a2a(args):
     for p in paths.values():
         if not os.path.isfile(p):
             raise RuntimeError("A1a trajectories missing; run A1a first")
+    fit_acc_estimator(paths, A2A, "A2a_nfacc")
+
+
+def fit_acc_estimator(paths, root, title):
+    """A2a procedure on the trajectories ``paths`` (train / test), outputs in ``root`` (also used by F5 amendment 1)."""
     cols = val_columns(paths["train"])
     results, tuned = {}, {}
     for H in HORIZONS:
-        model_path = os.path.join(A2A, "models", f"nf_dvel_H{H}.pt")
+        model_path = os.path.join(root, "models", f"nf_dvel_H{H}.pt")
         model = train_basis(paths["train"], H, model_path, target="dvel")
         log_progress(f"A2a basis dvel H={H}: val shared mse {model['train_log'][-1]['val_shared_mse']:.5f}")
         kw = dict(kind="nf", model_path=model_path, target="dvel")
         best, grid = tune(paths["train"], H, kw)
         tuned[str(H)] = {"best": best, "grid": grid}
-        save_json(os.path.join(A2A, "tuned_rls.json"), tuned)
+        save_json(os.path.join(root, "tuned_rls.json"), tuned)
         res = {}
         for part, c in (("val", cols), ("test", None)):
             p = paths["train"] if part == "val" else paths["test"]
@@ -73,16 +78,16 @@ def run_a2a(args):
                                 ("NF_RLS_S2", {**best, "reset_on_episode": False})):
                 res[f"{part}/{name}"] = summarise(*replay(p, H, cols=c, **kw, **extra))
         results[str(H)] = res
-        save_json(os.path.join(A2A, "pred_err.json"), results)
+        save_json(os.path.join(root, "pred_err.json"), results)
     gains = {H: 1 - results[str(H)]["val/NF_RLS_S1"]["mean"] / results[str(H)]["val/FD_persistence"]["mean"]
              for H in HORIZONS}
     best_gain = max(gains.values())
     h_star = 5 if abs(gains[5] - best_gain) < 1e-9 else max(gains, key=gains.get)
-    save_json(os.path.join(A2A, "horizon_choice.json"), {"relative_gain_vs_FD_on_val": gains, "H_star": h_star})
+    save_json(os.path.join(root, "horizon_choice.json"), {"relative_gain_vs_FD_on_val": gains, "H_star": h_star})
     names = ["zero", "FD_persistence", "NF_frozen", "NF_RLS_S1", "NF_RLS_S2"]
-    lines = ["# A2a_nfacc summary", "",
+    lines = [f"# {title} summary", "",
              "Mean error |y - y_hat| (m/s) of the evader's velocity change over H steps (= H dt x mean acceleration).",
-             "val = 20 % train-pool envs not used to train the basis; test = held-out RL, scripted, exploiters.", "",
+             "val = 20 % of the recorded training envs, not used to train the basis; test = held-out RL, scripted, exploiters.", "",
              "| H | set | " + " | ".join(names) + " |", "|---" * (len(names) + 2) + "|"]
     for H, res in results.items():
         for part in ("val", "test"):
@@ -90,16 +95,16 @@ def run_a2a(args):
     lines += ["", "Relative error reduction of NF_RLS_S1 vs FD persistence (val): " +
               ", ".join(f"H={h}: {g:+.3f}" for h, g in gains.items()), "", f"**H* = {h_star}** (pre-registered rule).",
               "", "Tuned RLS: " + ", ".join(f"H={h}: {v['best']}" for h, v in tuned.items())]
-    with open(os.path.join(A2A, "summary.md"), "w") as f:
+    with open(os.path.join(root, "summary.md"), "w") as f:
         f.write("\n".join(lines) + "\n")
 
 
-def a2b_methods():
-    with open(os.path.join(A2A, "horizon_choice.json")) as f:
+def a2b_methods(root=A2A):
+    with open(os.path.join(root, "horizon_choice.json")) as f:
         H = json.load(f)["H_star"]
-    with open(os.path.join(A2A, "tuned_rls.json")) as f:
+    with open(os.path.join(root, "tuned_rls.json")) as f:
         best = json.load(f)[str(H)]["best"]
-    base = ACC_PREFIX + [f"task.adapt.horizon={H}", f"task.adapt.model_path={os.path.join(A2A, 'models', f'nf_dvel_H{H}.pt')}"]
+    base = ACC_PREFIX + [f"task.adapt.horizon={H}", f"task.adapt.model_path={os.path.join(root, 'models', f'nf_dvel_H{H}.pt')}"]
     return {"NFacc_frozen": base + ["task.adapt.freeze=true"],
             "NFacc_OA": base + [f"task.adapt.delta={best['delta']}", f"task.adapt.forgetting={best['forgetting']}"]}
 

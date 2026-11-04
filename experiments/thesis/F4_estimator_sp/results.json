@@ -9,6 +9,8 @@
       "x3_exploiters_clean": 0.9648241400718689,
       "other_campaign_evaders": 0.5811513364315033,
       "own_campaign_evaders": 0.86295485496521,
+      "other_campaign_evaders_no_s1": 0.4627622564633687,
+      "own_campaign_evaders_no_s1": 0.8394406239191691,
       "exploitability": 0.8286300003528595
     },
     "ema/0": {
@@ -20,6 +22,8 @@
       "x3_exploiters_clean": 0.4743363857269287,
       "other_campaign_evaders": 0.4149918995797634,
       "own_campaign_evaders": 0.7786539494991302,
+      "other_campaign_evaders_no_s1": 0.2737689524888992,
+      "own_campaign_evaders_no_s1": 0.7531175414721171,
       "exploitability": 0.5518858134746552
     },
     "nf/1": {
@@ -31,6 +35,8 @@
       "x3_exploiters_clean": 0.804300049940745,
       "other_campaign_evaders": 0.6744918242096901,
       "own_campaign_evaders": 0.6990839689970016,
+      "other_campaign_evaders_no_s1": 0.6043581902980805,
+      "own_campaign_evaders_no_s1": 0.6286988457043966,
       "exploitability": 0.9109523817896843
     },
     "ema/1": {
@@ -42,6 +48,8 @@
       "x3_exploiters_clean": 0.321184237798055,
       "other_campaign_evaders": 0.5427615530788898,
       "own_campaign_evaders": 0.7360401302576065,
+      "other_campaign_evaders_no_s1": 0.4090382983287176,
+      "own_campaign_evaders_no_s1": 0.6640761295954386,
       "exploitability": 0.7861127555370331
     },
     "nf/2": {
@@ -53,6 +61,8 @@
       "x3_exploiters_clean": 0.9646571278572083,
       "other_campaign_evaders": 0.8303811728954316,
       "own_campaign_evaders": 0.7473497614264488,
+      "other_campaign_evaders_no_s1": 0.7877948840459188,
+      "own_campaign_evaders_no_s1": 0.6674327751000723,
       "exploitability": 0.8767275884747505
     },
     "ema/2": {
@@ -64,6 +74,8 @@
       "x3_exploiters_clean": 0.7551489075024923,
       "other_campaign_evaders": 0.538953716494143,
       "own_campaign_evaders": 0.7185542210936546,
+      "other_campaign_evaders_no_s1": 0.4168029559155305,
+      "own_campaign_evaders_no_s1": 0.6326044301191965,
       "exploitability": 0.6871611475944519
     }
   },
@@ -94,10 +106,20 @@
         "lo": 0.5811513364315033,
         "hi": 0.8303811728954317
       },
+      "other_campaign_evaders_no_s1": {
+        "mean": 0.6183051102691227,
+        "lo": 0.4627622564633687,
+        "hi": 0.7877948840459187
+      },
       "own_campaign_evaders": {
         "mean": 0.7697961951295534,
         "lo": 0.6990839689970016,
         "hi": 0.86295485496521
+      },
+      "own_campaign_evaders_no_s1": {
+        "mean": 0.7118574149078793,
+        "lo": 0.6286988457043966,
+        "hi": 0.8394406239191691
       },
       "train": {
         "mean": 0.451519052622219,
@@ -141,10 +163,20 @@
         "lo": 0.4149918995797634,
         "hi": 0.5427615530788898
       },
+      "other_campaign_evaders_no_s1": {
+        "mean": 0.36653673557771577,
+        "lo": 0.2737689524888992,
+        "hi": 0.41680295591553057
+      },
       "own_campaign_evaders": {
         "mean": 0.7444161002834638,
         "lo": 0.7185542210936546,
         "hi": 0.7786539494991302
+      },
+      "own_campaign_evaders_no_s1": {
+        "mean": 0.6832660337289175,
+        "lo": 0.6326044301191965,
+        "hi": 0.7531175414721171
       },
       "train": {
         "mean": 0.39593197351787235,
@@ -214,6 +246,16 @@
         0.29142745640128853
       ]
     },
+    "other_campaign_evaders_no_s1": {
+      "mean": 0.2517683746914069,
+      "lo": 0.18899330397446948,
+      "hi": 0.37099192813038834,
+      "per_seed": [
+        0.1889933039744695,
+        0.1953198919693629,
+        0.3709919281303883
+      ]
+    },
     "own_campaign_evaders": {
       "mean": 0.02538009484608968,
       "lo": -0.03695616126060486,
@@ -222,6 +264,16 @@
         0.08430090546607971,
         -0.03695616126060486,
         0.02879554033279419
+      ]
+    },
+    "own_campaign_evaders_no_s1": {
+      "mean": 0.02859138117896191,
+      "lo": -0.035377283891042,
+      "hi": 0.086323082447052,
+      "per_seed": [
+        0.086323082447052,
+        -0.035377283891042,
+        0.034828344980875725
       ]
     },
     "train": {

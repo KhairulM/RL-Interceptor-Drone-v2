@@ -6,26 +6,35 @@ pursuers the evader meets run the same estimator + RLS on clean inputs. Arms: un
 (Exp 2, QD-DPP on both roles as F3 amendment 3). Reused: F2-plain / F3 (plain obs) and F2-acc (finite difference).
 F5c: every final pursuer vs the train pool, the test set and all RL evaders of the plain-evader campaigns, clean and
 noisy, plus its exploiter; F5 pursuers also with RLS frozen at eval (RLS ablation B1).
+Amendment 1 (11-04 21:11): the estimator is retrained (A2a rules) on trajectories of a new generalist vs the train pool
++ self-play evaders F5c never evaluates (F4 seed 2, F2-acc); F5c campaign-evader metrics exclude stage-1 evaders.
 """
 
+import hashlib
 import json
 import os
 import time
 
 import numpy as np
+import torch
 
 import common
-from a2_nfacc import a2b_methods
+from a2_nfacc import a2b_methods, fit_acc_estimator
 from a_adapt import test_set
 from common import OUT, evaluate, log_progress, save_json, train
 from d_sampling import EXPLOIT_FRAMES
-from f2_final import ACC, _done, run_campaign
+from f2_final import ACC, OPP_ACC, _done, run_campaign
 from f3_sampler_sp import F3C, SAMPLERS, _policies
 from f3_sampler_sp import name as f3_name
 from f4_estimator_sp import NOISY, _mirror
-from x3_gap import load_split
+from x3_gap import GEN_FRAMES, load_split
 
 F5C = os.path.join(OUT, "F5_acc_sp")
+EST = os.path.join(F5C, "estimator")          # amendment 1: retrained estimator
+GEN_SEED = 0
+INDEP_PLAIN = ["thesis-F4-nf-s2", "thesis-F4-ema-s2"]   # plain-obs evaders, seed 200: no F5c evaluation evader
+INDEP_ACC = "thesis-F2-acc"                              # evaders observe the pursuer's acceleration
+REC_ENVS = 1024
 SEEDS = [0, 100]
 FREEZE = "task.adapt.freeze=true"
 NEW = {"uniform_rls": SAMPLERS["uniform"], "qd_dpp_rls": SAMPLERS["qd_dpp"]}
@@ -40,7 +49,7 @@ CONTRASTS = [("uniform_rls", "clean", "uniform_plain", "clean"), ("uniform_rls",
 
 
 def rls_overrides():
-    return a2b_methods()["NFacc_OA"]
+    return a2b_methods(EST)["NFacc_OA"]
 
 
 def name(arm, k, smoke=False):
@@ -74,25 +83,29 @@ def _roles():
     return {"pursuer": pov, "evader": _mirror(pov)}
 
 
-def _smoke_evals():
-    """One short eval per F5c override set, a tiny exploiter, and the reused pursuers under noise (one lane; the other
-    waits for it)."""
-    root = os.path.join(F5C, "smoke")
-    done = os.path.join(root, "DONE")
+def _once(done, fn, what):
+    """Run fn on one lane; the other lane waits for its DONE marker."""
     if os.path.isfile(done):
         return
     if not common._acquire_lock(done + ".lock"):
         while not os.path.isfile(done) and os.path.isfile(done + ".lock"):
             time.sleep(60)
         if not os.path.isfile(done):
-            raise RuntimeError("F5 smoke evals failed on the other lane")
+            raise RuntimeError(f"{what} failed on the other lane")
         return
     try:
-        _smoke_eval_jobs(root)
+        fn()
         open(done, "w").close()
     finally:
         if os.path.isfile(done + ".lock"):
             os.remove(done + ".lock")
+
+
+def _smoke_evals():
+    """One short eval per F5c override set, a tiny exploiter, and the reused pursuers under noise (one lane; the other
+    waits for it)."""
+    root = os.path.join(F5C, "smoke")
+    _once(os.path.join(root, "DONE"), lambda: _smoke_eval_jobs(root), "F5 smoke evals")
 
 
 def _smoke_eval_jobs(root):
@@ -117,7 +130,61 @@ def _smoke_eval_jobs(root):
     log_progress(f"F5 smoke evals ok ({len(jobs)})")
 
 
+def independent_evaders():
+    """(plain-obs evaders, acceleration-input evaders) for the estimator: RL evaders of self-play campaigns that F5c
+    never evaluates and that share no checkpoint with one it does; duplicates (same file) dropped."""
+    seen, plain = set(), []
+    for c in INDEP_PLAIN:
+        for e in _policies(c, "evader"):
+            h = hashlib.md5(open(e["checkpoint_path"], "rb").read()).hexdigest()
+            if h not in seen:
+                seen.add(h)
+                plain.append(e)
+    return plain, _policies(INDEP_ACC, "evader")
+
+
+def merge_traj(paths, out):
+    """Concatenate recorded trajectories along the env axis, truncated to the shortest recording."""
+    ds = [torch.load(p) for p in paths]
+    T1 = min(d["z"].shape[0] for d in ds)
+    torch.save({"z": torch.cat([d["z"][:T1] for d in ds], 1), "own_pos": torch.cat([d["own_pos"][:T1] for d in ds], 1),
+                "done": torch.cat([d["done"][:T1 - 1] for d in ds], 1), "envs": torch.cat([d["envs"] for d in ds]),
+                "opponent": [o for d in ds for o in d["opponent"]], "step_dt": ds[0]["step_dt"],
+                "lengths": [d["z"].shape[0] for d in ds]}, out)
+    return out
+
+
+def _retrain_jobs():
+    split = load_split()
+    plain, acc = independent_evaders()
+    gen = train(os.path.join(EST, "ckpt", "generalist.pt"), split["train"] + plain, GEN_FRAMES, role="pursuer",
+                seed=GEN_SEED)
+    if not gen:
+        raise RuntimeError("F5 estimator generalist failed")
+    roll = os.path.join(EST, "rollouts")
+    n_main = len(split["train"]) + len(plain)
+    jobs = [("train_plain", split["train"] + plain, REC_ENVS, []),
+            ("train_acc", acc, round(REC_ENVS * len(acc) / n_main), OPP_ACC),   # same envs per opponent
+            ("test", test_set(split), REC_ENVS, [])]
+    for part, opps, n, ov in jobs:
+        path = os.path.join(roll, f"traj_{part}.pt")
+        if not os.path.isfile(path):
+            evaluate(os.path.join(EST, "evals", f"record_{part}.json"), opps, policy_ckpt=gen, save_episodes=False,
+                     extra=[f"eval_traj_out={path}", f"eval_traj_envs={n}"] + ov)
+        if not os.path.isfile(path):
+            raise RuntimeError(f"F5 estimator recording {part} failed")
+    train_path = merge_traj([os.path.join(roll, f"traj_{p}.pt") for p in ("train_plain", "train_acc")],
+                            os.path.join(roll, "traj_train.pt"))
+    fit_acc_estimator({"train": train_path, "test": os.path.join(roll, "traj_test.pt")}, EST, "F5 estimator (A2a rules)")
+    log_progress(f"F5 estimator retrained: {rls_overrides()}")
+
+
+def retrain_estimator():
+    _once(os.path.join(EST, "DONE"), _retrain_jobs, "F5 estimator retraining")
+
+
 def run_f5(args):
+    retrain_estimator()
     roles = _roles()
     for arm, n in SMOKE_STAGES.items():
         run_campaign(name(arm, 0, True), [], dict(NEW[arm]), smoke_stages=n, role_overrides=roles)
@@ -168,7 +235,8 @@ def _rates(path, key):
 
 def _metrics(prefix, c, split, test, labels, key):
     J = {**_rates(prefix + "_train.json", key), **_rates(prefix + "_test.json", key)}
-    Jc = _rates(prefix + "_campaign_evaders.json", key)
+    Jc = {kk: v for kk, v in _rates(prefix + "_campaign_evaders.json", key).items()
+          if not kk.endswith(":s1")}                 # amendment 1: stage-1 evaders are shared by same-seed campaigns
     if not J or not Jc:
         return None
     ids = lambda opps: [J[e["id"]] for e in opps if e["id"] in J]
@@ -226,7 +294,8 @@ def analyse_f5(P, split, test):
              "with 2 seeds the CI is the range of the two values]. *_rls = learned acceleration estimate + RLS (F5); "
              "*_plain = plain observation (F2 / F3); uniform_fd = finite-difference acceleration (F2-acc). noisy = A3c "
              "sensor noise at eval; *_frozen = F5 pursuer evaluated with RLS frozen. exploitability = 1 - J (or capture) vs "
-             "a fresh exploiter. J = capture + evader crash + evader out of bounds; cap = capture only.", ""]
+             "a fresh exploiter. J = capture + evader crash + evader out of bounds; cap = capture only. other / own campaign evaders exclude "
+             "stage-1 evaders (amendment 1). Estimator retrained (amendment 1): `estimator/summary.md`.", ""]
     for tag, title in (("J", "J"), ("cap", "Capture only")):
         for cond in ("clean", "noisy", "clean_frozen", "noisy_frozen"):
             present = [a for a in arms if f"{tag}/{cond}/{a}" in agg]

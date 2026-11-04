@@ -123,7 +123,8 @@ def _J(path, key="neutralization_rate"):
 def _outcome_metrics(c, split, test, labels, key):
     J = {**_J(os.path.join(F3C, "evals", f"{c}_final_train.json"), key),
          **_J(os.path.join(F3C, "evals", f"{c}_final_test.json"), key)}
-    Jc = _J(os.path.join(F3C, "evals", f"{c}_final_campaign_evaders.json"), key)
+    Jc = {kk: v for kk, v in _J(os.path.join(F3C, "evals", f"{c}_final_campaign_evaders.json"), key).items()
+          if not kk.endswith(":s1")}                 # amendment 6: stage-1 evaders are shared by same-seed campaigns
     if not J or not Jc:
         return None
     r = {"train": np.mean([J[e["id"]] for e in split["train"] if e["id"] in J]),
@@ -227,7 +228,7 @@ def analyse_f3(camps, split, test):
                                                   "aggregate": agg, "paired": diffs, "evader_vendi": vendi})
     lines = ["# F3_sampler_sp summary", "", "Samplers used by both roles (amendment 3). Final pursuer of each "
              "campaign; mean J over the finished campaign seeds (1-2, see per_seed in results.json) [95 % "
-             "bootstrap CI; with 2 seeds the CI is only the range of the two values; 1 seed: no CI]. exploitability = 1 - J vs a fresh exploiter. evader_vendi = "
+             "bootstrap CI; with 2 seeds the CI is only the range of the two values; 1 seed: no CI]. exploitability = 1 - J vs a fresh exploiter. other / own campaign evaders exclude stage-1 evaders (amendment 6). evader_vendi = "
              "effective number of distinct RL evaders a campaign produced (max = its number of RL evaders).", "",
              "| sampler | " + " | ".join(metrics) + " |", "|---" * (len(metrics) + 1) + "|"]
     for s in SAMPLERS:

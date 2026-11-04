@@ -132,6 +132,11 @@ def analyse_f4(camps, split, test):
             r["x3_exploiters_clean"] = mean(Jclean, ids["x3_exploiters"])
         r["other_campaign_evaders"] = float(np.mean([v for kk, v in Jc.items() if not kk.startswith(c + "/")]))
         r["own_campaign_evaders"] = float(np.mean([v for kk, v in Jc.items() if kk.startswith(c + "/")]))
+        # Post-hoc (11-04, plan §9): stage-1 evaders are byte-identical across same-seed campaigns.
+        r["other_campaign_evaders_no_s1"] = float(np.mean([v for kk, v in Jc.items()
+                                                           if not kk.startswith(c + "/") and not kk.endswith(":s1")]))
+        r["own_campaign_evaders_no_s1"] = float(np.mean([v for kk, v in Jc.items()
+                                                         if kk.startswith(c + "/") and not kk.endswith(":s1")]))
         ex = _J(os.path.join(F4C, "evals", f"{c}_final_vs_exploiter.json"))
         if ex:
             r["exploitability"] = 1 - next(iter(ex.values()))
@@ -152,7 +157,8 @@ def analyse_f4(camps, split, test):
     lines = ["# F4_estimator_sp summary (v2)", "", "Pursuer observes an *estimated* evader velocity (no true velocity), "
              "trained and evaluated with sensor noise (except *_clean). ema = EMA-filtered finite-difference velocity "
              "(A3d V_ema); nf = learned velocity + learned acceleration estimate (A3d V_nf). Mean over 3 campaign seeds "
-             "[95 % bootstrap CI]; paired = same campaign seed.",
+             "[95 % bootstrap CI]; paired = same campaign seed. *_no_s1 = post-hoc (11-04): stage-1 evaders excluded "
+             "(byte-identical across same-seed campaigns).",
              "", "| metric | ema | nf | nf - ema (paired) |", "|---|---|---|---|"]
     f = lambda x: f"{x['mean']:.3f} [{x['lo']:.3f}, {x['hi']:.3f}]"
     for m in metrics:

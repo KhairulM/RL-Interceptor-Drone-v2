@@ -58,7 +58,7 @@ velocity, no acceleration).
   in 2 of 3 nf campaigns the exploiter makes the pursuer crash (88-92 %). Prediction held for X3 exploiters, not for
   exploitability.
 
-**Running / pending**: F3 redone (amendment 3, 11-03 14:15): the samplers (hedge, pfsp, qd_dpp) now act on both roles, as in the reference papers; 2 seeds per arm (amendment 4, 11-04 14:45; hedge/qd_dpp seed 0 done, pfsp-s0 and hedge-s1 running, qd_dpp-s1 / pfsp-s1 start ~15:35 / ~16:20). Expected F3c ~11-05 08:30-10:30. Then F5 (pre-registered 11-04 17:40): learned acceleration estimate + RLS in self-play (uniform and QD-DPP, 2 seeds each) vs the F2 / F3 pursuers, clean and noisy, RLS frozen at eval as ablation; expected F5c ~11-06 19:30. Freeze moved to 11-08. Earlier delays: power loss (11-01 08:48 - 11-02 10:19) and a resume bug (analysis uses stages 0-8, plan §9).
+**Running / pending**: F3 redone (amendment 3, 11-03 14:15): the samplers (hedge, pfsp, qd_dpp) now act on both roles, as in the reference papers; 2 seeds per arm (amendment 4, 11-04 14:45; hedge/qd_dpp seed 0 done, pfsp-s0 and hedge-s1 running, qd_dpp-s1 / pfsp-s1 start ~15:35 / ~16:20). Expected F3c ~11-05 08:30-10:30. Then F5 (pre-registered 11-04 17:40, amendment 1 21:11: estimator retrained on self-play evaders F5c never evaluates): learned acceleration estimate + RLS in self-play (uniform and QD-DPP, 2 seeds each) vs the F2 / F3 pursuers, clean and noisy, RLS frozen at eval as ablation; expected F5c ~11-06 21:00. F3c / F5c campaign-evader metrics exclude stage-1 evaders (shared by same-seed campaigns). Freeze moved to 11-08. Earlier delays: power loss (11-01 08:48 - 11-02 10:19) and a resume bug (analysis uses stages 0-8, plan §9).
 
 ## Relation to the reference papers (updated 2026-11-02 10:30)
 
@@ -1008,5 +1008,6 @@ How the fresh exploiters win (fractions of episodes):
 - Prediction "nf > ema on held-out RL and X3 exploiters by >= 0.05; exploitability lower for nf (low confidence)":
   X3 exploiters **held** (+0.441); held-out RL **held in direction and size, not significant** (+0.122, CI includes 0);
   exploitability **did not hold** (nf higher by +0.197).
+- **Post-hoc (11-04, plan §9): stage-1 evaders excluded.** Stage-1 evaders are byte-identical across campaigns with the same seed (here nf-sK and ema-sK share theirs), so "other campaigns' evaders" contained a copy of each pursuer's own stage-1 opponent. Without them (3 evaders per campaign): other campaigns' evaders ema 0.367 [0.274, 0.417], nf 0.618 [0.463, 0.788], nf - ema **+0.252 [+0.189, +0.371]**; own campaign ema 0.683 [0.633, 0.753], nf 0.712 [0.629, 0.839], nf - ema +0.029 [-0.035, +0.086]. Both arms are lower (the stage-1 evaders are easy) and the nf advantage is larger; conclusions unchanged. The registered numbers above are unchanged (`*_no_s1` columns in `results.json` / `summary.md`).
 - Limitation: 3 seeds, one exploiter per pursuer; the estimator is the clean-trained MLP chosen by the A3d rule, not the
   better noise-trained GRU found later (A3e).
