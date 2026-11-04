@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-11-04 16:40; details in the sections below)
+## Summary (updated 2026-11-04 17:45; details in the sections below)
 
 J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over
 seeds; "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position +
@@ -58,7 +58,7 @@ velocity, no acceleration).
   in 2 of 3 nf campaigns the exploiter makes the pursuer crash (88-92 %). Prediction held for X3 exploiters, not for
   exploitability.
 
-**Running / pending**: F3 redone (amendment 3, 11-03 14:15): the samplers (hedge, pfsp, qd_dpp) now act on both roles, as in the reference papers; 2 seeds per arm (amendment 4, 11-04 14:45; hedge/qd_dpp seed 0 done, pfsp-s0 and hedge-s1 running, qd_dpp-s1 / pfsp-s1 start ~15:35 / ~16:20). Expected F3c ~11-05 08:30-10:30. Earlier delays: power loss (11-01 08:48 - 11-02 10:19) and a resume bug (analysis uses stages 0-8, plan §9).
+**Running / pending**: F3 redone (amendment 3, 11-03 14:15): the samplers (hedge, pfsp, qd_dpp) now act on both roles, as in the reference papers; 2 seeds per arm (amendment 4, 11-04 14:45; hedge/qd_dpp seed 0 done, pfsp-s0 and hedge-s1 running, qd_dpp-s1 / pfsp-s1 start ~15:35 / ~16:20). Expected F3c ~11-05 08:30-10:30. Then F5 (pre-registered 11-04 17:40): learned acceleration estimate + RLS in self-play (uniform and QD-DPP, 2 seeds each) vs the F2 / F3 pursuers, clean and noisy, RLS frozen at eval as ablation; expected F5c ~11-06 19:30. Freeze moved to 11-08. Earlier delays: power loss (11-01 08:48 - 11-02 10:19) and a resume bug (analysis uses stages 0-8, plan §9).
 
 ## Relation to the reference papers (updated 2026-11-02 10:30)
 

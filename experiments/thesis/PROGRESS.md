@@ -51,6 +51,7 @@ the log).
 | F2a / F2b / F2c (final runs) | F2a **done** (06:19, 5 seeds); smoke tests F2a/F2b/F3/F4v1 passed 03:48-04:51; F2b **done** (campaigns finished 18:15 acc / 18:33 plain); F2c **done** (10-30 14:29, moved forward; in RESULTS.md) | `F2a_exploit_acc/`, `scripts/selfplay/outputs/thesis-F2-{acc,plain}/`, `F2c_final_eval/` | pre-registered 10-28 19:30 (plan Phase F); `exps/f2_final.py`; env flag `oracle.opp_side_accel` |
 | F3 / F3c (samplers in self-play) | **redo started 11-03 14:15 (amendment 3: sampler on both roles)**; seed 0 of hedge / qd_dpp / pfsp `-both` first; **amendment 4 (11-04 14:45): 2 seeds per arm** (qd_dpp/pfsp-both-s1 added); uniform s0/s1 reused; pursuer-only campaigns kept, not analysed | `scripts/selfplay/outputs/thesis-F3-*`, `F3_sampler_sp/` | pre-registered 10-28 20:30; `exps/f3_sampler_sp.py`; orchestrator `pursuer_sampler: hedge|qd_dpp`, `eval_extra_overrides` |
 | F4 / F4c **v2** (learned opponent model in self-play, estimated velocity + noise) | **done** (F4c 10-31 22:09; analysis fixed and written up 11-02) | `scripts/selfplay/outputs/thesis-F4-*`, `F4_estimator_sp/` | pre-registered 10-28 21:30; `exps/f4_estimator_sp.py`; env `observation.opp_drop_rel_vel`, `adapt.opp_side`; orchestrator `role_task_overrides` |
+| F5 / F5c (learned acceleration + RLS in self-play vs reference pursuers) | **queued** behind F3c (pre-registered 11-04 17:40): smoke, then 4 campaigns uniform_rls / qd_dpp_rls x seeds 0 / 100; F5c reuses F2 / F3 pursuers and exploiters, clean + noisy eval, RLS frozen at eval (B1) | `scripts/selfplay/outputs/thesis-F5-*`, `F5_acc_sp/` | `exps/f5_acc_sp.py`, `tests/test_f5_design.py` |
 | D3 campaign (QD-DPP), BayesID | dropped (D3 replaced by F2b/F3) | | |
 | F1_final | **done** (10-28 04:22, 5 seeds) | `F1_final/` | 2x2 factorial, 5 seeds, `exps/f1_final.py` (reuses X3 / D1 / X4 runs) |
 
@@ -65,6 +66,7 @@ holding the driver PID; stale locks of dead PIDs are taken over).
 - F3 order (seed-major): hedge-both-s0, qd_dpp-both-s0, pfsp-both-s0, hedge-both-s1, qd_dpp-both-s1, pfsp-both-s1
   (seed-1 start deadline `S1_START_DEADLINE` 11-04 20:00). F3c waits for all 8 campaigns (incl. uniform s0/s1) and for
   any running campaign (stages 0-8).
+- **Lane chains v7** (11-04 17:43; same lanes): each waits for its v6 chain (lane C 187940, lane D 187941) to exit, then `F5 && F5c` (F5 = two smoke campaigns + smoke evals on one lane, then the 4 campaigns in the order uniform_rls-s0, qd_dpp_rls-s0, uniform_rls-s1, qd_dpp_rls-s1); stops if the F5 smoke fails. F5c waits for the 4 F5 campaigns and the F3c exploiters.
 - **After a reboot**: all lock files are stale and PIDs get reused, so delete them first
   (`find experiments/thesis scripts/selfplay/outputs -name "*.lock" -delete`), then relaunch the two chains; campaigns
   resume from their last finished stage (`fresh_start` is off). The two F3 drivers running since 11-02 10:22 hold the
@@ -72,7 +74,7 @@ holding the driver PID; stale locks of dead PIDs are taken over).
   the chains (new processes load the guard) instead of relying on those drivers.
 - If a chain died: re-run `run.py --exp <ID>` for the remaining IDs in that order (resumable, concurrency-safe). If
   2104746 died before F2c finished, nothing breaks: the F4 campaigns just start earlier.
-- Expected (12.7 h per campaign, ~1.45 h per stage): hedge/qd_dpp-both-s0 done 03:00 / 03:43; pfsp-both-s0 ~11-04 15:35, hedge-both-s1 ~16:20; qd_dpp-both-s1 (lane D) ~11-05 04:20, pfsp-both-s1 (lane C) ~05:00; F3c ~11-05 08:30-10:30. Freeze 11-05. No further fallback is pre-registered (F3 seed 2 was already
+- Expected (12.7 h per campaign, ~1.45 h per stage): hedge/qd_dpp-both-s0 done 03:00 / 03:43; pfsp-both-s0 ~11-04 15:35, hedge-both-s1 ~16:20; qd_dpp-both-s1 (lane D) ~11-05 04:20, pfsp-both-s1 (lane C) ~05:00; F3c ~11-05 08:30-10:30; F5 smoke ~1 h, F5 rounds ~11-05 23:30 / ~11-06 12:30, F5c ~11-06 19:30. Freeze moved to 11-08 (user, 11-04). No further fallback is pre-registered (F3 seed 2 was already
   dropped on 10-29); if F3 runs late, ask the user before cutting anything.
 
 ## Decisions taken
@@ -110,6 +112,7 @@ holding the driver PID; stale locks of dead PIDs are taken over).
 
 (Timestamps of log entries written on 10-27 before 21:20 are approximate; `driver_log.txt` has exact times.)
 
+- 2026-11-04 17:45: **F5 added (user)**: learned acceleration estimate (A2b, velocity observed) + RLS in full self-play, uniform (Exp 1, vs no acceleration input) and QD-DPP (Exp 2, vs the reference pursuers uniform / Hedge / PFSP), 2 seeds each; clean + noisy eval; RLS ablation by freezing RLS at eval (user chose B1 over separate RLS-off campaigns; a fixed-pool noisy-training RLS test was proposed and dropped by the user). Evader keeps the plain observation. Pre-registered in the plan 17:40, code `exps/f5_acc_sp.py` + `tests/test_f5_design.py` (58 pass), analysis checked on synthetic evals (all 36 contrasts exact). Lane chains v7 queue F5 -> F5c behind F3c. **Freeze moved 11-05 -> 11-08** (user).
 - 2026-11-04 15:25: **F3 amendment 5 (user): capture-only secondary metrics** in F3c (`<metric>_cap` = the same metric from `capture_rate`; plan amended before F3c). Checked on synthetic evals (capture = J - 0.1 gives exactly -0.1 / +0.1 for exploitability); 55 tests pass. Provisional in-campaign capture rate (not a pre-registered metric, each campaign vs its own evaders): stage-6 pursuer mean / worst: uniform 0.938 / 0.906 and 0.937 / 0.881, hedge 0.944 / 0.906 and 0.941 / 0.895, qd_dpp-s0 0.950 / 0.930, pfsp-s0 0.797 / 0.597; stage-8 pursuer: uniform 0.848 and 0.915, hedge-s0 0.897, qd_dpp-s0 0.903. qd_dpp ~ hedge ~ uniform (within the seed spread), pfsp lower.
 - 2026-11-04 14:46: **F3 amendment 4 (user): at least 2 seeds per sampler.** qd_dpp-both-s1 and pfsp-both-s1 added (plan amended before any F3c run); `S1_START_DEADLINE` 08:00 -> 20:00, F3c requires all 8 campaigns (55 tests pass). Lane chains v6 replace v5 (see Running jobs). F3c moves to ~11-05 08:30-10:30, the freeze day.
 - 2026-11-04 11:25: F3 hedge-both-s0 (03:00) and qd_dpp-both-s0 (03:43) done, 9 stages each, exit 0. pfsp-both-s0 (lane D, started 03:00) at stage 6 of 9, hedge-both-s1 (lane C, started 03:43, before the 08:00 deadline) at stage 5 of 9; ~1.45 h per stage -> ~15:30 / ~16:30, then F3c (~11-04 20:00-22:00).
