@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-11-03 14:20; details in the sections below)
+## Summary (updated 2026-11-03 14:50; details in the sections below)
 
 J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over
 seeds; "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position +
@@ -36,6 +36,9 @@ velocity, no acceleration).
 - A3e (offline): a GRU trained on noisy inputs is the best estimator under noise (velocity 0.19 m/s vs 0.29 for the
   MLP used in closed loop, -36 %; acceleration -12 %); a Kalman filter only matches the clean MLP. So A3d / F4 use
   a weaker-than-best estimator.
+- A3f (offline): a spectral-norm penalty on the estimator network (Pan et al. 2026) changes its error by
+  <= 2 % at the pre-registered strength; stronger penalties trade clean accuracy for noise robustness, which training
+  on noisy inputs achieves better. Not adopted.
 
 **Final runs**
 - F1 (5 seeds): the acceleration input dominates (train +0.20, exploiters +0.46); held-out results are bimodal per seed.
@@ -779,6 +782,45 @@ FD and FD + EMA reused from A3a / A3d. [A3e_estimators/summary.md](A3e_estimator
 - Caveats: one training run per model (no seed spread); 8 epochs with the last epoch kept, and the clean GRU was
   still improving at epoch 8; offline error only, not closed-loop performance. A measured velocity with A3c's noise
   (error 0.128) is still better than every estimator from positions.
+
+## A3f_specnorm (done 2026-11-03 14:41; offline, one training run per model)
+
+User request after Pan et al. (RA-L 2026, "Learning on the Fly"), who train their residual-dynamics network with a
+spectral-norm penalty. Pre-registered (plan, A3f row) before any run. The A3a / A3d positions-only MLP estimator is
+retrained with loss + beta * sum_l ||W_l||^2 over the basis' 3 layers and the shared head: **spec** = largest singular
+value (Pan et al.), **frob** = Frobenius norm (plain weight decay, the control). beta in {1e-4, 1e-3, 1e-2}, chosen on
+val in the basis' training condition. Same data, split, noise draws, masks and metric as A3a / A3d; the unregularised
+models re-evaluated with the A3f code match the stored A3a / A3d numbers exactly (max |diff| 0). Files:
+`A3f_specnorm/summary.md`, `pred_err.json`.
+
+Mean error (m/s); acc = evader velocity change over 0.2 s, vel = current evader velocity; test = held-out evaders.
+
+| target | test inputs | MLP clean | spec clean | frob clean | MLP aug | spec aug | frob aug |
+|---|---|---|---|---|---|---|---|
+| acc | clean | 0.2884 | 0.2884 (0.0 %) | 0.2902 | 0.2901 | 0.2892 (-0.3 %) | 0.2895 |
+| acc | noisy | 0.3309 | 0.3276 (-1.0 %) | 0.3244 | 0.2931 | 0.2921 (-0.3 %) | 0.2922 |
+| vel | clean | 0.1261 | 0.1286 (+2.0 %) | 0.1269 | 0.1614 | 0.1619 (+0.3 %) | 0.1635 |
+| vel | noisy | 0.2918 | 0.2905 (-0.4 %) | 0.2881 | 0.2324 | 0.2347 (+1.0 %) | 0.2347 |
+
+Lipschitz bound prod ||W_l||_2 (normalised inputs), MLP -> spec at beta*: acc clean 6.4 -> 3.8, acc aug 5.9 -> 2.9,
+vel clean 36.5 -> 30.1, vel aug 36.7 -> 15.5 (frob lowers it about as much: 3.1, 2.2, 29.1, 27.9). beta* = 1e-4 (the
+smallest grid value) for 7 of 8 models (vel spec aug: 1e-3): on val, any stronger penalty is worse.
+
+- Predictions: (1) "spec lowers the Lipschitz bound >= 2x" **held in 2 of 4** (aug bases 2.0x / 2.4x; clean bases
+  1.7x / 1.2x). (2) "clean basis, noisy test: spec >= 10 % better" **did not hold** (-1.0 % acc, -0.4 % vel).
+  (3) "aug basis within +/- 5 %" **held** (-0.3 %, +1.0 %). (4) "clean test within +/- 5 %" **held** (0.0 to +2.0 %).
+  (5) "spec <= frob on noisy test, clean basis" **did not hold** (frob slightly better on both targets).
+- Pre-registered consequence: spec does not beat the closed-loop estimators (acc MLP aug -0.3 %, vel MLP clean -0.4 %)
+  by >= 10 %, so it is **not a candidate** for A3d / F4. The spectral penalty does not help this estimator.
+- Exploratory (not the pre-registered beta): larger penalties make the clean-trained basis more noise-robust at a cost
+  on clean inputs, e.g. acc spec beta 1e-2: noisy test -10.6 %, clean val +8.0 %; vel frob beta 1e-2: noisy test
+  -9.7 %, clean val +60 %. Noise-augmented training does better on both counts (acc MLP aug: noisy test -11.4 % vs MLP
+  clean, clean val +2.1 %), and A3e's GRU aug is better still. So in this setting the regulariser buys noise
+  robustness only by trading off accuracy, which training on noisy inputs achieves more cheaply.
+- Caveats: one training run per model, so differences of 1-2 % are likely within seed noise; beta* sits at the grid
+  edge, so the val-optimal penalty may be below 1e-4 (i.e. about zero); offline error only. Setting differs from Pan
+  et al.: their network predicts the robot's own residual acceleration from its state and action, ours estimates an
+  opponent's state from noisy position history.
 
 ## F1_final (done 2026-10-28 04:22; 5 seeds, noise-free)
 
