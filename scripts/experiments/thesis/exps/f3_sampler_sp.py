@@ -109,11 +109,38 @@ def run_f3c(args):
     analyse_f3(camps, split, test)
 
 
-def _J(path):
+def _J(path, key="neutralization_rate"):
     if not os.path.isfile(path):
         return {}
     with open(path) as f:
-        return {k: v["neutralization_rate"] for k, v in json.load(f)["matchups"].items()}
+        return {k: v[key] for k, v in json.load(f)["matchups"].items()}
+
+
+# Amendment 5 (11-04, user): the outcome metrics are also reported with capture only (no evader crash / leaving the
+# arena), as a secondary "<metric>_cap" column.
+
+
+def _outcome_metrics(c, split, test, labels, key):
+    J = {**_J(os.path.join(F3C, "evals", f"{c}_final_train.json"), key),
+         **_J(os.path.join(F3C, "evals", f"{c}_final_test.json"), key)}
+    Jc = _J(os.path.join(F3C, "evals", f"{c}_final_campaign_evaders.json"), key)
+    if not J or not Jc:
+        return None
+    r = {"train": np.mean([J[e["id"]] for e in split["train"] if e["id"] in J]),
+         "heldout_rl": np.mean([J[e["id"]] for e in split["heldout_rl"] if e["id"] in J]),
+         "heldout_scripted": np.mean([J[e["id"]] for e in split["heldout_scripted"] if e["id"] in J]),
+         "x3_exploiters": np.mean([J[e["id"]] for e in test if e["id"].startswith("exploit/") and e["id"] in J]),
+         "other_campaign_evaders": np.mean([v for kk, v in Jc.items() if not kk.startswith(c + "/")]),
+         "own_campaign_evaders": np.mean([v for kk, v in Jc.items() if kk.startswith(c + "/")])}
+    by_c = {}
+    for e in split["heldout_rl"] + split["heldout_scripted"]:
+        if e["id"] in J and e["id"] in labels:
+            by_c.setdefault(labels[e["id"]], []).append(J[e["id"]])
+    r["heldout_worst_cluster"] = min(np.mean(v) for v in by_c.values())
+    ex = _J(os.path.join(F3C, "evals", f"{c}_final_vs_exploiter.json"), key)
+    if ex:
+        r["exploitability"] = 1 - next(iter(ex.values()))
+    return r
 
 
 def _sampling_stats(c):
@@ -165,25 +192,10 @@ def analyse_f3(camps, split, test):
         labels = json.load(f)["labels"]
     rows = {}
     for s, k, c in camps:
-        J = {**_J(os.path.join(F3C, "evals", f"{c}_final_train.json")),
-             **_J(os.path.join(F3C, "evals", f"{c}_final_test.json"))}
-        Jc = _J(os.path.join(F3C, "evals", f"{c}_final_campaign_evaders.json"))
-        if not J or not Jc:
+        r = _outcome_metrics(c, split, test, labels, "neutralization_rate")
+        if r is None:
             continue
-        r = {"train": np.mean([J[e["id"]] for e in split["train"] if e["id"] in J]),
-             "heldout_rl": np.mean([J[e["id"]] for e in split["heldout_rl"] if e["id"] in J]),
-             "heldout_scripted": np.mean([J[e["id"]] for e in split["heldout_scripted"] if e["id"] in J]),
-             "x3_exploiters": np.mean([J[e["id"]] for e in test if e["id"].startswith("exploit/") and e["id"] in J]),
-             "other_campaign_evaders": np.mean([v for kk, v in Jc.items() if not kk.startswith(c + "/")]),
-             "own_campaign_evaders": np.mean([v for kk, v in Jc.items() if kk.startswith(c + "/")])}
-        by_c = {}
-        for e in split["heldout_rl"] + split["heldout_scripted"]:
-            if e["id"] in J and e["id"] in labels:
-                by_c.setdefault(labels[e["id"]], []).append(J[e["id"]])
-        r["heldout_worst_cluster"] = min(np.mean(v) for v in by_c.values())
-        ex = _J(os.path.join(F3C, "evals", f"{c}_final_vs_exploiter.json"))
-        if ex:
-            r["exploitability"] = 1 - next(iter(ex.values()))
+        r.update({f"{m}_cap": v for m, v in _outcome_metrics(c, split, test, labels, "capture_rate").items()})
         st = _sampling_stats(c)
         if c in vendi:
             r["evader_vendi"] = vendi[c]["vendi"]
@@ -195,17 +207,18 @@ def analyse_f3(camps, split, test):
                "other_campaign_evaders", "own_campaign_evaders", "exploitability", "evader_vendi", "sampling_eff_frac",
                "sampling_max_prob"]
     n_diff = 9                                   # paired differences for the first n_diff metrics
+    cap = [f"{m}_cap" for m in metrics[:8]]      # secondary: capture only (amendment 5)
     agg, diffs = {}, {}
     for s in SAMPLERS:
         agg[s] = {}
-        for m in metrics:
+        for m in metrics + cap:
             v = [rows[(s, k)][m] for k in range(len(SEEDS)) if (s, k) in rows and m in rows[(s, k)]]
             if v:
                 agg[s][m] = {"mean": float(np.mean(v)), "ci": list(an.bootstrap_ci(v)[1:]), "per_seed": v}
     for a, b in (("qd_dpp", "hedge"), ("qd_dpp", "uniform"), ("hedge", "uniform"), ("pfsp", "uniform"),
                  ("qd_dpp", "pfsp")):
         diffs[f"{a}-{b}"] = {}
-        for m in metrics[:n_diff]:
+        for m in metrics[:n_diff] + cap:
             d = [rows[(a, k)][m] - rows[(b, k)][m] for k in range(len(SEEDS))
                  if (a, k) in rows and (b, k) in rows and m in rows[(a, k)] and m in rows[(b, k)]]
             if d:
@@ -227,5 +240,18 @@ def analyse_f3(camps, split, test):
         lines.append(f"| {pair} | " + " | ".join(
             f"{dd[m]['mean']:+.3f} [{dd[m]['ci'][0]:+.3f}, {dd[m]['ci'][1]:+.3f}]" if m in dd else "-"
             for m in metrics[:n_diff]) + " |")
+    lines += ["", "Secondary (amendment 5): the same outcome metrics with capture only (evader crash / leaving the arena "
+              "not counted; exploitability_cap = 1 - capture rate vs the exploiter):", "",
+              "| sampler | " + " | ".join(cap) + " |", "|---" * (len(cap) + 1) + "|"]
+    for s in SAMPLERS:
+        lines.append(f"| {s} | " + " | ".join(
+            f"{agg[s][m]['mean']:.3f} [{agg[s][m]['ci'][0]:.3f}, {agg[s][m]['ci'][1]:.3f}]" if m in agg[s] else "-"
+            for m in cap) + " |")
+    lines += ["", "Seed-paired differences, capture only:", "", "| pair | " + " | ".join(cap) + " |",
+              "|---" * (len(cap) + 1) + "|"]
+    for pair, dd in diffs.items():
+        lines.append(f"| {pair} | " + " | ".join(
+            f"{dd[m]['mean']:+.3f} [{dd[m]['ci'][0]:+.3f}, {dd[m]['ci'][1]:+.3f}]" if m in dd else "-"
+            for m in cap) + " |")
     with open(os.path.join(F3C, "summary.md"), "w") as f:
         f.write("\n".join(lines) + "\n")
