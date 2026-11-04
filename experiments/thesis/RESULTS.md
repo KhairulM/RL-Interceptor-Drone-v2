@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-11-04 17:45; details in the sections below)
+## Summary (updated 2026-11-05 07:50; details in the sections below)
 
 J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over
 seeds; "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position +
@@ -16,11 +16,17 @@ velocity, no acceleration).
   adding the evader's acceleration lifts J 0.65 -> 0.94 (train), 0.47 -> 0.77 (held-out RL), 0.31 -> 0.97 (exploiters).
 
 **RQ1: opponent sampling**
-- QD-DPP beats hardness-prioritised samplers (held-out RL +0.19 vs multi-metric, +0.13 vs win-rate PFSP) but **not
-  uniform** (+0.04, n.s.); hardness-only prioritisation is worse than uniform (D1, 5 seeds).
+- Fixed pool (D1, 5 seeds): QD-DPP beats hardness-prioritised samplers (held-out RL +0.19 vs multi-metric, +0.13 vs
+  win-rate PFSP) but **not uniform** (+0.04, n.s.); hardness-only prioritisation is worse than uniform there.
 - The DPP caps a duplicated opponent's sampling mass but does not protect performance (D1b); duplication robustness
   appears only without a uniform floor (D1c, exploratory).
 - No sampler lowers exploitability (0.44-0.69, D2); with the acceleration input the sampler has no effect (F1).
+- **Self-play, samplers on both roles (F3, 2 seeds, descriptive)**: **Hedge (Roncero) is best**: held-out RL +0.10 and
+  worst held-out cluster +0.16 vs uniform on both seeds (opposite of the fixed-pool D1 result). QD-DPP is not better
+  than uniform (-0.04 / -0.05) and below Hedge. PFSP yields the most diverse evader populations (Vendi 2.99 vs 2.46)
+  but the most specialised pursuer (other campaigns' evaders -0.23). Every self-play pursuer stays ~fully exploitable
+  (0.97-0.98). **Answer to RQ1: not robustly. QD-DPP beats badly tuned hardness prioritisation on a fixed pool (D1),
+  but is not better than uniform (D1, F3) and is below Roncero's Hedge in self-play (F3, 2 seeds).**
 
 **RQ2: opponent model / online adaptation**
 - Noise-free: a learned acceleration estimate equals the finite difference (A2b, n.s.), and both beat M0 (+0.18 train,
@@ -58,9 +64,9 @@ velocity, no acceleration).
   in 2 of 3 nf campaigns the exploiter makes the pursuer crash (88-92 %). Prediction held for X3 exploiters, not for
   exploitability.
 
-**Running / pending**: F3 redone (amendment 3, 11-03 14:15): the samplers (hedge, pfsp, qd_dpp) now act on both roles, as in the reference papers; 2 seeds per arm (amendment 4, 11-04 14:45; hedge/qd_dpp seed 0 done, pfsp-s0 and hedge-s1 running, qd_dpp-s1 / pfsp-s1 start ~15:35 / ~16:20). Expected F3c ~11-05 08:30-10:30. Then F5 (pre-registered 11-04 17:40, amendment 1 21:11: estimator retrained on self-play evaders F5c never evaluates): learned acceleration estimate + RLS in self-play (uniform and QD-DPP, 2 seeds each) vs the F2 / F3 pursuers, clean and noisy, RLS frozen at eval as ablation; expected F5c ~11-06 21:00. F3c / F5c campaign-evader metrics exclude stage-1 evaders (shared by same-seed campaigns). Freeze moved to 11-08. Earlier delays: power loss (11-01 08:48 - 11-02 10:19) and a resume bug (analysis uses stages 0-8, plan §9).
+**Running / pending**: F3 done (F3c 11-05 07:42). F5 running since 11-05 07:20 (learned acceleration estimate + RLS in self-play, uniform and QD-DPP, 2 seeds each, vs the F2 / F3 pursuers; pre-registered 11-04 17:40, amendment 1 21:11); expected F5c ~11-06 21:00. Freeze 11-08.
 
-## Relation to the reference papers (updated 2026-11-02 10:30)
+## Relation to the reference papers (updated 2026-11-05 07:50)
 
 Reference papers (the thesis is positioned against these three):
 **[AgilePE]** Tang et al. 2026, arXiv:2608.14135; **[Roncero]** Sanchez Roncero et al. 2026 (AMSPBH),
@@ -87,9 +93,9 @@ disagrees under our protocol, extends the claim, or does not test it.
 
 | # | claim in the reference papers | our evidence | status |
 |---|---|---|---|
-| 1 | Prioritising hard opponents (Hedge / PFSP) improves on uniform population sampling. Roncero Fig. 5: Hedge beats uniform AMSPB by +0.05 to +0.27 win rate in 8 of 9 settings (3 seeds). AgilePE: PFSP stronger than FSP (single runs). | D1, 5 seeds, fixed 20-evader pool: win-rate softmax (S-W, closest to Hedge/PFSP) minus uniform: train **-0.054 [-0.081, -0.026]**, held-out RL **-0.088 [-0.145, -0.035]**, worst held-out cluster **-0.088 [-0.147, -0.030]**, worse on 5/5 seeds. Multi-metric softmax (S-M, closest to Gavin's outcome score): train **-0.150 [-0.259, -0.047]**, exploiters **-0.166 [-0.302, -0.047]**, held-out RL -0.143 [-0.306, +0.021]. D2: no sampler lowers exploitability. | **Does not replicate under our protocol.** Differences: we train one pursuer against a fixed pool (no co-evolving generations); our uniform floor is 0.5 (Roncero 0.7) and we use a softmax (T = 0.9) instead of a power eta = 2. We did not run latest-opponent-only self-play (Roncero's AMSDRL, Gavin's SP), so we do not test "population beats latest-only". D1c (exploratory): with **no** uniform floor, hardness prioritisation collapses (train -0.29); this agrees with Roncero's advice to keep gamma large, and is a warning for PFSP without a uniform share (AgilePE does not report one). |
-| 2 | Self-play with PFSP "sustains tactical diversity" (AgilePE); the population "contains distinct pursuit and evasion behaviours" (Roncero). Neither paper measures diversity. | X2: 22 RL evaders from three self-play campaigns amount to **3.8 effectively distinct behaviours** (Vendi score), 7 clusters; consecutive stages are 36 % closer than random same-campaign pairs. | **Extends:** first quantitative measure; the pool is diverse across campaigns but highly redundant within one. |
-| 3 | Our addition: sample by quality *and* diversity (QD-DPP). No reference paper uses diversity in sampling. | D1: QD-DPP beats both hardness samplers (vs S-M held-out RL +0.185 [+0.110, +0.259]; vs S-W +0.131 [+0.038, +0.223]) but is **not** better than uniform (+0.042 [-0.069, +0.131]). D1b: bounds the sampling mass of duplicates but does not protect performance. F1: no sampler effect once the acceleration input is present. D2: not less exploitable. | **New, mostly negative:** diversity repairs the damage hardness prioritisation does in our setting, nothing more. |
+| 1 | Prioritising hard opponents (Hedge / PFSP) improves on uniform population sampling. Roncero Fig. 5: Hedge beats uniform AMSPB by +0.05 to +0.27 win rate in 8 of 9 settings (3 seeds). AgilePE: PFSP stronger than FSP (single runs). | D1, 5 seeds, fixed 20-evader pool: win-rate softmax (S-W, closest to Hedge/PFSP) minus uniform: train **-0.054 [-0.081, -0.026]**, held-out RL **-0.088 [-0.145, -0.035]**, worst held-out cluster **-0.088 [-0.147, -0.030]**, worse on 5/5 seeds. Multi-metric softmax (S-M, closest to Gavin's outcome score): train **-0.150 [-0.259, -0.047]**, exploiters **-0.166 [-0.302, -0.047]**, held-out RL -0.143 [-0.306, +0.021]. D2: no sampler lowers exploitability. In full self-play with the sampler on both roles (F3, 2 seeds, descriptive): Roncero's Hedge beats uniform on held-out RL (+0.100) and the worst held-out cluster (+0.161) on both seeds; PFSP without a uniform share is mixed on held-out RL (+0.038) and much worse against other campaigns' evaders (-0.226). | **Replicates directionally in self-play (Hedge, F3, 2 seeds), not on a fixed pool (D1).** PFSP without a uniform share specialises (F3, D1c). Differences of the fixed-pool test: we train one pursuer against a fixed pool (no co-evolving generations); our uniform floor is 0.5 (Roncero 0.7) and we use a softmax (T = 0.9) instead of a power eta = 2. We did not run latest-opponent-only self-play (Roncero's AMSDRL, Gavin's SP), so we do not test "population beats latest-only". D1c (exploratory): with **no** uniform floor, hardness prioritisation collapses (train -0.29); this agrees with Roncero's advice to keep gamma large, and is a warning for PFSP without a uniform share (AgilePE does not report one). |
+| 2 | Self-play with PFSP "sustains tactical diversity" (AgilePE); the population "contains distinct pursuit and evasion behaviours" (Roncero). Neither paper measures diversity. | X2: 22 RL evaders from three self-play campaigns amount to **3.8 effectively distinct behaviours** (Vendi score), 7 clusters; consecutive stages are 36 % closer than random same-campaign pairs. F3 (2 seeds): evader Vendi per campaign (4 RL evaders, max 4): pfsp 2.985 > hedge 2.499 ~ uniform 2.456 > qd_dpp 2.350; pfsp - uniform +0.529 on both seeds. | **Extends:** first quantitative measure; the pool is diverse across campaigns but highly redundant within one. **Consistent with AgilePE:** PFSP self-play produces the most diverse evaders (F3), but its pursuer is the most specialised. |
+| 3 | Our addition: sample by quality *and* diversity (QD-DPP). No reference paper uses diversity in sampling. | D1: QD-DPP beats both hardness samplers (vs S-M held-out RL +0.185 [+0.110, +0.259]; vs S-W +0.131 [+0.038, +0.223]) but is **not** better than uniform (+0.042 [-0.069, +0.131]). D1b: bounds the sampling mass of duplicates but does not protect performance. F1: no sampler effect once the acceleration input is present. D2: not less exploitable. F3 (self-play, both roles, 2 seeds): not better than uniform (held-out RL -0.041, worst cluster -0.052) and below Hedge (-0.140 / -0.213); produces the least diverse evaders (Vendi 2.350). | **New, negative:** diversity repairs the damage of badly tuned hardness prioritisation on a fixed pool (D1); in self-play it is no better than uniform and worse than Roncero's Hedge (F3). |
 | 4 | Population training generalises to unseen opponents (Roncero: unseen APF evader; Gavin: SP/PFSP pursuers vs other evaders). | Consistent for scripted opponents: held-out scripted evaders (zigzag, fast flee, 4 switching evaders) are neutralised at J 0.99-1.00 by every pursuer. **Not** for learned opponents: against the independent v10 lineage the generalist loses up to 0.37 J to a specialist; fresh exploiters (PPO best responses, 100M frames) reach J 0.22-0.43 against it (X3), and the mean exploitability per sampler is 0.44-0.69 (D2; one failed exploiter included). With the reference papers' own co-evolution protocol (F2b/F2c, 1 seed per arm), the final self-play pursuers neutralise held-out scripted evaders at only 0.83-0.88, the thesis train pool's v9 evaders at 0.34-0.48, and are **~fully exploitable (0.97)**: a fresh exploiter makes them crash in 97 % of episodes. | **Consistent for scripted, contradicted for learned opponents.** None of the three papers reports exploitability or held-out RL lineages; under their protocol the gap is larger, not smaller. |
 | 5 | Seeds may converge to different strategies (Roncero, limitations). | Generalist (uniform sampler) train J 0.56-0.87 across 5 seeds; held-out generalisation is **bimodal per seed**: 1-2 of 5 seeds fail on all later v10 evaders (J 0.10-0.29) while the others reach 0.82-0.97 (F1). | **Extends:** quantifies it; with 3 seeds (Roncero) effects of +/- 0.1 can come from one seed. |
 | 6 | Observation design: Roncero and Gavin give the pursuer opponent position + velocity to a memoryless MLP; Gavin leaves "trajectory prediction" out of scope; AgilePE adds a temporal window of opponent state. | Adding the opponent's acceleration (finite difference of two consecutive observations) is the **largest effect in this thesis**: train 0.722 -> 0.940 (+0.199 [+0.128, +0.270]), exploiters 0.497 -> 0.983 (+0.464 [+0.239, +0.638]), held-out RL 0.634 -> 0.838 (CI includes 0 because of the bimodal seeds) (F1, 5 seeds). A learned acceleration estimate does the same (A2b, 5 seeds: all paired differences to the finite difference within +/- 0.04, n.s.). It also lowers exploitability: 0.672 -> 0.397, paired -0.275 [-0.522, -0.044] (F2a). A raw 10-step history stack (our analogue of a temporal window) was *worse* than no history (train -0.254 [-0.355, -0.152]) (A1b). Under co-evolution (F2c, 1 seed per arm, descriptive) the gain is smaller: final pursuer +0.12 on held-out RL, +0.07 on the whole test set, but worse on the other campaign's evaders (0.74 vs 0.86) and no lower exploitability (0.965 vs 0.974); the acc campaign also cycles much less. | **New:** a memoryless pursuer with position + velocity (Roncero, Gavin) is limited by the missing opponent acceleration far more than by opponent sampling, when trained against a fixed pool; under co-evolution the evidence is weaker (one campaign per arm, mixed). Caveat: AgilePE's window length and architecture are not given, so the history-stack result is not a test of AgilePE itself. |
@@ -961,6 +967,72 @@ Findings:
   only the held-out RL subset passes, +0.116). Exploitability: 0.965 vs 0.974 is no meaningful difference.
 - Limitation: one seed per arm. In F1 the acceleration result was bimodal across seeds, so a single campaign per arm
   cannot separate an input effect from a seed effect.
+
+## F3_sampler_sp / F3c (final eval done 2026-11-05 07:42; 2 seeds per sampler, descriptive by pre-registration)
+
+RQ1 under the reference papers' protocol: full self-play campaigns (plain observation, 9 stages x 300M frames,
+pursuer first, warm start, noise-free) that differ only in the opponent sampler, used **by both roles** (amendment 3):
+**uniform**; **hedge** = Roncero eq. (12) exactly (gamma 0.7, eta 2); **pfsp** = Hedge with gamma 0, p ~ (1 - J)^2
+(the hard-opponent core of AgilePE / Gavin); **qd_dpp** = the same Hedge quality re-weighted by a DPP over behaviour
+descriptors. Campaign seeds 0 / 100 (uniform seed 0 = F2b plain). Final pursuer (stage 8) of each campaign.
+other / own campaign evaders exclude the stage-1 evaders, which are identical across same-seed campaigns
+(amendment 6). With 2 seeds the bracket is only the range of the two values; **no difference can be called
+supported** (pre-registered). [F3_sampler_sp/summary.md](F3_sampler_sp/summary.md); per-campaign values in
+`results.json`. The earlier pursuer-only F3 campaigns (hedge s0/s1, qd_dpp s0, pfsp s0) are kept on disk, not analysed.
+
+| final pursuer, J | uniform | hedge | qd_dpp | pfsp |
+|---|---|---|---|---|
+| held-out RL (v10) | 0.736 [0.696, 0.777] | **0.836** [0.791, 0.882] | 0.696 [0.588, 0.803] | 0.775 [0.639, 0.910] |
+| held-out worst cluster | 0.593 [0.540, 0.646] | **0.754** [0.692, 0.816] | 0.541 [0.377, 0.705] | 0.665 [0.503, 0.827] |
+| other campaigns' evaders | 0.852 [0.843, 0.862] | 0.888 [0.871, 0.906] | 0.878 [0.872, 0.884] | **0.626** [0.580, 0.672] |
+| own campaign's evaders | 0.936 | 0.959 | 0.969 | **0.776** |
+| thesis train pool | 0.570 | 0.617 | 0.562 | 0.542 |
+| held-out scripted | 0.795 | 0.831 | 0.821 | 0.826 |
+| X3 exploiters | 0.951 | 0.964 | 0.958 | 0.930 |
+| exploitability (fresh exploiter) | 0.973 | 0.979 | 0.977 | 0.983 |
+| evader Vendi (distinct RL evaders, max 4) | 2.456 | 2.499 | 2.350 | **2.985** |
+| sampling: max probability (mean) | 0.521 | 0.664 | 0.664 | 0.988 |
+
+Per seed (seed 0 / seed 1), held-out RL: uniform 0.777 / 0.696; hedge 0.791 / 0.882; qd_dpp 0.803 / 0.588;
+pfsp 0.910 / 0.639. Worst held-out cluster: uniform 0.646 / 0.540; hedge 0.692 / 0.816; qd_dpp 0.705 / 0.377;
+pfsp 0.827 / 0.503.
+
+Seed-paired differences (mean of the 2 pairs [range]):
+
+| pair | held-out RL | worst held-out cluster | other campaigns' evaders | train pool | exploitability | evader Vendi |
+|---|---|---|---|---|---|---|
+| hedge - uniform | +0.100 [+0.014, +0.186] | +0.161 [+0.046, +0.276] | +0.036 [+0.009, +0.063] | +0.047 [-0.007, +0.101] | +0.007 | +0.043 |
+| qd_dpp - uniform | -0.041 [-0.108, +0.026] | -0.052 [-0.163, +0.059] | +0.026 [+0.023, +0.029] | -0.008 | +0.004 | -0.107 |
+| qd_dpp - hedge | -0.140 [-0.293, +0.013] | -0.213 [-0.439, +0.013] | -0.010 | -0.055 [-0.098, -0.012] | -0.002 | -0.149 |
+| pfsp - uniform | +0.038 [-0.057, +0.133] | +0.072 [-0.037, +0.181] | **-0.226** [-0.262, -0.190] | -0.028 | +0.011 | **+0.529** [+0.412, +0.647] |
+| qd_dpp - pfsp | -0.079 [-0.107, -0.051] | -0.124 [-0.126, -0.122] | **+0.252** [+0.213, +0.292] | +0.020 | -0.006 | -0.636 |
+
+Capture-only (secondary, amendment 5) gives the same ordering: hedge - uniform held-out RL +0.112, worst cluster
++0.153; qd_dpp - uniform -0.019 / -0.035; pfsp - uniform on other campaigns' evaders -0.290.
+
+Findings:
+- **Hedge (Roncero) is the best sampler in self-play on average** (the single best held-out run is PFSP seed 0, 0.910): higher than uniform on held-out RL (+0.100) and the worst
+  held-out cluster (+0.161) on **both** seeds. The size differs strongly between
+  seeds (held-out RL +0.014 / +0.186); J is also higher on average on the other metrics. This is the direction Roncero reports and the **opposite** of our fixed-pool
+  result D1 (win-rate softmax worse than uniform on 5/5 seeds); the protocols differ (co-evolution, both roles,
+  Hedge eta = 2 with gamma 0.7 vs softmax with a 0.5 floor on a fixed pool).
+- **QD-DPP does not improve on uniform** (held-out RL -0.041, worst cluster -0.052, mixed across seeds) and is below
+  Hedge on average (held-out RL -0.140: seed 0 +0.012, seed 1 -0.294); on other campaigns' evaders it is level with
+  Hedge and slightly above uniform (+0.026). Its seed 1 is the worst held-out result of all 8 campaigns (0.588 / worst cluster 0.377).
+- **PFSP (no uniform share) produces the most diverse evader populations** (Vendi 2.985 vs 2.35-2.50, both seeds) but
+  the most specialised pursuer: it is clearly worse against the other campaigns' evaders (-0.226 vs uniform, both
+  seeds) and even against its own campaign's evaders (0.776 vs 0.94-0.97). On held-out RL it is mixed (+0.133 / -0.057).
+- **No sampler changes exploitability**: every self-play pursuer is ~fully exploitable (0.97-0.98), as in F2c.
+- Predictions (pre-registered 10-28 / amendments 1-3): "all paired differences within +/- 0.05": **did not hold**
+  for hedge - uniform (+0.10 / +0.16) and pfsp on other campaigns' evaders (-0.23); held for exploitability and most
+  qd_dpp - uniform differences. "D1: hedge <= uniform": **did not hold** (Roncero's "hedge > uniform" is the observed
+  direction). "qd_dpp ~ uniform": **held** on held-out RL (-0.041), marginally outside on the worst cluster (-0.052). "pfsp <= uniform on
+  held-out RL and worst cluster": **did not hold** on the means (+0.038 / +0.072, mixed seeds). "pfsp has the highest
+  max sampling probability": **held** (0.988). "qd_dpp >= pfsp": **did not hold** on held-out RL / worst cluster
+  (-0.079 / -0.124), **held** on other campaigns' evaders (+0.252). AgilePE's claim "PFSP sustains diversity"
+  (evader Vendi pfsp >= uniform): **consistent** (+0.529, both seeds).
+- Limitations: 2 seeds per sampler (descriptive only); one exploiter per pursuer; the sampler only reweights a
+  population of 4-5 RL opponents per role, so the distributions differ less than the names suggest (except pfsp).
 
 ## F4_estimator_sp v2 (campaigns done 2026-10-31 16:36; F4c done 22:09; analysis fixed 2026-11-02 10:25; 3 seeds per arm)
 
