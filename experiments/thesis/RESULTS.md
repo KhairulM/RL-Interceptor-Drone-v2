@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-11-04 14:50; details in the sections below)
+## Summary (updated 2026-11-04 16:40; details in the sections below)
 
 J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over
 seeds; "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position +
@@ -49,6 +49,8 @@ velocity, no acceleration).
   lower exploitability) did not hold. **Both self-play pursuers are ~fully exploitable (0.97), and their exploiters win
   by making the pursuer crash (97 %)**, unlike the timeout-based exploits of pool-trained pursuers (0.40-0.69). The
   plain campaign shows the stage-to-stage cycling reported by the reference papers; the acc campaign barely cycles.
+  Caveat: for these self-play pursuers the held-out v10 evaders are much easier than the train pool's late v9 / v11
+  evaders (J 0.65-0.83 vs 0.12-0.34), so their held-out RL score is not evidence of better generalisation (X2 note).
 
 - F4 (self-play, no true evader velocity, sensor noise; 3 seeds per arm): learned estimators (nf) vs EMA finite
   difference (ema). nf generalises better: other campaigns' evaders +0.196 [+0.132, +0.291], X3 exploiters +0.441
@@ -166,6 +168,25 @@ block (mean/std of 9 per-step behaviour features), equal block weights. Details:
   (v9 spans 4 clusters, v10 3, v11 3).
 - Pre-registered split written to `X2_descriptors/split.json`: train = v9 + v11 RL evaders + {hover, circular,
   flee, weave} (20); held-out = v10 RL (6) + {zigzag, fast_flee, 4 switch evaders @0.5} (6) + X3 exploiters.
+- **Note (added 2026-11-04, after F2c; affects how held-out RL numbers are read):** the v10 RL evaders are
+  **weaker than the train pool's late v9 / v11 evaders for pursuers that never trained on the pool**. v10 is the
+  campaign without warm start whose pursuers never worked (X1: J 0.27-0.35), so its evaders never had to learn the
+  lure-into-crash tactic of late v9 / v11 evaders (v9 runs to stage 19; X1's hardest evaders are v9 s19 / s17 / s15).
+  Mean J by evader group (late = stage >= 7):
+
+  | pursuers | v9 late | v11 late | v10 late | v10 early |
+  |---|---|---|---|---|
+  | F2b plain / acc final (self-play, never saw the pool) | 0.28 / 0.12 | 0.34 / 0.15 | 0.65 / 0.83 | 0.91 / 0.96 |
+  | X1: last 4 stages of v9 and v11 (trained on v9 / v11 evaders) | 0.51 | 0.60 | 0.82 | 0.91 |
+  | X1: scripted pure pursuit / APF | 0.21 | 0.22 | 0.24 | 0.28 |
+  | D1 pool-trained (QD / S-M / S-W) | 0.41 / 0.19 / 0.31 | 0.82 / 0.47 / 0.64 | 0.61 / 0.41 / 0.45 | 0.74 / 0.57 / 0.64 |
+  | F1 pool-trained with acceleration input (QD_acc / SU_acc) | 0.84 / 0.85 | 0.97 / 0.98 | 0.63 / 0.93 | 0.83 / 0.94 |
+
+  So "held-out RL > train pool" for a self-play pursuer (F2c) reflects an easier held-out set, not better
+  generalisation; for pool-trained pursuers (D1, F1) v10 late is the harder set, as expected for unseen opponents,
+  and scripted pursuers find all groups alike. Not universal either: the F4 self-play pursuers score lower on held-out
+  RL than on the train pool. The late v9 / v11 evaders beat the F2b pursuers by making them crash (pursuer crash
+  0.68-0.89), not by crashing themselves (evader crash + OOB 0.02-0.14 in every group).
 
 ## X3_gap (done 2026-10-26)
 
