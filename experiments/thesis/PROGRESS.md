@@ -112,7 +112,7 @@ holding the driver PID; stale locks of dead PIDs are taken over).
 
 (Timestamps of log entries written on 10-27 before 21:20 are approximate; `driver_log.txt` has exact times.)
 
-- 2026-11-05 07:55: F3c done (07:42, all 8 campaigns incl. the last pfsp-both-s1 exploiter; the first lane's summary at
+- 2026-11-05 07:44: F3c done (07:42, all 8 campaigns incl. the last pfsp-both-s1 exploiter; the first lane's summary at
   07:20 lacked that one value and was superseded). Written up in RESULTS.md (F3 section, summary RQ1 with an explicit
   RQ1 answer, reference claims 1-3). Hedge best on average (held-out RL +0.10, worst cluster +0.16 vs uniform, both
   seeds); QD-DPP not better than uniform and below Hedge on average; PFSP most diverse evaders (Vendi +0.53) but most

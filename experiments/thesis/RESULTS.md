@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-11-05 07:50; details in the sections below)
+## Summary (updated 2026-11-05 07:44; details in the sections below)
 
 J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over
 seeds; "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position +
@@ -66,7 +66,7 @@ velocity, no acceleration).
 
 **Running / pending**: F3 done (F3c 11-05 07:42). F5 running since 11-05 07:20 (learned acceleration estimate + RLS in self-play, uniform and QD-DPP, 2 seeds each, vs the F2 / F3 pursuers; pre-registered 11-04 17:40, amendment 1 21:11); expected F5c ~11-06 21:00. Freeze 11-08.
 
-## Relation to the reference papers (updated 2026-11-05 07:50)
+## Relation to the reference papers (updated 2026-11-05 07:44)
 
 Reference papers (the thesis is positioned against these three):
 **[AgilePE]** Tang et al. 2026, arXiv:2608.14135; **[Roncero]** Sanchez Roncero et al. 2026 (AMSPBH),
