@@ -7,6 +7,8 @@ Amendment 3 (11-03, user, before any F3 result): the sampler is used by BOTH rol
 ("-both" campaigns). The pursuer-only campaigns of amendments 1-2 (thesis-F3-{hedge,qd_dpp,pfsp}-s*) are kept on disk
 but not analysed. Seed 0 of every arm first; seed-1 campaigns start only before S1_START_DEADLINE (11-05 freeze).
 uniform is the same on both sides already, so uniform seed 0 (F2b "plain") and seed 1 are reused.
+Amendment 4 (11-04 14:45, user, before any F3c result): 2 seeds for every arm (qd_dpp-both-s1, pfsp-both-s1 added);
+S1_START_DEADLINE moved to 11-04 20:00 and F3c waits for all 8 campaigns (F3c then ends ~11-05 morning).
 F3c: final pursuer of every campaign vs the thesis test set, the train pool and all campaigns' RL evaders, plus one
 fresh exploiter each; seed-paired comparison of the samplers.
 """
@@ -32,7 +34,7 @@ SAMPLERS = {"uniform": {},
             "qd_dpp": {"pursuer_sampler": "qd_dpp", "evader_sampler": "qd_dpp"},
             "pfsp": {"pursuer_sampler": "hedge", "evader_sampler": "hedge", "hedge_gamma": 0.0}}
 SEEDS = [0, 100]
-S1_START_DEADLINE = datetime.datetime(2026, 11, 4, 8, 0)    # a campaign takes ~13.3 h; F3c must end before 11-05
+S1_START_DEADLINE = datetime.datetime(2026, 11, 4, 20, 0)   # amendment 4: a campaign takes ~12.7 h, F3c ends ~11-05 AM
 
 
 def name(sampler, k):
@@ -84,10 +86,9 @@ def _policies(campaign, role):
 
 
 def run_f3c(args):
-    # Seed 0 of every arm (and uniform seed 1) is required; other seed-1 campaigns are used if they finished.
+    # Amendment 4: both seeds of every arm are required.
     allc = [(s, k, name(s, k)) for k in range(len(SEEDS)) for s in SAMPLERS]
-    required = [x for x in allc if x[1] == 0 or x[0] == "uniform"]
-    while not all(os.path.isfile(_done(c)) for _, _, c in required) or any(_running(c) for _, _, c in allc):
+    while not all(os.path.isfile(_done(c)) for _, _, c in allc) or any(_running(c) for _, _, c in allc):
         time.sleep(60)
     camps = [x for x in allc if os.path.isfile(_done(x[2]))]
     log_progress(f"F3c campaigns: {[c for _, _, c in camps]}")
