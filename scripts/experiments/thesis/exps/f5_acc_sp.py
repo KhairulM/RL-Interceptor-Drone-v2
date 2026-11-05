@@ -48,6 +48,19 @@ CONTRASTS = [("uniform_rls", "clean", "uniform_plain", "clean"), ("uniform_rls",
     (a, c, a, c + "_frozen") for a in NEW for c in ("clean", "noisy")]
 
 
+# 11-05 (user): Exp 2 (qd_dpp_rls) is paused until QD-DPP is revised (F6). Meanwhile F5c evaluates and analyses Exp 1
+# only (uniform_rls vs uniform_plain / uniform_fd, RLS ablation of uniform_rls); hedge / pfsp / qd_dpp_plain are only
+# needed by Exp 2 contrasts. Campaign evaders = those of the non-paused plain-evader campaigns; when Exp 2 resumes, the
+# Exp 1 pursuers get an extra eval vs the new evaders (`*_campaign_evaders_add.json`, merged by _metrics).
+PAUSED_ARMS = {"qd_dpp_rls"}
+EXP1_ARMS = {"uniform_rls", "uniform_plain", "uniform_fd"}
+
+
+def active_pursuers():
+    P = pursuers()
+    return [p for p in P if p[0] in EXP1_ARMS] if PAUSED_ARMS else P
+
+
 def rls_overrides():
     return a2b_methods(EST)["NFacc_OA"]
 
@@ -203,13 +216,14 @@ def run_f5(args):
 
 
 def run_f5c(args):
-    P = pursuers()
+    P = active_pursuers()
     while not (all(os.path.isfile(_done(c)) for a, _, c, _, _ in P if a in NEW)
                and all(os.path.isfile(ex) for a, _, _, _, ex in P if a not in NEW)):
         time.sleep(60)
     split = load_split()
     test = test_set(split)
-    all_ev = [e for a, _, c, _, _ in P if a != "uniform_fd" for e in _policies(c, "evader")]
+    all_ev = [e for a, _, c, _, _ in pursuers() if a != "uniform_fd" and a not in PAUSED_ARMS
+              for e in _policies(c, "evader")]
     for i, (a, k, c, pov, ex_path) in enumerate(P):
         ck = _policies(c, "pursuer")[-1]["checkpoint_path"]
         if a in NEW:
@@ -223,7 +237,13 @@ def run_f5c(args):
                 if opps:
                     evaluate(os.path.join(F5C, "evals", f"{c}_{cond}_{g}.json"), opps, policy_ckpt=ck, extra=ov)
         log_progress(f"F5c {c} done")
-    analyse_f5(P, split, test)
+    need = [os.path.join(F5C, "evals", f"{c}_{cond}_{g}.json") for a, _, c, pov, ex in P for cond in conditions(a, pov)
+            for g in ("train", "test", "campaign_evaders") + (("vs_exploiter",) if os.path.isfile(ex) else ())]
+    missing = [x for x in need if not os.path.isfile(x)]
+    if missing:                                   # the other lane is still producing them and analyses after
+        log_progress(f"F5c: {len(missing)} eval files missing on this lane, analysis left to the other lane")
+        return
+    analyse_f5(P, split, test, suffix="_exp1" if PAUSED_ARMS else "")
 
 
 def _rates(path, key):
@@ -235,7 +255,8 @@ def _rates(path, key):
 
 def _metrics(prefix, c, split, test, labels, key):
     J = {**_rates(prefix + "_train.json", key), **_rates(prefix + "_test.json", key)}
-    Jc = {kk: v for kk, v in _rates(prefix + "_campaign_evaders.json", key).items()
+    Jc = {kk: v for kk, v in {**_rates(prefix + "_campaign_evaders.json", key),
+                              **_rates(prefix + "_campaign_evaders_add.json", key)}.items()
           if not kk.endswith(":s1")}                 # amendment 1: stage-1 evaders are shared by same-seed campaigns
     if not J or not Jc:
         return None
@@ -258,7 +279,7 @@ def _metrics(prefix, c, split, test, labels, key):
     return r
 
 
-def analyse_f5(P, split, test):
+def analyse_f5(P, split, test, suffix=""):
     import analysis as an
     with open(os.path.join(OUT, "X2_descriptors", "clusters.json")) as f:
         labels = json.load(f)["labels"]
@@ -286,10 +307,10 @@ def analyse_f5(P, split, test):
                 if d:
                     diffs.setdefault(f"{tag}/{a}:{ca} - {b}:{cb}", {})[m] = {
                         "mean": float(np.mean(d)), "ci": list(an.bootstrap_ci(d)[1:]), "per_seed": d}
-    save_json(os.path.join(F5C, "results.json"), {"aggregate": agg, "paired": diffs})
+    save_json(os.path.join(F5C, f"results{suffix}.json"), {"aggregate": agg, "paired": diffs})
     arms = list(dict.fromkeys(a for a, *_ in P))
     fmt = lambda x, sign="": f"{x['mean']:{sign}.3f} [{x['ci'][0]:{sign}.3f}, {x['ci'][1]:{sign}.3f}]"
-    lines = ["# F5_acc_sp summary", "",
+    lines = ["# F5_acc_sp summary" + (" (Exp 1 only: Exp 2 / qd_dpp_rls paused 11-05, user)" if suffix else ""), "",
              "Final pursuer (stage 8) of each campaign; mean over the campaign seeds (2; uniform_fd 1) [95 % bootstrap CI; "
              "with 2 seeds the CI is the range of the two values]. *_rls = learned acceleration estimate + RLS (F5); "
              "*_plain = plain observation (F2 / F3); uniform_fd = finite-difference acceleration (F2-acc). noisy = A3c "
@@ -313,5 +334,5 @@ def analyse_f5(P, split, test):
                 lines.append(f"| {key[len(tag) + 1:]} | " + " | ".join(fmt(dd[m], "+") if m in dd else "-"
                                                                         for m in metrics) + " |")
         lines.append("")
-    with open(os.path.join(F5C, "summary.md"), "w") as f:
+    with open(os.path.join(F5C, f"summary{suffix}.md"), "w") as f:
         f.write("\n".join(lines) + "\n")

@@ -37,6 +37,13 @@ eval_episodes_out: null    # optional .pt with the per-episode records (bootstra
 eval_traj_out: null        # optional .pt with per-step opponent-adapter inputs of evenly spaced envs (thesis A1a)
 eval_traj_envs: 512
 
+# Thesis F6: policy-space diversity term vs earlier same-role checkpoints (PPOPolicy.set_diversity). Off when
+# ckpts is empty or beta is 0.
+diversity:
+  ckpts: []
+  beta: 0.0
+  cap: 2.0
+
 # Opponent re-sampling inside one training run (thesis D1): every `every_frames`, recompute the opponent
 # probabilities from the episodes played since the last refresh and reassign envs. 0 = fixed probabilities.
 refresh:

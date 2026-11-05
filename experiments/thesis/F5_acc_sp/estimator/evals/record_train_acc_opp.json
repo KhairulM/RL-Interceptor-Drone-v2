@@ -1,0 +1,50 @@
+{
+  "policies": [
+    {
+      "id": "thesis-F2-acc/evader:s1",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F2-acc/checkpoints/evader_stage1.pt",
+      "metadata": {
+        "campaign": "thesis-F2-acc",
+        "stage": 1,
+        "db_id": "evader:s4"
+      }
+    },
+    {
+      "id": "thesis-F2-acc/evader:s3",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F2-acc/checkpoints/evader_stage3.pt",
+      "metadata": {
+        "campaign": "thesis-F2-acc",
+        "stage": 3,
+        "db_id": "evader:s5"
+      }
+    },
+    {
+      "id": "thesis-F2-acc/evader:s5",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F2-acc/checkpoints/evader_stage5.pt",
+      "metadata": {
+        "campaign": "thesis-F2-acc",
+        "stage": 5,
+        "db_id": "evader:s6"
+      }
+    },
+    {
+      "id": "thesis-F2-acc/evader:s7",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F2-acc/checkpoints/evader_stage7.pt",
+      "metadata": {
+        "campaign": "thesis-F2-acc",
+        "stage": 7,
+        "db_id": "evader:s7"
+      }
+    }
+  ],
+  "probs": {
+    "thesis-F2-acc/evader:s1": 0.25,
+    "thesis-F2-acc/evader:s3": 0.25,
+    "thesis-F2-acc/evader:s5": 0.25,
+    "thesis-F2-acc/evader:s7": 0.25
+  }
+}

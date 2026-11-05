@@ -191,6 +191,10 @@ class PPOPolicy(TensorDictModuleBase):
         with torch.no_grad():
             next_values = self.critic(next_tensordict)["state_value"]
         rewards = tensordict[("next", "agents", "reward")]
+        div_reward = None
+        if getattr(self, "div_refs", None):
+            div_reward = self._intrinsic_reward(tensordict)
+            rewards = rewards + div_reward
         dones = einops.repeat(
             tensordict[("next", "terminated")],
             "t e 1 -> t e a 1",
@@ -218,7 +222,10 @@ class PPOPolicy(TensorDictModuleBase):
 
         infos: TensorDict = torch.stack(infos).to_tensordict()
         infos = infos.apply(torch.mean, batch_size=[])
-        return {k: v.item() for k, v in infos.items()}
+        out = {k: v.item() for k, v in infos.items()}
+        if div_reward is not None:
+            out["div_reward"] = div_reward.mean().item()
+        return out
 
     def _update(self, tensordict: TensorDict):
         dist = self.actor.get_dist(tensordict)
@@ -243,6 +250,12 @@ class PPOPolicy(TensorDictModuleBase):
         value_loss = torch.max(value_loss_original, value_loss_clipped)
 
         loss = policy_loss + entropy_loss + value_loss
+        div_info = {}
+        if getattr(self, "div_refs", None):
+            div = self._diversity_distance(tensordict, dist.mean)
+            div_loss = - self.div_beta * div.clamp(max=self.div_cap).mean()
+            loss = loss + div_loss
+            div_info = {"div_loss": div_loss.detach(), "div_distance": div.detach().mean()}
         self.actor_opt.zero_grad()
         self.critic_opt.zero_grad()
         loss.backward()
@@ -257,8 +270,45 @@ class PPOPolicy(TensorDictModuleBase):
             "entropy": entropy,
             "actor_grad_norm": actor_grad_norm,
             "critic_grad_norm": critic_grad_norm,
-            "explained_var": explained_var
+            "explained_var": explained_var,
+            **div_info,
         }, [])
+
+    def set_diversity(self, ckpt_paths, beta: float, cap: float):
+        """Thesis F6: PSD-PSRO's policy-space diversity regulariser (Yao et al. 2023, Eq. 14 / 17), adapted to
+        continuous actions. Both parts of its gradient: -beta * mean_s min(min_j d_j(s), cap) in the loss (direct KL
+        gradient) and the same quantity per step as an intrinsic reward (_intrinsic_reward). d_j(s) = 0.5 * sum_k
+        ((mu(s) - mu_j(s)) / sigma_j)_k^2 is the KL between the learner's and frozen policy j's action Gaussians with
+        the learner's std replaced by sigma_j (mean-only KL: the learner cannot raise it by changing its own std).
+        The j are earlier same-role policies loaded from ``ckpt_paths`` (min over them, not over their convex hull)."""
+        import copy
+        self.div_beta, self.div_cap = float(beta), float(cap)
+        self.div_refs = []
+        for path in ckpt_paths:
+            state = torch.load(path, map_location=self.device)
+            if isinstance(state, dict) and "state_dict" in state:
+                state = state["state_dict"]
+            ref = copy.deepcopy(self.actor)
+            ref.load_state_dict({k[len("actor."):]: v for k, v in state.items() if k.startswith("actor.")})
+            ref.requires_grad_(False)
+            self.div_refs.append(ref)
+
+    @torch.no_grad()
+    def _intrinsic_reward(self, tensordict: TensorDict) -> torch.Tensor:
+        """PSD-PSRO's intrinsic reward (Yao et al. 2023, Eq. 17 / Alg. 1): beta * min(min_j d_j(s_t), cap) per rollout
+        step, added to the task reward before GAE, so the policy also seeks states where it differs. Shape of the
+        reward ([..., agents, 1])."""
+        loc = self.actor.get_dist(tensordict.select(*self.actor.in_keys).clone(False)).mean
+        return (self.div_beta * self._diversity_distance(tensordict, loc).clamp(max=self.div_cap)).unsqueeze(-1)
+
+    def _diversity_distance(self, tensordict: TensorDict, loc: torch.Tensor) -> torch.Tensor:
+        """min_j d_j(s) per sample and agent (see set_diversity)."""
+        d = []
+        for ref in self.div_refs:
+            with torch.no_grad():
+                ref_dist = ref.get_dist(tensordict.select(*ref.in_keys).clone(False))
+            d.append((0.5 * ((loc - ref_dist.mean) / ref_dist.base_dist.scale) ** 2).sum(-1))
+        return torch.stack(d).min(0).values
 
 
 def make_batch(tensordict: TensorDict, num_minibatches: int):

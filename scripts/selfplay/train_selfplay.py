@@ -172,6 +172,19 @@ def _opponent_probs(db, role, reference_id, cfg):
     return _samplers.qd_dpp_probs(_samplers.hedge_scores(challenge, eta), desc, 1.0, gamma)
 
 
+def _diversity_overrides(db, role, retry_id, cfg):
+    """Thesis F6: worker overrides for the policy-space diversity term vs all earlier same-role RL checkpoints (none
+    before the role's first RL policy, or when ``role`` is not in ``diversity_roles``)."""
+    if role not in list(cfg.get("diversity_roles", []) or []) or float(cfg.get("diversity_beta", 0.0)) <= 0:
+        return []
+    ckpts = [p["checkpoint_path"] for p in db.list_policies(role)
+             if p["kind"] == "rl" and p["id"] != retry_id and p.get("checkpoint_path")]
+    if not ckpts:
+        return []
+    return [f"diversity.ckpts=[{','.join(ckpts)}]", f"diversity.beta={float(cfg.diversity_beta)}",
+            f"diversity.cap={float(cfg.diversity_cap)}"]
+
+
 def _pool_to_worker_spec(db, role, probs):
     """Serialise only the selected opponents into the worker's spec format."""
     policies = []
@@ -322,6 +335,7 @@ def main():
             latest_entry = db.get_policy(role, latest) if latest else None
             if latest_entry and latest_entry["kind"] == "rl":
                 overrides.append(f"init_policy={latest_entry['checkpoint_path']}")
+        overrides += _diversity_overrides(db, role, retry_id, cfg)
         _run_worker(cfg, overrides)
 
         with open(train_out, "r") as f:

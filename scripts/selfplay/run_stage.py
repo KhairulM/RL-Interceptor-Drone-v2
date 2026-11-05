@@ -215,6 +215,10 @@ def _run_train(cfg, env, base_env, policy):
     if cfg.get("init_policy", None):
         _load_state_dict(policy, cfg.init_policy, base_env.device)
         logging.info(f"warm-started from {cfg.init_policy}")
+    dcfg = cfg.get("diversity", None)
+    if dcfg is not None and dcfg.get("ckpts", None) and float(dcfg.beta) > 0:
+        policy.set_diversity(list(dcfg.ckpts), float(dcfg.beta), float(dcfg.cap))
+        logging.info(f"diversity term: beta={dcfg.beta} cap={dcfg.cap} vs {list(dcfg.ckpts)}")
 
     use_wandb = (
         wandb is not None and init_wandb is not None
@@ -263,6 +267,7 @@ def _run_train(cfg, env, base_env, policy):
         stats_only = {k: v for k, v in info.items()
                       if isinstance(v, float) and k.startswith("train/")}
         if stats_only:
+            stats_only.update({k: v for k, v in info.items() if k.startswith("div_")})   # thesis F6 (set_diversity)
             print(OmegaConf.to_yaml(stats_only), end="")
         pbar.set_postfix({"rollout_fps": collector._fps,
                           "frames": collector._frames})

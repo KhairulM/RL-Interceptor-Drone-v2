@@ -120,10 +120,10 @@ def _J(path, key="neutralization_rate"):
 # arena), as a secondary "<metric>_cap" column.
 
 
-def _outcome_metrics(c, split, test, labels, key):
-    J = {**_J(os.path.join(F3C, "evals", f"{c}_final_train.json"), key),
-         **_J(os.path.join(F3C, "evals", f"{c}_final_test.json"), key)}
-    Jc = {kk: v for kk, v in _J(os.path.join(F3C, "evals", f"{c}_final_campaign_evaders.json"), key).items()
+def _outcome_metrics(c, split, test, labels, key, root=F3C):
+    J = {**_J(os.path.join(root, "evals", f"{c}_final_train.json"), key),
+         **_J(os.path.join(root, "evals", f"{c}_final_test.json"), key)}
+    Jc = {kk: v for kk, v in _J(os.path.join(root, "evals", f"{c}_final_campaign_evaders.json"), key).items()
           if not kk.endswith(":s1")}                 # amendment 6: stage-1 evaders are shared by same-seed campaigns
     if not J or not Jc:
         return None
@@ -138,7 +138,7 @@ def _outcome_metrics(c, split, test, labels, key):
         if e["id"] in J and e["id"] in labels:
             by_c.setdefault(labels[e["id"]], []).append(J[e["id"]])
     r["heldout_worst_cluster"] = min(np.mean(v) for v in by_c.values())
-    ex = _J(os.path.join(F3C, "evals", f"{c}_final_vs_exploiter.json"), key)
+    ex = _J(os.path.join(root, "evals", f"{c}_final_vs_exploiter.json"), key)
     if ex:
         r["exploitability"] = 1 - next(iter(ex.values()))
     return r

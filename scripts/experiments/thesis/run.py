@@ -44,6 +44,8 @@ EXPERIMENTS = {
     "F4c": "f4_estimator_sp:run_f4c",
     "F5": "f5_acc_sp:run_f5",
     "F5c": "f5_acc_sp:run_f5c",
+    "F6": "f6_div_sp:run_f6",
+    "F6c": "f6_div_sp:run_f6c",
 }
 
 

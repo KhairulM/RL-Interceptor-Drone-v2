@@ -64,6 +64,14 @@ class F5DesignTests(unittest.TestCase):
             if a.endswith("_plain"):
                 self.assertTrue(ex.endswith(f"F3_sampler_sp/ckpt/exploiter_{c}.pt"), ex)
 
+    def test_paused_exp2_leaves_only_exp1_pursuers(self):
+        self.assertEqual(f5.PAUSED_ARMS, {"qd_dpp_rls"})
+        arms = [a for a, *_ in f5.active_pursuers()]
+        self.assertEqual(sorted(arms), sorted(["uniform_rls"] * 2 + ["uniform_plain"] * 2 + ["uniform_fd"]))
+        keys = [(a, ca, b, cb) for a, ca, b, cb in f5.CONTRASTS if {a, b} <= f5.EXP1_ARMS]
+        self.assertIn(("uniform_rls", "clean", "uniform_plain", "clean"), keys)
+        self.assertIn(("uniform_rls", "noisy", "uniform_rls", "noisy_frozen"), keys)
+
     def test_estimator_evaders_share_no_checkpoint_with_evaluated_ones(self):
         plain, acc = f5.independent_evaders()
         self.assertEqual((len(plain), len(acc)), (7, 4))      # F4 seed-2 stage-1 evader is shared by nf and ema

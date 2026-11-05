@@ -165,6 +165,28 @@ class SelfplayOrchestratorTests(unittest.TestCase):
                           self.database().list_policies(orchestrator.EVADER)[-1]["id"],
                           OmegaConf.merge(self.cfg, {"evader_sampler": "bogus"}))
 
+    def test_diversity_term_only_for_listed_role_vs_earlier_same_role_checkpoints(self):
+        self.cfg.diversity_roles = [orchestrator.EVADER]
+        self.cfg.diversity_beta = 0.1
+        self.cfg.diversity_cap = 2.0
+        self.run_campaign()
+        train = [args for args, _ in self.calls if args["mode"] == "train"]
+        evader_ckpts = []
+        for args in train:
+            if args["task.role"] == orchestrator.PURSUER or not evader_ckpts:
+                self.assertNotIn("diversity.ckpts", args)
+            else:
+                self.assertEqual(args["diversity.ckpts"], "[" + ",".join(evader_ckpts) + "]")
+                self.assertEqual(float(args["diversity.beta"]), 0.1)
+                self.assertEqual(float(args["diversity.cap"]), 2.0)
+            if args["task.role"] == orchestrator.EVADER:
+                evader_ckpts.append(args["stage_ckpt"])
+        self.assertEqual(len(evader_ckpts), 3)
+
+    def test_no_diversity_term_by_default(self):
+        self.run_campaign()
+        self.assertFalse(any("diversity.ckpts" in args for args, _ in self.calls))
+
     def test_max_total_stages_caps_a_resumed_campaign(self):
         self.cfg.n_stages = 3
         self.run_campaign()                     # fresh: stages 0-2
