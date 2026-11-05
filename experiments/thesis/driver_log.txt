@@ -816,3 +816,12 @@
 2026-11-05 22:23:07 [skip: campaign thesis-F5-uniform_rls-s1 run by another lane]
 2026-11-05 22:23:07 [skip: campaign thesis-F5-qd_dpp_rls-s1 run by another lane]
 2026-11-05 22:23:07 === done F5
+2026-11-05 22:23:11 === start F5c (--exp F5c)
+2026-11-05 22:23:21 [isaac slot 0 acquired]
+2026-11-05 22:23:21 campaign thesis-F6-smoke-hedge_div start: n_stages=5 max_total_stages=5 frames_per_stage=2000000 uniform_mix=1.0 seed=0 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F6-smoke-hedge_div pursuer_sampler=hedge evader_sampler=hedge diversity_roles=[evader] diversity_beta=1.0 diversity_cap=2.0 num_envs=256 task_overrides=[] eval_extra_overrides=[eval_cutoff_steps=1500]
+2026-11-05 23:06:23 campaign thesis-F6-smoke-hedge_div exit 0
+2026-11-06 00:41:15 F6 pilot: beta=1.0 ({0.0: {'J_vs_training_pursuers': 0.49829841653505963, 'div_distance_end': None}, 0.1: {'J_vs_training_pursuers': 0.1007265957693259, 'div_distance_end': 165.4638870239258}, 1.0: {'J_vs_training_pursuers': 0.18726253509521484, 'div_distance_end': 39.37812423706055}})
+2026-11-06 00:41:15 campaign thesis-F6-hedge_div-s0 start: n_stages=9 max_total_stages=9 frames_per_stage=300000000 uniform_mix=1.0 seed=0 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F6-hedge_div-s0 pursuer_sampler=hedge evader_sampler=hedge diversity_roles=[evader] diversity_beta=1.0 diversity_cap=2.0 task_overrides=[] eval_extra_overrides=[eval_cutoff_steps=1500]
+2026-11-06 03:38:48 campaign thesis-F5-uniform_rls-s1 exit 0
+2026-11-06 03:38:48 [skip: campaign thesis-F5-qd_dpp_rls-s1 run by another lane]
+2026-11-06 03:38:48 === done F5

@@ -1,0 +1,19 @@
+{
+  "beta": 1.0,
+  "cap": 2.0,
+  "rows": {
+    "0.0": {
+      "J_vs_training_pursuers": 0.49829841653505963,
+      "div_distance_end": null
+    },
+    "0.1": {
+      "J_vs_training_pursuers": 0.1007265957693259,
+      "div_distance_end": 165.4638870239258
+    },
+    "1.0": {
+      "J_vs_training_pursuers": 0.18726253509521484,
+      "div_distance_end": 39.37812423706055
+    }
+  },
+  "rule": "largest beta with J <= J0 + 0.05 and div_distance_end >= cap/2, else largest with J ok"
+}
