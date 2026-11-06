@@ -57,17 +57,35 @@ class F5DesignTests(unittest.TestCase):
     def test_pursuer_roster_pairs_two_seeds_and_reuses_f3_exploiters(self):
         P = f5.pursuers()
         arms = [a for a, *_ in P]
-        for a in ("uniform_rls", "qd_dpp_rls", "uniform_plain", "hedge_plain", "pfsp_plain", "qd_dpp_plain"):
+        for a in ("qd_dpp_rls", "hedge_plain", "pfsp_plain", "qd_dpp_plain"):
             self.assertEqual(arms.count(a), 2, a)
+        for a in ("uniform_rls", "uniform_plain"):                 # amendment 2: third seed pair
+            self.assertEqual(arms.count(a), 3, a)
         self.assertEqual(arms.count("uniform_fd"), 1)
-        for a, _, c, _, ex in P:
-            if a.endswith("_plain"):
+        for a, k, c, _, ex in P:
+            if a.endswith("_plain") and k < 2:
                 self.assertTrue(ex.endswith(f"F3_sampler_sp/ckpt/exploiter_{c}.pt"), ex)
+
+    def test_amendment2_seed_pair_is_appended_with_own_exploiters(self):
+        P = f5.pursuers()
+        self.assertEqual([(a, k) for a, k, *_ in P[-2:]], [("uniform_rls", 2), ("uniform_plain", 2)])
+        self.assertEqual([c for _, _, c, _, _ in P[-2:]], f5.seed3_campaigns())
+        self.assertEqual(f5.seed3_campaigns(), ["thesis-F5-uniform_rls-s2", "thesis-F5-uniform_plain-s2"])
+        for _, _, c, _, ex in P[-2:]:
+            self.assertEqual(ex, os.path.join(f5.F5C, "ckpt", f"exploiter_{c}.pt"))
+        self.assertEqual(P[-1][3], [])                              # plain observation
+        self.assertEqual(P[-2][3], f5.rls_overrides())
+        self.assertEqual(f5.EXP1_SEED3, 300)
+        self.assertNotIn(f5.EXP1_SEED3, f5.SEEDS)
+        # earlier pursuers keep their position (exploiter seeds 700 + index are unchanged)
+        self.assertEqual([(a, k) for a, k, *_ in f5.active_pursuers()[:5]],
+                         [("uniform_rls", 0), ("uniform_plain", 0), ("uniform_rls", 1), ("uniform_plain", 1),
+                          ("uniform_fd", 0)])
 
     def test_paused_exp2_leaves_only_exp1_pursuers(self):
         self.assertEqual(f5.PAUSED_ARMS, {"qd_dpp_rls"})
         arms = [a for a, *_ in f5.active_pursuers()]
-        self.assertEqual(sorted(arms), sorted(["uniform_rls"] * 2 + ["uniform_plain"] * 2 + ["uniform_fd"]))
+        self.assertEqual(sorted(arms), sorted(["uniform_rls"] * 3 + ["uniform_plain"] * 3 + ["uniform_fd"]))
         keys = [(a, ca, b, cb) for a, ca, b, cb in f5.CONTRASTS if {a, b} <= f5.EXP1_ARMS]
         self.assertIn(("uniform_rls", "clean", "uniform_plain", "clean"), keys)
         self.assertIn(("uniform_rls", "noisy", "uniform_rls", "noisy_frozen"), keys)
@@ -78,7 +96,8 @@ class F5DesignTests(unittest.TestCase):
         mine = {_md5(e["checkpoint_path"]) for e in plain + acc}
         self.assertEqual(len(mine), 11)
         evaluated = {_md5(e["checkpoint_path"]) for a, _, c, _, _ in f5.pursuers() if a not in f5.NEW
-                     and a != "uniform_fd" for e in f5._policies(c, "evader")}
+                     and a != "uniform_fd" and os.path.isfile(f5._done(c))    # amendment-2 campaigns once run
+                     for e in f5._policies(c, "evader")}
         split = f5.load_split()
         pool = {_md5(e["checkpoint_path"]) for e in split["train"] + f5.test_set(split)
                 if e.get("checkpoint_path") and os.path.isfile(e["checkpoint_path"])}
@@ -112,6 +131,14 @@ class F5DesignTests(unittest.TestCase):
         r = f5._metrics(prefix, c, split, [], {}, "neutralization_rate")
         self.assertAlmostEqual(r["own_campaign_evaders"], 0.6)
         self.assertAlmostEqual(r["other_campaign_evaders"], 0.9)
+        # amendment 2: the seed-300 evaders come from a separate file and are merged (stage 1 still excluded)
+        with open(prefix + "_campaign_evaders_s300.json", "w") as f:
+            json.dump({"matchups": {k: {"neutralization_rate": v} for k, v in
+                                    {"s3/evader:s1": 0.0, "s3/evader:s3": 0.3}.items()}}, f)
+        r = f5._metrics(prefix, c, split, [], {}, "neutralization_rate")
+        self.assertAlmostEqual(r["other_campaign_evaders"], 0.7)
+        self.assertAlmostEqual(r["own_campaign_evaders"], 0.6)
+        os.remove(prefix + "_campaign_evaders_s300.json")
 
 
 if __name__ == "__main__":

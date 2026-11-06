@@ -8,6 +8,9 @@ F5c: every final pursuer vs the train pool, the test set and all RL evaders of t
 noisy, plus its exploiter; F5 pursuers also with RLS frozen at eval (RLS ablation B1).
 Amendment 1 (11-04 21:11): the estimator is retrained (A2a rules) on trajectories of a new generalist vs the train pool
 + self-play evaders F5c never evaluates (F4 seed 2, F2-acc); F5c campaign-evader metrics exclude stage-1 evaders.
+Amendment 2 (11-06 12:45, user, after the 2-seed Exp 1 results): a third Exp 1 seed pair (seed 300): uniform_rls-s2 and
+uniform_plain-s2 (plain obs, uniform, F3 protocol); every Exp 1 pursuer is also evaluated vs their RL evaders
+(`*_campaign_evaders_s300.json`).
 """
 
 import hashlib
@@ -36,6 +39,8 @@ INDEP_PLAIN = ["thesis-F4-nf-s2", "thesis-F4-ema-s2"]   # plain-obs evaders, see
 INDEP_ACC = "thesis-F2-acc"                              # evaders observe the pursuer's acceleration
 REC_ENVS = 1024
 SEEDS = [0, 100]
+EXP1_SEED3 = 300          # amendment 2: third Exp 1 seed pair (k = 2); seed 200 is the estimator's evader lineage
+PLAIN3 = "thesis-F5-uniform_plain-s2"
 FREEZE = "task.adapt.freeze=true"
 NEW = {"uniform_rls": SAMPLERS["uniform"], "qd_dpp_rls": SAMPLERS["qd_dpp"]}
 SMOKE_STAGES = {"uniform_rls": 3, "qd_dpp_rls": 5}      # qd_dpp: first stages with 2 RL opponents per role
@@ -81,7 +86,15 @@ def pursuers():
             out.append((f"{s}_plain", k, c, [], os.path.join(F3C, "ckpt", f"exploiter_{c}.pt")))
     out.append(("uniform_fd", 0, "thesis-F2-acc", list(ACC),
                 os.path.join(OUT, "F2c_final_eval", "ckpt", "exploiter_acc_final.pt")))
+    # Amendment 2 (appended last so earlier exploiter seeds keep their index): both exploiters are trained by F5c.
+    c = name("uniform_rls", 2)
+    out.append(("uniform_rls", 2, c, rls_overrides(), os.path.join(F5C, "ckpt", f"exploiter_{c}.pt")))
+    out.append(("uniform_plain", 2, PLAIN3, [], os.path.join(F5C, "ckpt", f"exploiter_{PLAIN3}.pt")))
     return out
+
+
+def seed3_campaigns():
+    return [name("uniform_rls", 2), PLAIN3]
 
 
 def conditions(arm, pov):
@@ -213,32 +226,38 @@ def run_f5(args):
     for k in range(len(SEEDS)):
         for arm in NEW:
             run_campaign(name(arm, k), [], dict(NEW[arm], seed=SEEDS[k]), role_overrides=roles)
+    # Amendment 2: third Exp 1 seed pair.
+    run_campaign(name("uniform_rls", 2), [], dict(NEW["uniform_rls"], seed=EXP1_SEED3), role_overrides=roles)
+    run_campaign(PLAIN3, [], dict(SAMPLERS["uniform"], seed=EXP1_SEED3))
 
 
 def run_f5c(args):
     P = active_pursuers()
-    while not (all(os.path.isfile(_done(c)) for a, _, c, _, _ in P if a in NEW)
-               and all(os.path.isfile(ex) for a, _, _, _, ex in P if a not in NEW)):
+    own_ex = lambda ex: ex.startswith(F5C + os.sep)       # exploiter trained here (F5 pursuers, amendment-2 plain)
+    while not all(os.path.isfile(_done(c)) if own_ex(ex) else os.path.isfile(ex) for _, _, c, _, ex in P):
         time.sleep(60)
     split = load_split()
     test = test_set(split)
-    all_ev = [e for a, _, c, _, _ in pursuers() if a != "uniform_fd" and a not in PAUSED_ARMS
+    s3 = seed3_campaigns()
+    all_ev = [e for a, _, c, _, _ in pursuers() if a != "uniform_fd" and a not in PAUSED_ARMS and c not in s3
               for e in _policies(c, "evader")]
+    ev_s300 = [e for c in s3 for e in _policies(c, "evader")]          # amendment 2, separate file for every pursuer
     for i, (a, k, c, pov, ex_path) in enumerate(P):
         ck = _policies(c, "pursuer")[-1]["checkpoint_path"]
-        if a in NEW:
+        if own_ex(ex_path):
             target = {"id": f"f5/pursuer:{c}", "kind": "rl", "checkpoint_path": ck, "metadata": {}}
             train(ex_path, [target], EXPLOIT_FRAMES, role="evader", seed=700 + i, extra=_mirror(pov))
         ex = ([{"id": f"f5/evader:exploit_{c}", "kind": "rl", "checkpoint_path": ex_path, "metadata": {}}]
               if os.path.isfile(ex_path) else [])
         for cond, ov in conditions(a, pov).items():
             for g, opps in (("train", split["train"]), ("test", test), ("campaign_evaders", all_ev),
-                            ("vs_exploiter", ex)):
+                            ("campaign_evaders_s300", ev_s300), ("vs_exploiter", ex)):
                 if opps:
                     evaluate(os.path.join(F5C, "evals", f"{c}_{cond}_{g}.json"), opps, policy_ckpt=ck, extra=ov)
         log_progress(f"F5c {c} done")
     need = [os.path.join(F5C, "evals", f"{c}_{cond}_{g}.json") for a, _, c, pov, ex in P for cond in conditions(a, pov)
-            for g in ("train", "test", "campaign_evaders") + (("vs_exploiter",) if os.path.isfile(ex) else ())]
+            for g in ("train", "test", "campaign_evaders", "campaign_evaders_s300")
+            + (("vs_exploiter",) if os.path.isfile(ex) else ())]
     missing = [x for x in need if not os.path.isfile(x)]
     if missing:                                   # the other lane is still producing them and analyses after
         log_progress(f"F5c: {len(missing)} eval files missing on this lane, analysis left to the other lane")
@@ -256,7 +275,8 @@ def _rates(path, key):
 def _metrics(prefix, c, split, test, labels, key):
     J = {**_rates(prefix + "_train.json", key), **_rates(prefix + "_test.json", key)}
     Jc = {kk: v for kk, v in {**_rates(prefix + "_campaign_evaders.json", key),
-                              **_rates(prefix + "_campaign_evaders_add.json", key)}.items()
+                              **_rates(prefix + "_campaign_evaders_add.json", key),
+                              **_rates(prefix + "_campaign_evaders_s300.json", key)}.items()
           if not kk.endswith(":s1")}                 # amendment 1: stage-1 evaders are shared by same-seed campaigns
     if not J or not Jc:
         return None
@@ -311,8 +331,9 @@ def analyse_f5(P, split, test, suffix=""):
     arms = list(dict.fromkeys(a for a, *_ in P))
     fmt = lambda x, sign="": f"{x['mean']:{sign}.3f} [{x['ci'][0]:{sign}.3f}, {x['ci'][1]:{sign}.3f}]"
     lines = ["# F5_acc_sp summary" + (" (Exp 1 only: Exp 2 / qd_dpp_rls paused 11-05, user)" if suffix else ""), "",
-             "Final pursuer (stage 8) of each campaign; mean over the campaign seeds (2; uniform_fd 1) [95 % bootstrap CI; "
-             "with 2 seeds the CI is the range of the two values]. *_rls = learned acceleration estimate + RLS (F5); "
+             "Final pursuer (stage 8) of each campaign; mean over the campaign seeds (uniform_rls / uniform_plain: seeds 0, "
+             "100, 300 after amendment 2; uniform_fd 1) [95 % bootstrap CI over seeds; with 2 values it is their range]. "
+             "Campaign evaders include the seed-300 campaigns' evaders (amendment 2). *_rls = learned acceleration estimate + RLS (F5); "
              "*_plain = plain observation (F2 / F3); uniform_fd = finite-difference acceleration (F2-acc). noisy = A3c "
              "sensor noise at eval; *_frozen = F5 pursuer evaluated with RLS frozen. exploitability = 1 - J (or capture) vs "
              "a fresh exploiter. J = capture + evader crash + evader out of bounds; cap = capture only. other / own campaign evaders exclude "
