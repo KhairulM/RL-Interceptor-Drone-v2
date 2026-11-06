@@ -856,3 +856,15 @@
 2026-11-06 12:46:53 campaign thesis-F5-uniform_rls-s2 start: n_stages=9 max_total_stages=9 frames_per_stage=300000000 uniform_mix=1.0 seed=300 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F5-uniform_rls-s2 task_overrides=[] eval_extra_overrides=[eval_cutoff_steps=1500] role_task_overrides.pursuer=[task.adapt.enabled=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999] role_task_overrides.evader=[task.adapt.opp_side=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999]
 2026-11-06 20:23:01 campaign thesis-F6-hedge_div-s1 exit 0
 2026-11-06 20:23:01 === done F6
+2026-11-06 20:23:02 === start F5 (--exp F5)
+2026-11-06 20:23:03 [skip: campaign thesis-F5-qd_dpp_rls-s0 run by another lane]
+2026-11-06 20:23:03 [skip: campaign thesis-F5-qd_dpp_rls-s1 run by another lane]
+2026-11-06 20:23:03 [skip: campaign thesis-F5-uniform_rls-s2 run by another lane]
+2026-11-06 20:23:03 campaign thesis-F5-uniform_plain-s2 start: n_stages=9 max_total_stages=9 frames_per_stage=300000000 uniform_mix=1.0 seed=300 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F5-uniform_plain-s2 task_overrides=[] eval_extra_overrides=[eval_cutoff_steps=1500]
+2026-11-06 20:23:05 === start F6c (--exp F6c)
+2026-11-06 20:23:05 [waiting for a free Isaac slot (max 2)]
+2026-11-06 20:23:33 [skip: eval locked by another lane] /home/user/Projects/RLInterceptorDrone/experiments/thesis/F6_div_sp/evals/thesis-F6-hedge_div-s0_final_train.json
+2026-11-06 20:23:33 [waiting for a free Isaac slot (max 2)]
+2026-11-07 02:02:59 campaign thesis-F5-uniform_rls-s2 exit 0
+2026-11-07 02:02:59 [skip: campaign thesis-F5-uniform_plain-s2 run by another lane]
+2026-11-07 02:02:59 === done F5
