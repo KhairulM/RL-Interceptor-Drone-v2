@@ -54,6 +54,19 @@
 - **Stated limitations:** (Sec. VII) sim-to-real gap, no domain randomisation; overfitting to interaction patterns: "When training only against the latest version of the opponent, agents are prone to forget how to deal with previously encountered strategies", with the remedy "Expanding the diversity of opponent strategies met during training, for example via Self-Play or Population-Based Training"; perfect state information; 1v1 bounded obstacle-free arena only; quantitative evaluation mainly in simulation.
 - **Relation to candidates:** **(A):** no opponent pool or sampler (latest-opponent only), so no sampler comparison. Its value is documented motivation: the authors blame latest-opponent training for forgetting and overfitting (the hovering-evader failure) and call for more opponent diversity. The ICUAS 2026 follow-up adds PFSP mixed 50/50 with the latest opponent, still with no uniform or diversity arm. **(B):** none; memoryless policies, and the authors link the stationary-evader failure to the missing history, which is exactly the gap an online opponent-adaptation module targets. **(C):** none; the pursuer "must expect it to flee at any moment" whatever the opponent type, a clear case where inferring the opponent's type (hover vs. flee) would help. Setting: 1v1 CTBR, 10 s horizon, 8×8×5 m indoor-scale arena, the closest Gavin paper to the thesis's 1v1 protocol. Its hardware evidence is weaker than Roncero's: one real pursuer against a simulated evader, one flight.
 
+### Capture definitions in the reference papers (checked in the full PDFs, 2026-11-06)
+- **Roncero et al.:** capture when the distance between the two **geometric centres** falls below r_c = **0.1 m** (Table I),
+  terminal. The capture bonus is scaled by exp(-alpha_close * max(0, v_close - v_safe)), v_safe = 2 m/s, alpha_close = 3,
+  "discouraging unsafe high-speed collisions"; the disabling mechanism ("a net or a physical collision") is left out of
+  scope. Opponent crash / out of bounds is not rewarded. The thesis uses the same 0.1 m centre-to-centre radius.
+- **Gavin, Lacroix & Bronz (1v1) and Gavin & Bronz (3v1):** capture when the evader's centre comes within a capture
+  distance of the pursuer's **rigid circular net of radius R** (mounted below the pursuer, body-aligned). Numeric R and
+  capture distance are not given in the text (not found by full-text search; possibly only in a figure). Body contact
+  between agents is simulated and penalised softly (r_coll), not terminal (3v1: pursuer-pursuer contact is terminal).
+- **AgilePE:** no capture event. The metric is the in-FOV rate (evader inside the pursuer's detection cone). Episodes
+  terminate on "collision when the inter-agent distance drops below a safety threshold", with a proximity penalty
+  P_close below a safety distance; the threshold value is not given in the text.
+
 ### ESN-OA paper — arXiv 2602.06326
 - **Title:** *Online Adaptive Reinforcement Learning with Echo State Networks for Non-Stationary Dynamics*
 - **Authors:** Aoi Yoshimura, Gouhei Tanaka

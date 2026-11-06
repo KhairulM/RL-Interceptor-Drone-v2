@@ -132,6 +132,9 @@ class PursuitEvasion(IsaacEnv):
         self.reward_terminal_weight = float(task_cfg.get(
             "reward_terminal_weight", task_cfg.get("reward_capture_weight", 100.0)))
         self.reward_bounds_weight = float(task_cfg.get("reward_bounds_weight", 1.0))
+        # Pursuer-only floor penalty: the evader's floor term (same ramp over bounds_margin), no walls or ceiling.
+        # 0 = off (default), so runs without it are unchanged.
+        self.reward_floor_weight = float(task_cfg.get("reward_floor_weight", 0.0))
         self.bounds_margin = float(task_cfg.get("bounds_margin", 1.0))
         self.reward_step = float(task_cfg.get("reward_step", 0.005))
         # Dense per-step distance penalty (pursuer only; matches Intercept's
@@ -1357,6 +1360,8 @@ class PursuitEvasion(IsaacEnv):
         # Dense inward push so the boundary is learned before it is hit.
         if self.role == EVADER:
             bounds_pen = self.reward_bounds_weight * self._bounds_proximity(agent_pos)
+        elif self.reward_floor_weight > 0:
+            bounds_pen = self.reward_floor_weight * self._floor_proximity(agent_pos)
         else:
             bounds_pen = torch.zeros(self.num_envs, 1, device=self.device)
 
@@ -1459,3 +1464,8 @@ class PursuitEvasion(IsaacEnv):
         py = axis(pos[..., 1], -half, half)
         pz = axis(pos[..., 2], self.arena_z_min, self.arena_z_max)
         return torch.maximum(torch.maximum(px, py), pz).clamp(0.0, 1.0)  # [N,1]
+
+    def _floor_proximity(self, pos: torch.Tensor) -> torch.Tensor:
+        """The floor part of _bounds_proximity: 0 above arena_z_min + bounds_margin, ramping to 1 at arena_z_min."""
+        m = max(self.bounds_margin, 1e-6)
+        return ((self.arena_z_min + m - pos[..., 2]).clamp(min=0.0) / m).clamp(0.0, 1.0)  # [N,1]

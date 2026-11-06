@@ -50,6 +50,7 @@ reward_cmd_rate_weight: 0.2         # penalty on commanded body-rate MAGNITUDE (
 reward_terminal_weight: 100.0      # magnitude of every full win/loss outcome
 reward_bounds_weight: 1.0          # evader-only dense penalty ramping up within bounds_margin of a wall
 bounds_margin: 0.5
+reward_floor_weight: 0.0           # pursuer-only floor penalty (the evader's floor ramp, no walls / ceiling); 0 = off
 reward_step: 0.1                   # evader per-step survival reward; must exceed the per-step penalties
 # Optional dense distance penalty (pursuer only), matching Intercept's
 # reward_distance = reward_distance_weight * distance. Negative weight penalizes

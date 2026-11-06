@@ -46,6 +46,8 @@ EXPERIMENTS = {
     "F5c": "f5_acc_sp:run_f5c",
     "F6": "f6_div_sp:run_f6",
     "F6c": "f6_div_sp:run_f6c",
+    "F7": "f7_floor_sp:run_f7",
+    "F7c": "f7_floor_sp:run_f7c",
 }
 
 
