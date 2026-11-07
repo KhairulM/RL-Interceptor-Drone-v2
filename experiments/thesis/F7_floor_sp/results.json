@@ -1,0 +1,170 @@
+{
+  "metrics": {
+    "r0.15": {
+      "plain": {
+        "train": 0.7657968461513519,
+        "heldout_rl": 0.9592823485533396,
+        "heldout_scripted": 0.9283622403939565,
+        "x3_exploiters": 0.9877485434214274,
+        "other_campaign_evaders": 0.9627900900262775,
+        "other_f7_evaders": 0.9005605777104696,
+        "own_campaign_evaders": 0.9680068691571554,
+        "heldout_worst_cluster": 0.9135648608207703,
+        "heldout_scripted_pursuer_crash": 0.07219515865047772,
+        "exploitability": 0.0021781325340270996,
+        "exploiter_pursuer_crash": 0.006140684708952904
+      },
+      "floor_r15": {
+        "train": 0.7406211107969284,
+        "heldout_rl": 0.8270431856314341,
+        "heldout_scripted": 0.9116571545600891,
+        "x3_exploiters": 0.9828730622927347,
+        "other_campaign_evaders": 0.9219067891438802,
+        "other_f7_evaders": 0.8496550520261129,
+        "own_campaign_evaders": 0.9660741885503134,
+        "heldout_worst_cluster": 0.7508411208788554,
+        "heldout_scripted_pursuer_crash": 0.08929360906283061,
+        "exploitability": 0.9679507538676262,
+        "exploiter_pursuer_crash": 0.9702114462852478
+      },
+      "r15": {
+        "train": 0.7308338224887848,
+        "heldout_rl": 0.9339544673760732,
+        "heldout_scripted": 0.9004468123118082,
+        "x3_exploiters": 0.975013534228007,
+        "other_campaign_evaders": 0.9417550033993192,
+        "other_f7_evaders": 0.8441074093182882,
+        "own_campaign_evaders": 0.943865954875946,
+        "heldout_worst_cluster": 0.88602015376091,
+        "heldout_scripted_pursuer_crash": 0.10026690488060315,
+        "exploitability": 0.9627507403492928,
+        "exploiter_pursuer_crash": 0.9647731184959412
+      }
+    },
+    "r0.10": {
+      "plain": {
+        "train": 0.6014775615185499,
+        "heldout_rl": 0.7768023908138275,
+        "heldout_scripted": 0.8344204823176066,
+        "x3_exploiters": 0.9557417631149292,
+        "other_campaign_evaders": 0.8495521093859817,
+        "other_f7_evaders": 0.7443408146500587,
+        "own_campaign_evaders": 0.9179223775863647,
+        "heldout_worst_cluster": 0.6459898153940836,
+        "heldout_scripted_pursuer_crash": 0.17054600020249686,
+        "exploitability": 0.021886050701141357,
+        "exploiter_pursuer_crash": 0.035689450800418854
+      },
+      "floor_r15": {
+        "train": 0.5196025542914867,
+        "heldout_rl": 0.49014093975226086,
+        "heldout_scripted": 0.7906941076119741,
+        "x3_exploiters": 0.9143993655840555,
+        "other_campaign_evaders": 0.6497234544820256,
+        "other_f7_evaders": 0.49571236968040466,
+        "own_campaign_evaders": 0.6201632221539816,
+        "heldout_worst_cluster": 0.3025760551293691,
+        "heldout_scripted_pursuer_crash": 0.21260058134794235,
+        "exploitability": 0.9886965127661824,
+        "exploiter_pursuer_crash": 0.9912114143371582
+      },
+      "r15": {
+        "train": 0.51018360350281,
+        "heldout_rl": 0.6405068387587866,
+        "heldout_scripted": 0.7717350522677103,
+        "x3_exploiters": 0.9018355210622152,
+        "other_campaign_evaders": 0.7082868499888314,
+        "other_f7_evaders": 0.5644128819306692,
+        "own_campaign_evaders": 0.5924463073412577,
+        "heldout_worst_cluster": 0.5180103480815887,
+        "heldout_scripted_pursuer_crash": 0.230996901790301,
+        "exploitability": 0.9886091593652964,
+        "exploiter_pursuer_crash": 0.990882158279419
+      }
+    }
+  },
+  "differences": {
+    "r0.15": {
+      "floor_r15 - r15": {
+        "exploitability": 0.005200013518333435,
+        "exploiter_pursuer_crash": 0.005438327789306641,
+        "heldout_rl": -0.10691128174463915,
+        "heldout_worst_cluster": -0.13517903288205468,
+        "other_campaign_evaders": -0.019848214255438923,
+        "other_f7_evaders": 0.005547642707824707,
+        "own_campaign_evaders": 0.022208233674367306,
+        "train": 0.009787288308143571,
+        "heldout_scripted": 0.01121034224828088,
+        "heldout_scripted_pursuer_crash": -0.010973295817772538,
+        "x3_exploiters": 0.007859528064727783
+      },
+      "r15 - plain": {
+        "exploitability": 0.9605726078152657,
+        "exploiter_pursuer_crash": 0.9586324337869883,
+        "heldout_rl": -0.025327881177266365,
+        "heldout_worst_cluster": -0.02754470705986023,
+        "other_campaign_evaders": -0.0210350866269583,
+        "other_f7_evaders": -0.056453168392181396,
+        "own_campaign_evaders": -0.024140914281209347,
+        "train": -0.034963023662567094,
+        "heldout_scripted": -0.027915428082148308,
+        "heldout_scripted_pursuer_crash": 0.028071746230125427,
+        "x3_exploiters": -0.01273500919342041
+      },
+      "floor_r15 - plain": {
+        "exploitability": 0.9657726213335991,
+        "exploiter_pursuer_crash": 0.9640707615762949,
+        "heldout_rl": -0.13223916292190552,
+        "heldout_worst_cluster": -0.1627237399419149,
+        "other_campaign_evaders": -0.04088330088239722,
+        "other_f7_evaders": -0.05090552568435669,
+        "own_campaign_evaders": -0.001932680606842041,
+        "train": -0.025175735354423523,
+        "heldout_scripted": -0.016705085833867428,
+        "heldout_scripted_pursuer_crash": 0.01709845041235289,
+        "x3_exploiters": -0.004875481128692627
+      }
+    },
+    "r0.10": {
+      "floor_r15 - r15": {
+        "exploitability": 8.735340088605881e-05,
+        "exploiter_pursuer_crash": 0.0003292560577392578,
+        "heldout_rl": -0.1503658990065257,
+        "heldout_worst_cluster": -0.21543429295221966,
+        "other_campaign_evaders": -0.05856339550680578,
+        "other_f7_evaders": -0.06870051225026452,
+        "own_campaign_evaders": 0.02771691481272387,
+        "train": 0.009418950788676717,
+        "heldout_scripted": 0.018959055344263787,
+        "heldout_scripted_pursuer_crash": -0.018396320442358643,
+        "x3_exploiters": 0.01256384452184034
+      },
+      "r15 - plain": {
+        "exploitability": 0.966723108664155,
+        "exploiter_pursuer_crash": 0.9551927074790001,
+        "heldout_rl": -0.13629555205504096,
+        "heldout_worst_cluster": -0.12797946731249488,
+        "other_campaign_evaders": -0.1412652593971503,
+        "other_f7_evaders": -0.17992793271938956,
+        "own_campaign_evaders": -0.32547607024510705,
+        "train": -0.09129395801573992,
+        "heldout_scripted": -0.06268543004989624,
+        "heldout_scripted_pursuer_crash": 0.06045090158780414,
+        "x3_exploiters": -0.05390624205271399
+      },
+      "floor_r15 - plain": {
+        "exploitability": 0.9668104620650411,
+        "exploiter_pursuer_crash": 0.9555219635367393,
+        "heldout_rl": -0.28666145106156665,
+        "heldout_worst_cluster": -0.34341376026471454,
+        "other_campaign_evaders": -0.19982865490395607,
+        "other_f7_evaders": -0.24862844496965408,
+        "own_campaign_evaders": -0.2977591554323832,
+        "train": -0.0818750072270632,
+        "heldout_scripted": -0.043726374705632454,
+        "heldout_scripted_pursuer_crash": 0.042054581145445497,
+        "x3_exploiters": -0.041342397530873654
+      }
+    }
+  }
+}
