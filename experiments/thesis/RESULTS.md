@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-11-06 18:25; details in the sections below)
+## Summary (updated 2026-11-07 17:45; details in the sections below)
 
 J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over
 seeds; "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position +
@@ -63,20 +63,34 @@ velocity, no acceleration).
   [+0.254, +0.541], held-out RL +0.122 (n.s.). But nf is **more** exploitable (0.872 vs 0.675, +0.197 [+0.125, +0.277]):
   in 2 of 3 nf campaigns the exploiter makes the pursuer crash (88-92 %). Prediction held for X3 exploiters, not for
   exploitability.
-- F5 Exp 1 (self-play, uniform sampler, evader velocity observed, 2 seeds, descriptive): the learned acceleration
-  estimate + RLS lifts the final pursuer on held-out RL (+0.110) and the worst held-out cluster (+0.171) on both seeds,
-  +0.034 on other campaigns' evaders, exploitability unchanged (~0.96). Under sensor noise it keeps the held-out gain
-  (+0.137; finite difference -0.100) but falls below plain against the self-play evaders (other campaigns -0.105, own
-  -0.164) through more pursuer crashes; with RLS frozen it mostly disappears (-0.01 / -0.03 vs plain), so **online RLS under noise hurts
-  against campaign evaders** (-0.094) and helps only slightly on held-out RL (+0.022). The A3c RLS gain is not
-  reproduced in self-play. Predictions held for the clean acceleration effect, not for the noise robustness of plain
-  pursuers (-0.14 held-out RL) or the RLS benefit. Post-hoc: every evader win is a pursuer crash (near-miss dive at a low evader; timeout 0 %), also against scripted evaders (0.13-0.21); inside the campaigns each evader stage lures the current pursuers (0.79-0.99 crash) and the next pursuer stage patches it, while pool-trained generalists with the same reward are not lured (crash <= 0.03). Re-scored at a 0.15 m capture radius (eval-only), exploitability drops to 0.69-0.75 and the clean rls - plain held-out RL gain to +0.030 (worst cluster +0.060): the 0.10 m result is radius-sensitive.
+- F5 Exp 1 (self-play, uniform sampler, evader velocity observed, **3 seed pairs**; the third pair was added after
+  the first two were seen). Clean, the learned acceleration estimate + RLS lifts the final pursuer on held-out RL
+  (+0.091 [+0.055, +0.116]) and the worst held-out cluster (+0.128 [+0.042, +0.174]); both are positive on all 3 pairs.
+  It does **not** help against other campaigns' evaders (-0.027; seed 300 -0.157) and exploitability is unchanged
+  (~0.96). The third pair weakened the 2-seed picture (other campaigns +0.034 -> -0.027).
+  - Under sensor noise it is below plain against the self-play evaders (other campaigns -0.140 [-0.232, -0.065], all 3
+    pairs). This comes mainly from running RLS (rls - frozen -0.103). **The A3c RLS gain is not reproduced in
+    self-play.**
+  - Post-hoc: every evader win is a pursuer crash (near-miss dive at a low evader; timeout 0 %), also against scripted
+    evaders (0.13-0.21). Inside the campaigns each evader stage lures the current pursuers (0.79-0.99 crash) and the
+    next pursuer stage patches it. Pool-trained generalists with the same reward are not lured (crash <= 0.03).
+  - At a 0.15 m capture radius (eval-only re-score) the clean gain shrinks to held-out RL +0.021 and worst cluster
+    +0.049, and exploitability drops to 0.65 (rls) / 0.77 (plain). The 0.10 m result is radius-sensitive.
+- F6 (Hedge + PSD-PSRO diversity term for evaders, 2 seeds, descriptive): the evaders are more diverse (Vendi 3.25 vs
+  Hedge 2.50, both seeds), but the pursuer is much weaker than Hedge's. Held-out RL -0.262, other campaigns' evaders
+  -0.471, both seeds.
+  - The term was saturated (KL 13-52 >> cap 2), so it acted as a +2 per-step survival bonus, 20 x the evader's
+    survival reward.
+  - Its evaders stopped luring, so the pursuer never learned to resist luring. Against F3's evaders, which do lure,
+    it crashes in 0.48-0.75 of episodes (Hedge pursuer: 0.10-0.14).
+  - Predictions held for diversity, not for the pursuer. The term is not usable in this form.
 
-**Running / pending**: F5 Exp 1 done (F5c 11-06 08:43). F5 Exp 2 (`qd_dpp_rls`) paused by the user (11-05) until F6
-decides the sampler. F6 (Hedge + PSD-PSRO diversity term for evaders; pilot beta = 1.0): seed 0 done 11-06 11:42, seed 1
-running (ends ~19:30), then F6c. Freeze 11-08.
+**Running / pending**: F7 (pursuer floor penalty + 0.15 m capture radius, 2 campaigns, pre-registered 11-06 19:30)
+running since 11-07 08:43, at stage 5 of 9 at 16:50; F7c expected ~11-08 03:00. Its result decides whether F5 Exp 2
+(paused) or a redesigned F6 run with changed rules. Freeze 11-08 (the user decides after F7c). Every J of the earlier
+experiments re-scored at 0.15 m: [R15_rescore/](R15_rescore/) (status.json), not yet added to every section.
 
-## Relation to the reference papers (updated 2026-11-06 12:40)
+## Relation to the reference papers (updated 2026-11-07 17:45)
 
 Reference papers (the thesis is positioned against these three):
 **[AgilePE]** Tang et al. 2026, arXiv:2608.14135; **[Roncero]** Sanchez Roncero et al. 2026 (AMSPBH),
@@ -104,13 +118,13 @@ disagrees under our protocol, extends the claim, or does not test it.
 | # | claim in the reference papers | our evidence | status |
 |---|---|---|---|
 | 1 | Prioritising hard opponents (Hedge / PFSP) improves on uniform population sampling. Roncero Fig. 5: Hedge beats uniform AMSPB by +0.05 to +0.27 win rate in 8 of 9 settings (3 seeds). AgilePE: PFSP stronger than FSP (single runs). | D1, 5 seeds, fixed 20-evader pool: win-rate softmax (S-W, closest to Hedge/PFSP) minus uniform: train **-0.054 [-0.081, -0.026]**, held-out RL **-0.088 [-0.145, -0.035]**, worst held-out cluster **-0.088 [-0.147, -0.030]**, worse on 5/5 seeds. Multi-metric softmax (S-M, closest to Gavin's outcome score): train **-0.150 [-0.259, -0.047]**, exploiters **-0.166 [-0.302, -0.047]**, held-out RL -0.143 [-0.306, +0.021]. D2: no sampler lowers exploitability. In full self-play with the sampler on both roles (F3, 2 seeds, descriptive): Roncero's Hedge beats uniform on held-out RL (+0.100) and the worst held-out cluster (+0.161) on both seeds; PFSP without a uniform share is mixed on held-out RL (+0.038) and much worse against other campaigns' evaders (-0.226). | **Replicates directionally in self-play (Hedge, F3, 2 seeds), not on a fixed pool (D1).** PFSP without a uniform share specialises (F3, D1c). Differences of the fixed-pool test: we train one pursuer against a fixed pool (no co-evolving generations); our uniform floor is 0.5 (Roncero 0.7) and we use a softmax (T = 0.9) instead of a power eta = 2. We did not run latest-opponent-only self-play (Roncero's AMSDRL, Gavin's SP), so we do not test "population beats latest-only". D1c (exploratory): with **no** uniform floor, hardness prioritisation collapses (train -0.29); this agrees with Roncero's advice to keep gamma large, and is a warning for PFSP without a uniform share (AgilePE does not report one). |
-| 2 | Self-play with PFSP "sustains tactical diversity" (AgilePE); the population "contains distinct pursuit and evasion behaviours" (Roncero). Neither paper measures diversity. | X2: 22 RL evaders from three self-play campaigns amount to **3.8 effectively distinct behaviours** (Vendi score), 7 clusters; consecutive stages are 36 % closer than random same-campaign pairs. F3 (2 seeds): evader Vendi per campaign (4 RL evaders, max 4): pfsp 2.985 > hedge 2.499 ~ uniform 2.456 > qd_dpp 2.350; pfsp - uniform +0.529 on both seeds. | **Extends:** first quantitative measure; the pool is diverse across campaigns but highly redundant within one. **Consistent with AgilePE:** PFSP self-play produces the most diverse evaders (F3), but its pursuer is the most specialised. |
-| 3 | Our addition: sample by quality *and* diversity (QD-DPP). No reference paper uses diversity in sampling. | D1: QD-DPP beats both hardness samplers (vs S-M held-out RL +0.185 [+0.110, +0.259]; vs S-W +0.131 [+0.038, +0.223]) but is **not** better than uniform (+0.042 [-0.069, +0.131]). D1b: bounds the sampling mass of duplicates but does not protect performance. F1: no sampler effect once the acceleration input is present. D2: not less exploitable. F3 (self-play, both roles, 2 seeds): not better than uniform (held-out RL -0.041, worst cluster -0.052) and below Hedge (-0.140 / -0.213); produces the least diverse evaders (Vendi 2.350). | **New, negative:** diversity repairs the damage of badly tuned hardness prioritisation on a fixed pool (D1); in self-play it is no better than uniform and worse than Roncero's Hedge (F3). |
-| 4 | Population training generalises to unseen opponents (Roncero: unseen APF evader; Gavin: SP/PFSP pursuers vs other evaders). | Consistent for scripted opponents: held-out scripted evaders (zigzag, fast flee, 4 switching evaders) are neutralised at J 0.99-1.00 by every pursuer. **Not** for learned opponents: against the independent v10 lineage the generalist loses up to 0.37 J to a specialist; fresh exploiters (PPO best responses, 100M frames) reach J 0.22-0.43 against it (X3), and the mean exploitability per sampler is 0.44-0.69 (D2; one failed exploiter included). With the reference papers' own co-evolution protocol (F2b/F2c, 1 seed per arm), the final self-play pursuers neutralise held-out scripted evaders at only 0.83-0.88, the thesis train pool's v9 evaders at 0.34-0.48, and are **~fully exploitable (0.97)**: a fresh exploiter makes them crash in 97 % of episodes. The same holds for every later self-play pursuer (F3c 0.97-0.98; F5 Exp 1 uniform_rls 0.94-0.96, pursuer crash 95-97 % against its exploiter). | **Consistent for scripted, contradicted for learned opponents.** None of the three papers reports exploitability or held-out RL lineages; under their protocol the gap is larger, not smaller. |
+| 2 | Self-play with PFSP "sustains tactical diversity" (AgilePE); the population "contains distinct pursuit and evasion behaviours" (Roncero). Neither paper measures diversity. | X2: 22 RL evaders from three self-play campaigns amount to **3.8 effectively distinct behaviours** (Vendi score), 7 clusters; consecutive stages are 36 % closer than random same-campaign pairs. F3 (2 seeds): evader Vendi per campaign (4 RL evaders, max 4): pfsp 2.985 > hedge 2.499 ~ uniform 2.456 > qd_dpp 2.350; pfsp - uniform +0.529 on both seeds. F6 (2 seeds): adding a PSD-PSRO diversity term for the evaders to Hedge raises evader Vendi to 3.253 (+0.754 vs Hedge, both seeds), but the term was saturated (a survival bonus), its evaders stopped luring, and its pursuer is much weaker (held-out RL -0.262, other campaigns' evaders -0.471). | **Extends:** first quantitative measure; the pool is diverse across campaigns but highly redundant within one. **Consistent with AgilePE:** PFSP self-play produces the most diverse evaders (F3), but its pursuer is the most specialised. **More evader diversity does not by itself give a better pursuer** (F3 pfsp, F6). |
+| 3 | Our addition: sample by quality *and* diversity (QD-DPP). No reference paper uses diversity in sampling. | D1: QD-DPP beats both hardness samplers (vs S-M held-out RL +0.185 [+0.110, +0.259]; vs S-W +0.131 [+0.038, +0.223]) but is **not** better than uniform (+0.042 [-0.069, +0.131]). D1b: bounds the sampling mass of duplicates but does not protect performance. F1: no sampler effect once the acceleration input is present. D2: not less exploitable. F3 (self-play, both roles, 2 seeds): not better than uniform (held-out RL -0.041, worst cluster -0.052) and below Hedge (-0.140 / -0.213); produces the least diverse evaders (Vendi 2.350). F6 (diversity in training instead of sampling, 2 seeds): more diverse evaders, much weaker pursuer (see row 2). | **New, negative:** diversity repairs the damage of badly tuned hardness prioritisation on a fixed pool (D1); in self-play it is no better than uniform and worse than Roncero's Hedge (F3). |
+| 4 | Population training generalises to unseen opponents (Roncero: unseen APF evader; Gavin: SP/PFSP pursuers vs other evaders). | Consistent for scripted opponents: held-out scripted evaders (zigzag, fast flee, 4 switching evaders) are neutralised at J 0.99-1.00 by every pursuer. **Not** for learned opponents: against the independent v10 lineage the generalist loses up to 0.37 J to a specialist; fresh exploiters (PPO best responses, 100M frames) reach J 0.22-0.43 against it (X3), and the mean exploitability per sampler is 0.44-0.69 (D2; one failed exploiter included). With the reference papers' own co-evolution protocol (F2b/F2c, 1 seed per arm), the final self-play pursuers neutralise held-out scripted evaders at only 0.83-0.88, the thesis train pool's v9 evaders at 0.34-0.48, and are **~fully exploitable (0.97)**: a fresh exploiter makes them crash in 97 % of episodes. The same holds for every later self-play pursuer (F3c 0.97-0.98; F5 Exp 1 uniform_rls 0.95-0.97, pursuer crash 95-97 % against its exploiter; F6 0.98). | **Consistent for scripted, contradicted for learned opponents.** None of the three papers reports exploitability or held-out RL lineages; under their protocol the gap is larger, not smaller. |
 | 5 | Seeds may converge to different strategies (Roncero, limitations). | Generalist (uniform sampler) train J 0.56-0.87 across 5 seeds; held-out generalisation is **bimodal per seed**: 1-2 of 5 seeds fail on all later v10 evaders (J 0.10-0.29) while the others reach 0.82-0.97 (F1). | **Extends:** quantifies it; with 3 seeds (Roncero) effects of +/- 0.1 can come from one seed. |
-| 6 | Observation design: Roncero and Gavin give the pursuer opponent position + velocity to a memoryless MLP; Gavin leaves "trajectory prediction" out of scope; AgilePE adds a temporal window of opponent state. | Adding the opponent's acceleration (finite difference of two consecutive observations) is the **largest effect in this thesis**: train 0.722 -> 0.940 (+0.199 [+0.128, +0.270]), exploiters 0.497 -> 0.983 (+0.464 [+0.239, +0.638]), held-out RL 0.634 -> 0.838 (CI includes 0 because of the bimodal seeds) (F1, 5 seeds). A learned acceleration estimate does the same (A2b, 5 seeds: all paired differences to the finite difference within +/- 0.04, n.s.). It also lowers exploitability: 0.672 -> 0.397, paired -0.275 [-0.522, -0.044] (F2a). A raw 10-step history stack (our analogue of a temporal window) was *worse* than no history (train -0.254 [-0.355, -0.152]) (A1b). Under co-evolution (F2c, 1 seed per arm, descriptive) the gain is smaller: final pursuer +0.12 on held-out RL, +0.07 on the whole test set, but worse on the other campaign's evaders (0.74 vs 0.86) and no lower exploitability (0.965 vs 0.974); the acc campaign also cycles much less. With a learned estimate instead (F5 Exp 1, 2 seeds, descriptive): held-out RL +0.110, worst held-out cluster +0.171, train pool +0.078 on both seeds, other campaigns' evaders +0.034, exploitability unchanged (0.96 vs 0.97). | **New:** a memoryless pursuer with position + velocity (Roncero, Gavin) is limited by the missing opponent acceleration far more than by opponent sampling, when trained against a fixed pool; under co-evolution the gain is smaller but consistent across 2 seeds with a learned estimate (F5 Exp 1: held-out +0.11 / +0.17, other campaigns +0.03), mixed with finite differences (F2c, 1 seed), and it never lowers exploitability. Caveat: AgilePE's window length and architecture are not given, so the history-stack result is not a test of AgilePE itself. |
-| 7 | Future work in Roncero: online adaptation, recurrent policies. | Noise-free, online RLS adaptation of a learned opponent model adds nothing in closed loop (A1b, A2b; within or across episodes); a random reservoir (ESN) is worse than no adaptation. **Under sensor noise it helps**: RLS vs frozen basis +0.09 train, +0.24 exploiters, CIs exclude 0 (A3c, policies trained noise-free). Recurrent policies (GRU) **not tested**; a recurrent *estimator* (GRU, trained on noisy inputs) is the most accurate opponent-state estimator under noise offline (A3e: velocity -36 % vs the MLP used in closed loop). In self-play (F5 Exp 1, 2 seeds): RLS vs frozen changes nothing clean (all within +/- 0.01); under noise it is mixed: held-out RL +0.022, but other campaigns' evaders -0.094, train pool -0.021, exploitability +0.026. | **New, conditional:** online opponent-model adaptation pays off under sensor noise against a fixed pool (A3c), not with perfect state (Roncero's setting); in self-play (F5) it does not pay off. |
-| 8 | Sensor noise: AgilePE reports robustness under real sensor noise (mocap + IMU); Roncero and Gavin assume perfect state. | With 2 cm / 8 cm/s noise (eval only, policies trained clean): the finite-difference acceleration input collapses (train 0.94 -> 0.33, below the plain pursuer 0.70); the learned estimator + RLS keeps 0.80 and beats it by +0.47 train / +0.38 held-out RL / +0.49 exploiters (A3c, 5 seeds). Without any evader velocity (A3b), every pursuer is weak (~0.29) and the learned estimator is noise-proof but not better than no estimator. With an *estimated* velocity from noisy positions (A3d, 3 seeds): train 0.29 -> 0.38-0.40 (true velocity 0.62), no gain on held-out RL; the learned estimate is not clearly better than an EMA filter (+0.02 train, n.s.). In self-play with noise in training and evaluation (F4, 3 seeds per arm, estimated velocity only), learned estimators generalise better than the EMA filter (other campaigns' evaders +0.196, X3 exploiters +0.441, CIs exclude 0) but make the pursuer more exploitable (+0.197; crash-inducing exploits in 2 of 3 seeds). Self-play with velocity observed (F5 Exp 1, noise at eval only): plain pursuers lose 0.14 on held-out RL; the finite-difference pursuer falls below plain (held-out RL -0.100, other campaigns' evaders -0.478); the learned estimate keeps its held-out gain (+0.137) but is below plain against the self-play evaders (-0.105), through more pursuer crashes with RLS running. | **New:** opponent-acceleration inputs must be learned, not differenced, once sensing is noisy; the perfect-state results of Roncero and Gavin would not transfer to such inputs. Under co-evolution with noisy sensing the learned estimator trades better generalisation for higher exploitability. |
+| 6 | Observation design: Roncero and Gavin give the pursuer opponent position + velocity to a memoryless MLP; Gavin leaves "trajectory prediction" out of scope; AgilePE adds a temporal window of opponent state. | Adding the opponent's acceleration (finite difference of two consecutive observations) is the **largest effect in this thesis**: train 0.722 -> 0.940 (+0.199 [+0.128, +0.270]), exploiters 0.497 -> 0.983 (+0.464 [+0.239, +0.638]), held-out RL 0.634 -> 0.838 (CI includes 0 because of the bimodal seeds) (F1, 5 seeds). A learned acceleration estimate does the same (A2b, 5 seeds: all paired differences to the finite difference within +/- 0.04, n.s.). It also lowers exploitability: 0.672 -> 0.397, paired -0.275 [-0.522, -0.044] (F2a). A raw 10-step history stack (our analogue of a temporal window) was *worse* than no history (train -0.254 [-0.355, -0.152]) (A1b). Under co-evolution (F2c, 1 seed per arm, descriptive) the gain is smaller: final pursuer +0.12 on held-out RL, +0.07 on the whole test set, but worse on the other campaign's evaders (0.74 vs 0.86) and no lower exploitability (0.965 vs 0.974); the acc campaign also cycles much less. With a learned estimate instead (F5 Exp 1, 3 seed pairs): held-out RL +0.091 [+0.055, +0.116], worst held-out cluster +0.128 [+0.042, +0.174] (all 3 pairs positive), but other campaigns' evaders -0.027 and train pool +0.024 (seed 300 negative on both), exploitability unchanged (0.96 vs 0.97). At a 0.15 m capture radius (eval-only re-score) the held-out gain shrinks to +0.021. | **New:** a memoryless pursuer with position + velocity (Roncero, Gavin) is limited by the missing opponent acceleration far more than by opponent sampling, when trained against a fixed pool; under co-evolution the gain is smaller and limited to held-out evaders with a learned estimate (F5 Exp 1, 3 pairs: held-out +0.09 / +0.13, other campaigns -0.03), mixed with finite differences (F2c, 1 seed), largely final-approach precision (0.15 m re-score), and it never lowers exploitability. Caveat: AgilePE's window length and architecture are not given, so the history-stack result is not a test of AgilePE itself. |
+| 7 | Future work in Roncero: online adaptation, recurrent policies. | Noise-free, online RLS adaptation of a learned opponent model adds nothing in closed loop (A1b, A2b; within or across episodes); a random reservoir (ESN) is worse than no adaptation. **Under sensor noise it helps**: RLS vs frozen basis +0.09 train, +0.24 exploiters, CIs exclude 0 (A3c, policies trained noise-free). Recurrent policies (GRU) **not tested**; a recurrent *estimator* (GRU, trained on noisy inputs) is the most accurate opponent-state estimator under noise offline (A3e: velocity -36 % vs the MLP used in closed loop). In self-play (F5 Exp 1, 3 pairs): RLS vs frozen changes nothing clean (all within +/- 0.015); under noise it is mixed: held-out RL +0.031, but other campaigns' evaders -0.103 [-0.140, -0.069], train pool -0.025, exploitability +0.027. | **New, conditional:** online opponent-model adaptation pays off under sensor noise against a fixed pool (A3c), not with perfect state (Roncero's setting); in self-play (F5) it does not pay off. |
+| 8 | Sensor noise: AgilePE reports robustness under real sensor noise (mocap + IMU); Roncero and Gavin assume perfect state. | With 2 cm / 8 cm/s noise (eval only, policies trained clean): the finite-difference acceleration input collapses (train 0.94 -> 0.33, below the plain pursuer 0.70); the learned estimator + RLS keeps 0.80 and beats it by +0.47 train / +0.38 held-out RL / +0.49 exploiters (A3c, 5 seeds). Without any evader velocity (A3b), every pursuer is weak (~0.29) and the learned estimator is noise-proof but not better than no estimator. With an *estimated* velocity from noisy positions (A3d, 3 seeds): train 0.29 -> 0.38-0.40 (true velocity 0.62), no gain on held-out RL; the learned estimate is not clearly better than an EMA filter (+0.02 train, n.s.). In self-play with noise in training and evaluation (F4, 3 seeds per arm, estimated velocity only), learned estimators generalise better than the EMA filter (other campaigns' evaders +0.196, X3 exploiters +0.441, CIs exclude 0) but make the pursuer more exploitable (+0.197; crash-inducing exploits in 2 of 3 seeds). Self-play with velocity observed (F5 Exp 1, 3 pairs, noise at eval only): plain pursuers lose 0.135 on held-out RL; the finite-difference pursuer falls below plain (held-out RL -0.100, other campaigns' evaders -0.472); the learned estimate keeps a held-out gain on average (+0.086, seed 300 -0.014) but is below plain against the self-play evaders (-0.140), through more pursuer crashes with RLS running. | **New:** opponent-acceleration inputs must be learned, not differenced, once sensing is noisy; the perfect-state results of Roncero and Gavin would not transfer to such inputs. Under co-evolution with noisy sensing the learned estimator trades better generalisation for higher exploitability. |
 | 9 | Real-world transfer (all three), multi-pursuer coordination (Gavin), FOV-limited sensing (AgilePE). | Not studied. | **Not tested.** |
 
 ## X0_replay (done 2026-10-26)
@@ -1094,90 +1108,127 @@ How the fresh exploiters win (fractions of episodes):
 - Limitation: 3 seeds, one exploiter per pursuer; the estimator is the clean-trained MLP chosen by the A3d rule, not the
   better noise-trained GRU found later (A3e).
 
-## F5_acc_sp Exp 1 / F5c (campaigns done 2026-11-06 03:38; F5c Exp 1 done 08:43; 2 seeds, descriptive by pre-registration)
+## F5_acc_sp Exp 1 / F5c (3 seed pairs; campaigns done 2026-11-07 06:45; F5c done 08:31; written up 2026-11-07 17:45; descriptive)
 
 RQ2 under the reference papers' protocol: does the learned acceleration estimate (A2b machinery, velocity observed)
 help the pursuer in full self-play? New arm **uniform_rls**: F3 protocol (uniform sampler on both roles, plain
 observation + the learned estimate of the evader's mean acceleration over the next 0.2 s, online RLS on the last
 layer, 9 stages x 300M frames, pursuer first, warm start, clean training; frozen pursuers seen by the evader run the
-same estimator on clean inputs), campaign seeds 0 / 100. Reused: **uniform_plain** = F2-plain + F3-uniform-s1;
-**uniform_fd** = F2-acc (finite-difference acceleration, 1 seed). Final pursuer (stage 8) of each campaign, evaluated
-clean and with the A3c sensor-noise model (eval only); RLS ablation = the same uniform_rls pursuer with RLS frozen at
-eval (B1). With 2 seeds the bracket is the range of the two values; **no difference can be called supported**
-(pre-registered). [F5_acc_sp/summary_exp1.md](F5_acc_sp/summary_exp1.md); per-seed values in `results_exp1.json`.
+same estimator on clean inputs), campaign seeds 0 / 100 / 300. **uniform_plain** = F2-plain (seed 0) + F3-uniform-s1
+(seed 100) + the new uniform_plain-s2 (seed 300); **uniform_fd** = F2-acc (finite-difference acceleration, 1 seed).
+Final pursuer (stage 8) of each campaign, evaluated clean and with the A3c sensor-noise model (eval only); RLS ablation
+= the same uniform_rls pursuer with RLS frozen at eval (B1). [ ] = 95 % bootstrap CI over the 3 seeds (coarse);
+amendment 2 reports a difference whose CI excludes 0 as supported, with that caveat.
+[F5_acc_sp/summary_exp1.md](F5_acc_sp/summary_exp1.md); per-seed values in `results_exp1.json`; the 2-seed
+analysis is kept as [summary_exp1_2seeds.md](F5_acc_sp/summary_exp1_2seeds.md); every J at 0.15 m in
+[R15_rescore/F5_acc_sp/summary_exp1.md](R15_rescore/F5_acc_sp/summary_exp1.md).
 
-Deviations: (a) estimator retrained before the campaigns (amendment 1): H* = 10 by the A2a rule, NF + RLS (S1) error
-0.110 m/s vs 0.143 for finite-difference persistence on val (-23 %), test 0.143 vs 0.174
-([estimator/summary.md](F5_acc_sp/estimator/summary.md)). (b) Exp 2 (`qd_dpp_rls`) paused 11-05 by the user, so
-F5c was split (11-05 16:08): Exp 1 is analysed alone, and "campaign evaders" are those of the 10 non-paused
-plain-evader campaigns (8 F3 + 2 F5 uniform_rls), stage-1 evaders excluded. Output named `summary_exp1.md` instead of
-`summary.md`. Contrasts and metrics unchanged.
+Deviations:
+- (a) Amendment 1: the estimator was retrained before the campaigns. H* = 10 by the A2a rule. NF + RLS (S1) error is
+  0.110 m/s vs 0.143 for finite-difference persistence on val (-23 %); on test 0.143 vs 0.174
+  ([estimator/summary.md](F5_acc_sp/estimator/summary.md)).
+- (b) The user paused Exp 2 (`qd_dpp_rls`) on 11-05, so F5c was split (11-05 16:08) and Exp 1 is analysed alone.
+  "Campaign evaders" are the RL evaders of the 12 non-paused plain-evader campaigns (8 F3, 2 F5 uniform_rls seeds 0 /
+  100, and the 2 seed-300 campaigns), stage-1 evaders excluded.
+- (c) **Amendment 2** (11-06 12:45, decided after the 2-seed results were seen; optional-stopping risk disclosed, no
+  further seeds): a third seed pair (seed 300), and every Exp 1 pursuer re-evaluated against the new campaigns' evaders.
 
-| final pursuer, J | uniform_rls clean | uniform_plain clean | uniform_fd clean | uniform_rls noisy | uniform_plain noisy | uniform_fd noisy |
+The 2-seed numbers that this section had before (11-06 12:40) are superseded. Per-seed values below are in seed order
+0 / 100 / 300.
+
+**0.15 m column:** the same evals re-scored at a 0.15 m capture radius (exact, eval-only; `rescore.py`; see the F5
+post-hoc section). These are upper bounds for a 0.15 m game, because the opponents and exploiters were trained for 0.10 m.
+
+| final pursuer, J at 0.10 m (0.15 m) | uniform_rls clean | uniform_plain clean | uniform_fd clean | uniform_rls noisy | uniform_plain noisy | uniform_fd noisy |
 |---|---|---|---|---|---|---|
-| held-out RL (v10) | **0.846** [0.812, 0.879] | 0.736 [0.696, 0.777] | 0.893 | **0.731** [0.717, 0.745] | 0.595 [0.548, 0.641] | 0.541 |
-| held-out worst cluster | **0.764** [0.708, 0.820] | 0.593 [0.540, 0.646] | 0.827 | **0.622** [0.600, 0.645] | 0.403 [0.348, 0.457] | 0.440 |
-| other campaigns' evaders | 0.879 [0.867, 0.892] | 0.845 [0.841, 0.849] | 0.643 | 0.666 [0.642, 0.689] | **0.771** [0.763, 0.779] | 0.285 |
-| own campaign's evaders | 0.967 | 0.942 | - | 0.708 | **0.872** | - |
-| thesis train pool | 0.649 | 0.570 | 0.495 | 0.560 | 0.521 | 0.398 |
-| held-out scripted | 0.869 | 0.795 | 0.876 | 0.817 | 0.748 | 0.805 |
-| X3 exploiters | 0.972 | 0.951 | 0.986 | 0.917 | 0.895 | 0.892 |
-| exploitability (fresh exploiter) | 0.960 | 0.973 | 0.965 | 0.942 | 0.978 | 0.751 |
+| held-out RL (v10) | **0.871** [0.812, 0.921] (0.986) | 0.780 [0.696, 0.866] (0.965) | 0.893 (0.996) | **0.731** [0.717, 0.745] (0.934) | 0.645 [0.548, 0.746] (0.883) | 0.541 (0.776) |
+| held-out worst cluster | **0.789** [0.708, 0.839] (0.937) | 0.661 [0.540, 0.797] (0.889) | 0.827 (0.950) | **0.614** [0.597, 0.645] (0.893) | 0.487 [0.348, 0.655] (0.804) | 0.440 (0.717) |
+| other campaigns' evaders | 0.835 [0.742, 0.895] (0.965) | 0.862 [0.837, 0.899] (0.958) | 0.657 (0.941) | 0.640 [0.575, 0.700] (0.894) | **0.780** [0.765, 0.807] (0.935) | 0.293 (0.519) |
+| own campaign's evaders | 0.972 (0.995) | 0.946 (0.984) | - | 0.750 (0.967) | **0.865** (0.973) | - |
+| thesis train pool | 0.619 (0.809) | 0.595 (0.738) | 0.495 (0.775) | 0.539 (0.725) | 0.541 (0.689) | 0.398 (0.555) |
+| held-out scripted | 0.867 (0.947) | 0.808 (0.908) | 0.876 (0.956) | 0.827 (0.939) | 0.762 (0.898) | 0.805 (0.936) |
+| X3 exploiters | 0.975 (0.993) | 0.955 (0.987) | 0.986 (0.996) | 0.923 (0.979) | 0.903 (0.976) | 0.892 (0.965) |
+| exploitability (fresh exploiter) | 0.957 (0.645) | 0.974 (0.772) | 0.965 (0.327) | 0.944 (0.728) | 0.976 (0.824) | 0.751 (0.641) |
 
-Per seed (seed 0 / seed 1), held-out RL clean: uniform_rls 0.879 / 0.812, uniform_plain 0.777 / 0.696; worst
-held-out cluster: 0.820 / 0.708 vs 0.646 / 0.540.
+Per seed (0 / 100 / 300), clean:
+- held-out RL: uniform_rls 0.879 / 0.812 / 0.921; uniform_plain 0.777 / 0.696 / 0.866.
+- other campaigns' evaders: uniform_rls 0.895 / 0.868 / 0.742; uniform_plain 0.850 / 0.837 / 0.899.
 
-Seed-paired differences (mean of the 2 pairs [range]; uniform_fd: 1 pair):
+Seed-paired differences (3 pairs [CI]; uniform_fd: 1 pair), at 0.10 m (0.15 m):
 
 | pair | held-out RL | worst held-out cluster | other campaigns' evaders | own campaign | train pool | exploitability |
 |---|---|---|---|---|---|---|
-| rls - plain, clean | **+0.110** [+0.103, +0.116] | **+0.171** [+0.168, +0.174] | +0.034 [+0.026, +0.042] | +0.024 | +0.078 [+0.054, +0.102] | -0.013 [-0.021, -0.005] |
-| rls - plain, noisy | **+0.137** [+0.075, +0.198] | **+0.220** [+0.143, +0.296] | **-0.105** [-0.137, -0.074] | **-0.164** [-0.235, -0.094] | +0.039 [-0.002, +0.079] | -0.036 [-0.050, -0.022] |
-| fd - plain, clean | +0.117 | +0.181 | -0.206 | - | -0.106 | -0.010 |
-| fd - plain, noisy | -0.100 | -0.017 | **-0.478** | - | -0.161 | -0.226 |
-| rls - rls frozen, clean | +0.001 [-0.001, +0.004] | +0.003 | +0.007 | +0.005 | -0.001 | +0.009 |
-| rls - rls frozen, noisy | +0.022 [+0.009, +0.035] | +0.026 [+0.006, +0.047] | **-0.094** [-0.111, -0.077] | **-0.130** [-0.173, -0.086] | -0.021 [-0.029, -0.012] | +0.026 [+0.018, +0.035] |
+| rls - plain, clean | **+0.091** [+0.055, +0.116] (+0.021 [+0.005, +0.030]) | **+0.128** [+0.042, +0.174] (+0.049 [+0.011, +0.109]) | -0.027 [-0.157, +0.046] (+0.007 [-0.002, +0.015]) | +0.026 [+0.013, +0.035] (+0.011) | +0.024 [-0.085, +0.102] (+0.071 [+0.054, +0.093]) | -0.018 [-0.028, -0.005] (-0.127 [-0.258, +0.011]) |
+| rls - plain, noisy | +0.086 [-0.014, +0.198] (+0.051 [+0.011, +0.116]) | +0.127 [-0.058, +0.296] (+0.089 [+0.021, +0.183]) | **-0.140** [-0.232, -0.065] (-0.041 [-0.079, -0.021]) | **-0.115** [-0.235, -0.017] (-0.007) | -0.002 [-0.085, +0.079] (+0.036) | -0.032 [-0.050, -0.022] (-0.095 [-0.136, -0.064]) |
+| fd - plain, clean | +0.117 (+0.037) | +0.181 (+0.037) | -0.193 (-0.021) | - | -0.106 (+0.009) | -0.010 (-0.428) |
+| fd - plain, noisy | -0.100 (-0.105) | -0.017 (-0.074) | **-0.472** (-0.420) | - | -0.161 (-0.161) | -0.226 (-0.173) |
+| rls - rls frozen, clean | -0.001 [-0.005, +0.004] (+0.001) | -0.002 (-0.002) | +0.012 [+0.001, +0.022] (+0.003) | +0.007 (-0.000) | +0.001 (+0.000) | +0.015 [+0.003, +0.027] (+0.065 [+0.018, +0.104]) |
+| rls - rls frozen, noisy | +0.031 [+0.009, +0.049] (+0.020) | +0.039 [+0.006, +0.063] (+0.031) | **-0.103** [-0.140, -0.069] (-0.018 [-0.042, -0.003]) | -0.073 [-0.173, +0.039] (+0.001) | -0.025 [-0.034, -0.012] (-0.009) | +0.027 [+0.018, +0.035] (+0.037 [+0.017, +0.070]) |
 
-Capture-only (secondary) gives the same signs: rls - plain held-out RL +0.080 clean / +0.087 noisy; other campaigns'
-evaders +0.023 clean / -0.155 noisy.
+Capture-only (secondary) has the same signs. rls - plain on held-out RL: +0.127 clean, +0.099 noisy. On other
+campaigns' evaders: -0.029 clean, -0.167 noisy.
 
 Findings:
-- **Clean: the learned acceleration estimate helps the self-play pursuer on held-out evaders** (held-out RL +0.110,
-  worst held-out cluster +0.171, train pool +0.078, all on both seeds), slightly against the other campaigns'
-  evaders (+0.034), with exploitability unchanged (0.96 vs 0.97). This is a clearer self-play gain than the
-  finite-difference campaign F2-acc (1 seed, re-evaluated here: +0.117 held-out RL but -0.206 on other campaigns'
-  evaders, -0.106 train pool).
-  Descriptively, uniform_rls reaches the level of F3's best sampler (Hedge: held-out RL 0.836, worst cluster 0.754)
-  with a uniform sampler; this is not a registered contrast (that is Exp 2, paused).
-- **Noisy: the learned estimate keeps its held-out gain where finite differencing does not** (held-out RL +0.137 vs
-  plain; fd -0.100 vs plain, -0.478 on the other campaigns' evaders). But against the self-play evaders the
-  uniform_rls pursuer falls **below** plain (other campaigns -0.105, own campaign -0.164, both seeds). Averaged over
-  all 40 campaign evaders (stage 1 included, descriptive), the pursuer crash rate under noise rises from 0.10 to 0.29-0.33
-  for uniform_rls and from 0.13 to 0.22 for plain.
-- **This noisy loss comes from running RLS**: with RLS frozen the same pursuers reach 0.760 against other campaigns'
-  evaders (plain 0.771) and 0.838 against their own (plain 0.872); running RLS lowers this by -0.094 / -0.130. RLS
-  under noise helps slightly on held-out RL (+0.022) and the worst cluster (+0.026), and is worse on the train pool
-  (-0.021) and exploitability (+0.026). Clean, RLS changes nothing (all |difference| <= 0.009), as in A1b / A2b. The
-  A3c result (RLS beats frozen under noise, +0.09 train, +0.24 exploiters; pool-trained pursuers) is **not
-  reproduced** in self-play.
-- **Every pursuer stays ~fully exploitable** (0.94-0.98); the fresh exploiters win by making the pursuer crash (92-98 %
-  of episodes), as in F2c / F3c. uniform_fd under noise is the exception (0.751), because its exploiter itself crashes
-  in 17.5 % of the episodes.
-- Plain self-play pursuers are more noise-sensitive than pool-trained ones: clean -> noisy held-out RL -0.141 (worst
-  cluster -0.190) vs -0.03 for M0 in A3c.
-- Predictions (pre-registered 11-04 17:40): (1) clean "rls - plain >= +0.05 on held-out RL": **held** (+0.110, both
-  seeds); "no gain on other campaigns' evaders": **held** (+0.034 < 0.05, both seeds positive); "exploitability
-  within +/- 0.05": **held** (-0.013). (2) noisy "plain pursuers lose <= 0.05": **did not hold** (held-out RL -0.141,
-  worst cluster -0.190, other campaigns -0.074; held only on the train pool, -0.049, and exploitability); "fd falls
-  below plain": **held** (held-out RL -0.100, other campaigns -0.478, train -0.161); "rls >= plain on held-out RL":
-  **held** (+0.137). (4) RLS "clean, rls - frozen within +/- 0.03": **held**; "noisy, rls > frozen by >= 0.03 on the
-  train pool and lower exploitability": **did not hold** (-0.021, exploitability +0.026). Prediction (3) is Exp 2.
-- Limitations: 2 seeds (uniform_fd 1), descriptive only; one exploiter per pursuer, trained against the RLS-on
-  pursuer and reused for the frozen evaluation; the held-out v10 evaders are easier than the train pool's late
-  evaders for self-play pursuers (F2c caveat), so the worst-cluster and other-campaign columns matter more than the
-  held-out mean; the estimator is the MLP (A3e: a noise-trained GRU is more accurate); noise only at eval.
+- **Clean: the learned acceleration estimate helps on held-out evaders, on all 3 seed pairs.**
+  - Held-out RL +0.091 [+0.055, +0.116]; worst held-out cluster +0.128 [+0.042, +0.174]. Both CIs exclude 0.
+  - Smaller supported gains: own campaign +0.026, X3 exploiters +0.020, held-out scripted +0.059.
+  - It does **not** help against the other campaigns' evaders (-0.027; +0.046 / +0.031 / -0.157 per pair) or on the
+    train pool (+0.024; seed 300: -0.085). Exploitability is ~unchanged (-0.018).
+  - The third pair weakened the 2-seed result: other campaigns' evaders went from +0.034 to -0.027, train pool from
+    +0.078 to +0.024, held-out RL from +0.110 to +0.091.
+  - The seed-300 uniform_rls pursuer is the weakest against the other campaigns' evaders (0.742). It loses only by
+    crashing: pursuer crash 0.265, timeout 0.000 (seeds 0 / 100: crash 0.119 / 0.149). Its worst opponents are the
+    stage-7 evaders of other F5 campaigns (J 0.29-0.35).
+- **Noisy: the learned estimate keeps a held-out gain on average but falls below plain against the self-play evaders.**
+  - Held-out RL +0.086, worst cluster +0.127; both CIs include 0, because seed 300 is -0.014 / -0.058.
+  - Against self-play evaders it is below plain: other campaigns -0.140 [-0.232, -0.065] and own -0.115
+    [-0.235, -0.017], negative on all 3 pairs.
+  - Finite differencing collapses under noise: fd - plain is -0.100 on held-out RL and -0.472 on other campaigns'
+    evaders.
+- **Running RLS under noise causes most of the noisy loss against self-play evaders**: rls - frozen, other campaigns'
+  evaders -0.103 [-0.140, -0.069] (all 3 pairs).
+  - RLS under noise helps a little on held-out RL (+0.031) and the worst cluster (+0.039).
+  - It is worse on the train pool (-0.025) and on exploitability (+0.027).
+  - Clean, RLS changes nothing (all |difference| <= 0.015), as in A1b / A2b.
+  - The A3c result (RLS beats frozen under noise; pool-trained pursuers) is **not reproduced** in self-play.
+- **Every pursuer stays ~fully exploitable at 0.10 m** (0.94-0.98). The fresh exploiters win by making the pursuer
+  crash in 0.92-0.98 of the episodes (timeout 0). The one exception is uniform_fd under noise (0.751; pursuer crash
+  0.80).
+- Plain self-play pursuers are noise-sensitive: from clean to noisy, held-out RL drops -0.135 and the worst cluster
+  -0.174 (other campaigns -0.082, train -0.054). For comparison, M0 in A3c dropped -0.03.
+- **At 0.15 m (eval-only re-score) the clean advantage of the estimate shrinks to final-approach precision.**
+  - Held-out RL +0.021 [+0.005, +0.030]; worst cluster +0.049 [+0.011, +0.109]; train pool +0.071 [+0.054, +0.093].
+    All CIs exclude 0, but the gains are small.
+  - Under noise the deficit against campaign evaders mostly disappears: other campaigns -0.041, own -0.007.
+  - Exploitability falls to 0.65 (rls), 0.77 (plain) and 0.33 (fd): many exploiter wins are near misses inside 0.15 m.
+    These values are upper bounds, because the exploiters were trained for 0.10 m.
+- **Predictions (pre-registered 11-04 17:40), re-checked with 3 pairs:**
+  - (1) Clean:
+    - "rls - plain >= +0.05 on held-out RL": **held**. +0.091, CI excludes 0, every pair >= +0.055.
+    - "no gain on other campaigns' evaders": **held** (-0.027).
+    - "exploitability within +/- 0.05": **held** (-0.018).
+  - (2) Noisy:
+    - "plain pursuers lose <= 0.05": **did not hold**. Held-out RL -0.135, worst cluster -0.174, other campaigns
+      -0.082, train -0.054. It held only for exploitability.
+    - "fd falls below plain": **held**.
+    - "rls >= plain on held-out RL": **held on the mean** (+0.086), not on every pair (seed 300: -0.014).
+  - (4) RLS:
+    - "clean, rls - frozen within +/- 0.03": **held**.
+    - "noisy, rls > frozen by >= 0.03 on the train pool and lower exploitability": **did not hold** (-0.025;
+      exploitability +0.027).
+  - Prediction (3) belongs to Exp 2.
+- Limitations:
+  - 3 seed pairs (uniform_fd 1); the third pair was added after the first two were seen.
+  - One exploiter per pursuer, trained against the RLS-on pursuer and reused for the frozen evaluation.
+  - For self-play pursuers the held-out v10 evaders are easier than the train pool's late evaders (F2c caveat), so the
+    worst-cluster and other-campaign columns matter more than the held-out mean.
+  - The estimator is the MLP; A3e found a noise-trained GRU to be more accurate.
+  - Noise is applied only at eval.
 
 ### F5 Exp 1, post-hoc: how evaders beat the self-play pursuers (added 2026-11-06 17:40; descriptive, not pre-registered)
+
+Written before the seed-300 pair finished: the numbers below are pooled over seeds 0 / 100 only (the 2-seed
+F5c). The seed-300 pursuers also lose only by crashing (timeout 0; see the findings above).
 
 From existing eval files only ([F5_acc_sp/outcomes_posthoc.md](F5_acc_sp/outcomes_posthoc.md), generated by
 `exps/f5_outcomes.py`; pooled over seeds, weighted by episodes, stage-1 evaders excluded from campaign evaders). An
@@ -1234,3 +1285,104 @@ evader wins (episode not neutralised) only by a pursuer crash or a timeout.
   the previous aggressive pursuer, so patching each lure is cheaper than general caution near the ground, which would
   cost fast captures against everything else. Limitations: episode means, not trajectories (the last second is not
   observed); the lower evader altitude in crash episodes may partly be spawn altitude; post-hoc.
+
+## F6_div_sp / F6c (campaigns done 2026-11-06 11:42 / 20:23; F6c done 2026-11-07 04:13; written up 17:45; 2 seeds, descriptive)
+
+**Question:** can a diversity term for the evaders produce more diverse evaders while the pursuer stays as good as
+under Roncero's Hedge?
+
+**Setup:**
+- Arm **hedge_div** = F3 `hedge` (plain obs, Hedge gamma 0.7 / eta 2 on both roles, 9 stages x 300M, seeds 0 / 100)
+  + PSD-PSRO's policy-space diversity regulariser for the evaders only (amendment 1: Hedge instead of QD-DPP).
+- Every RL evader after the first maximises beta * min(min_j d_j(s), cap), as a loss term and as a per-step intrinsic
+  reward. d_j = mean-only KL to each earlier RL evader of its campaign; cap = 2.
+- beta from the training-only pilot (F3 hedge-both-s0, evader stage 5, 100M frames per beta):
+  - J vs training pursuers 0.498 (beta 0), 0.101 (beta 0.1), 0.187 (beta 1.0).
+  - End distance 165 (beta 0.1) and 39 (beta 1.0).
+  - The rule chose **beta = 1.0** ([pilot/choice.json](F6_div_sp/pilot/choice.json)). Both regularised pilot
+    evaders beat their pursuers more often than beta = 0.
+- F6c = F3c for each final pursuer (train pool, test set, campaign evaders, a fresh 100M-frame exploiter), plus the 8
+  F3 final pursuers vs the F6 evaders (probes, used for the evader Vendi score).
+- Primary contrast: hedge_div - hedge (same seeds). With 2 seeds, [ ] is the range and nothing can be called
+  supported. [F6_div_sp/summary.md](F6_div_sp/summary.md); 0.15 m re-score:
+  [R15_rescore/F6_div_sp/summary.md](R15_rescore/F6_div_sp/summary.md).
+
+| final pursuer, J at 0.10 m (0.15 m) | hedge_div | hedge | uniform | qd_dpp | pfsp |
+|---|---|---|---|---|---|
+| held-out RL (v10) | 0.575 [0.418, 0.731] (0.810) | 0.836 (0.974) | 0.736 (0.952) | 0.696 (0.936) | 0.775 (0.944) |
+| held-out worst cluster | 0.467 [0.264, 0.669] (0.708) | 0.754 (0.897) | 0.593 (0.880) | 0.541 (0.859) | 0.665 (0.884) |
+| other campaigns' evaders (F3, stage 1 excl.) | **0.417** [0.285, 0.549] (0.721) | 0.888 (0.965) | 0.852 (0.940) | 0.878 (0.949) | 0.626 (0.898) |
+| own campaign's evaders | 0.956 (0.991) | 0.959 (0.994) | 0.936 (0.979) | 0.969 (0.996) | 0.776 (0.930) |
+| thesis train pool | 0.426 (0.650) | 0.617 (0.784) | 0.570 (0.715) | 0.562 (0.729) | 0.542 (0.787) |
+| held-out scripted | 0.827 (0.941) | 0.831 (0.920) | 0.795 (0.901) | 0.821 (0.911) | 0.826 (0.930) |
+| X3 exploiters | 0.948 (0.991) | 0.964 (0.990) | 0.951 (0.986) | 0.958 (0.987) | 0.930 (0.986) |
+| exploitability | 0.979 (0.686) | 0.979 (0.814) | 0.973 (0.752) | 0.977 (0.695) | 0.983 (0.497) |
+| evader Vendi (max 4) | **3.253** [3.176, 3.330] | 2.499 | 2.456 | 2.350 | 2.985 |
+
+hedge_div - hedge (2 pairs [range]), at 0.10 m (0.15 m):
+
+| metric | difference |
+|---|---|
+| held-out RL | -0.262 [-0.372, -0.151] (-0.165 [-0.314, -0.015]) |
+| worst held-out cluster | -0.287 [-0.428, -0.147] (-0.189) |
+| other campaigns' evaders | -0.471 [-0.586, -0.356] (-0.244 [-0.388, -0.100]) |
+| train pool | -0.191 (-0.134) |
+| exploitability | -0.001 (-0.128) |
+| evader Vendi | +0.754 [+0.633, +0.876] |
+
+Against qd_dpp / uniform / pfsp, hedge_div is lower on other campaigns' evaders by -0.461 / -0.435 / -0.209 (both
+seeds) and has higher evader Vendi by +0.904 / +0.797 / +0.268.
+
+Findings:
+- **The diversity term produced more diverse evaders but a much weaker pursuer.**
+  - Evader Vendi is 3.33 / 3.18, above every F3 campaign (2.30-3.02) on both seeds.
+  - The hedge_div pursuer is below Hedge on held-out RL (-0.262), the worst cluster (-0.287), other campaigns'
+    evaders (-0.471) and the train pool (-0.191), on both seeds.
+  - Held-out scripted, X3 exploiters (-0.016, mixed seeds), own campaign and exploitability are ~unchanged.
+- **The regulariser was saturated, so it acted as a survival bonus, not as a diversity gradient.**
+  - Over the last 10 logged updates of evader stages 3 / 5 / 7, the mean min-KL distance was 52 / 15 / 28 (seed 0)
+    and 31 / 13 / 18 (seed 1), always far above cap = 2. The lowest logged batch mean was 4.4.
+  - The mean intrinsic reward per stage was 1.98-2.00 per step (maximum 2.0). So min(d, cap) was at the cap for almost
+    every state, and the loss term had almost no gradient.
+  - What remained is about +2 per step while the episode lasts: 20 x the evader's survival reward (`reward_step`
+    0.1). Any episode end, including a pursuer crash (neutral in the game reward), ends this stream.
+  - The diversity measured by Vendi is therefore a side effect of a different objective, not of the KL gradient. A
+    larger cap (or a normalised distance) would be needed to test the PSD-PSRO term itself.
+- **The F6 evaders stopped luring, so the hedge_div pursuers never learned to resist it.**
+  - Inside the hedge_div campaigns (each stage's eval vs its training opponents), evader stages 3 / 5 / 7 beat the
+    stage >= 2 pursuers by a mix of timeout (0.31-0.66) and pursuer crash (0.22-0.45). In F3 hedge-both-s0 the
+    same stages make the pursuer crash in 0.96-0.99 of episodes, timeout 0.00.
+  - The final hedge_div pursuers then meet the F3 evaders, which do lure. They crash in 0.753 (seed 0) / 0.482
+    (seed 1) of those episodes; F3 hedge pursuers crash in 0.144 / 0.105. Timeout is 0 in all four.
+  - Against the 8 F3 pursuers the F6 evaders (stage 1 excluded) are about as hard as the F3 evaders: mean J 0.801,
+    pursuer crash 0.200; F3 pursuers vs other F3 campaigns' evaders: J 0.811.
+  - Interpretation (post-hoc): with the term on, luring stops paying for the evader, and the anti-lure pressure that
+    made Hedge's pursuer robust disappears.
+- **At 0.15 m (eval-only re-score):**
+  - Much of hedge_div's deficit is near misses: hedge_div - hedge is -0.165 on held-out RL and -0.244 on other
+    campaigns' evaders. It is still negative on both seeds.
+  - hedge_div's exploitability falls to 0.686 vs Hedge's 0.814. This is an upper bound: the exploiters were trained
+    for 0.10 m.
+- **Predictions (pre-registered 11-05 ~16:00, amendment 1 16:12):**
+  - (1) Mechanism, mean distance >= cap/2 at the end of evader stages 3 / 5 / 7: **held**, trivially (13-52 >> 1); the
+    term was saturated (see above).
+  - (2) Diversity, Vendi above hedge (2.499) and qd_dpp (2.350) on both seeds and >= +0.3 vs hedge: **held**
+    (+0.754; both seeds above every F3 value).
+  - (3) Pursuer:
+    - hedge_div - hedge >= -0.05 on held-out RL and the worst cluster: **did not hold** (-0.262 / -0.287, both
+      seeds).
+    - >= 0 on other campaigns' evaders: **did not hold** (-0.471).
+  - (4) Exploitability unchanged (0.97-0.98): **held** (0.979).
+  - The user's target (more diversity at no pursuer cost) was not met.
+- **Consequence for the plan:**
+  - The regulariser at cap 2 / beta 1 is not a usable thesis method in its current form.
+  - Whether F5 Exp 2 is rerun with Hedge + regulariser was to be decided after F6. On this result it should not be,
+    unless the term is redesigned (cap / normalisation) and re-piloted.
+  - F7 (floor penalty, 0.15 m radius) may change the luring dynamics that this finding depends on, so the decision
+    waits for F7c (user).
+- Limitations:
+  - 2 seeds.
+  - Vendi is computed in F3's frozen descriptor space, which includes J vs the F3 pursuers, so a different way of
+    winning (timeout vs lure) counts as diversity.
+  - The in-campaign stage evals are vs each stage's own training opponents only.
+  - div_distance is a batch mean, not per state.
