@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-11-09 11:54; details in the sections below)
+## Summary (updated 2026-11-09 19:34; details in the sections below)
 
 J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over
 seeds; "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position +
@@ -27,6 +27,11 @@ velocity, no acceleration).
   but the most specialised pursuer (other campaigns' evaders -0.23). Every self-play pursuer stays ~fully exploitable
   (0.97-0.98). **Answer to RQ1: not robustly. QD-DPP beats badly tuned hardness prioritisation on a fixed pool (D1),
   but is not better than uniform (D1, F3) and is below Roncero's Hedge in self-play (F3, 2 seeds).**
+- **F6b (2 seeds, descriptive)** replaces F6's hard-capped term and restores in-campaign luring (later pursuer
+  crash rates 0.95-0.99), but it does not increase diversity (Vendi 2.365 vs Hedge 2.499) or preserve pursuer
+  performance (held-out RL -0.128, worst cluster -0.190, other campaigns -0.002). Neither diversity-training variant
+  meets the goal: F6 increased diversity but weakened the pursuer; F6b did not increase diversity and remained below
+  Hedge on the main held-out measures.
 
 **RQ2: opponent model / online adaptation**
 - Noise-free: a learned acceleration estimate equals the finite difference (A2b, n.s.), and both beat M0 (+0.18 train,
@@ -86,6 +91,38 @@ velocity, no acceleration).
     it crashes in 0.48-0.75 of episodes (Hedge pursuer: 0.10-0.14).
   - Predictions held for diversity, not for the pursuer. The term is not usable in this form.
 
+- F6b / F6bc (redesigned diversity term, 2 seeds, descriptive; completed 2026-11-09 16:09):
+  [F6b_div_sp/summary.md](F6b_div_sp/summary.md). This reports the primary 0.10 m evaluation; the 0.15 m exact
+  re-score has not been run yet. The action-space distance and smooth bonus remove F6's hard cap plateau;
+  batch-centering removes the positive mean intrinsic reward that acted as a survival bonus in F6. The training-only
+  pilot selected beta = 0.03 (tau = 0.0727): it was the only beta passing both pilot guards. No kept beta passed
+  the stricter activity check, so selecting the largest kept beta was the preregistered fallback. Beta 0.1 missed
+  the timeout cutoff narrowly: 0.23750 vs the 0.23369 limit (0.00381 over); the rule has no
+  uncertainty margin, so the selected beta is sensitive to this single pilot estimate.
+  - **Registered mechanism check held** at every evader stage 3 / 5 / 7 endpoint. Last-10-update mean distance /
+    bonus (seed 0): 0.19131 / 0.81538, 0.07591 / 0.57875, 0.07810 / 0.56771; (seed 100): 0.16239 / 0.79501,
+    0.08335 / 0.57924, 0.09173 / 0.60546. All distances exceed tau = 0.07266 and all mean bonuses are below
+    0.9. The logged batch-mean intrinsic reward was effectively zero (mean across updates about 1e-11; maximum
+    absolute update mean < 2.5e-9), confirming centering was applied. Nuance: the stage-3 `div_sat` diagnostic
+    (fraction of samples with bonus > 0.9) was 0.463 / 0.426 at the endpoint; it fell to 0.059-0.146 at stages
+    5 / 7. The smooth bonus has no zero-gradient cap, but many stage-3 samples were still near its asymptote.
+  - At 0.10 m, the matched Hedge contrast was -0.128 [-0.285, +0.029] on held-out RL and -0.190 [-0.410, +0.029]
+    on the worst held-out cluster; other-campaign evaders were -0.002 [-0.015, +0.012]. These brackets are the
+    two seed-pair range, not confidence intervals. The per-seed result is mixed for held-out RL / worst cluster
+    (seed 0: -0.285 / -0.410; seed 1: +0.029 / +0.029), while other-campaign performance misses the preregistered
+    >= 0 criterion on seed 0 (-0.015).
+  - **The diversity prediction failed:** Vendi was 2.335 / 2.395, below matched Hedge at 2.454 / 2.543 on both
+    seeds (mean paired difference -0.133). The registered "more diverse and no worse than Hedge" success condition
+    therefore failed.
+  - The revised term did restore the luring behavior that F6 had lost: in the stage 3 / 5 / 7 in-campaign
+    evaluations, later pursuer stages crashed in 0.949-0.991 of episodes, versus 0.22-0.45 for F6's evaders.
+    Final-pursuer exploitability was 0.983 vs 0.979 for Hedge, essentially unchanged.
+  - Relative to F6's saturated version, F6b improved mean held-out RL by +0.134 and other-campaign evaders by
+    +0.469, but Vendi fell by 0.888. Thus removing the saturation did not deliver the intended quality-diversity
+    trade-off: the evaders remained lure-effective but were not more diverse, and the pursuers did not match Hedge.
+  - This is a two-seed descriptive comparison; no difference is inferentially supported. The preregistered success
+    rule (diversity plus pursuer non-inferiority) was not met.
+
 - F7 (0.15 m capture radius in training, with / without a pursuer floor penalty; 1 seed per arm, descriptive):
   **neither removes the luring weakness**. Both pursuers are fully exploitable under the 0.15 m rules (0.963 / 0.968,
   pursuer crash 0.97); the exploiters lure from farther away (closest distance ~0.24 m). The floor penalty lowers
@@ -95,7 +132,7 @@ velocity, no acceleration).
   - Predictions (1), (3), (4), (5) did not hold; (2) held in part. **Decision rule: the rules stay** (0.10 m, no floor
     penalty).
 
-**0.15 m capture radius (eval-only exact re-score of every closed-loop eval; added to every section 2026-11-09 11:45).**
+**0.15 m capture radius (eval-only exact re-score of closed-loop evals completed by 2026-11-09 11:45; F6b still pending).**
 J at 0.15 m is an upper bound and exploitability a lower bound for a 0.15 m game, because every policy and exploiter
 was trained for 0.10 m. Most directions hold; many 0.10 m gaps were partly final-approach precision. What changes:
 - RQ1: QD-DPP still beats the hardness samplers on a fixed pool (D1) and still not uniform. Hedge - uniform in
@@ -113,19 +150,21 @@ was trained for 0.10 m. Most directions hold; many 0.10 m gaps were partly final
 
 **Self-play only (0.10 m)**: see [Self-play synthesis](#self-play-synthesis-rq1-and-rq2-from-the-self-play-campaigns-only-010-m-written-2026-11-09) below: RQ1 no (Hedge best, descriptive); RQ2 partly (opponent model helps on held-out evaders, RLS does not).
 
-**Running / pending**: F6b v2 (amendment 1, 11-09 01:30; beta 0.03, tau 0.0727): both campaigns at stage 6 of 9 at
-11:10, F6bc expected ~20:30. F8 (Roncero's rules, 26 stages) queued behind it, results ~11-10 midday. No freeze
-date (user, 11-09). F5 Exp 2 (paused) and the exploiter-augmented pool are the user's decision.
+**Running / pending (updated 2026-11-09 19:34)**: F6b / F6bc are complete and audited; the registered average
+mechanism checks held, with the early-stage high-bonus caveat above. F8 is running on lanes M / N (one campaign
+at stage-11 evader training, the other at stage-10 pursuer evaluation at the last process check); F8c follows.
+F6b's 0.15 m exact rescore is pending. No freeze date (user, 11-09). F5 Exp 2 (paused) and the exploiter-
+augmented pool are the user's decision.
 
 ## Self-play synthesis: RQ1 and RQ2 from the self-play campaigns only (0.10 m; written 2026-11-09)
 
-Only the self-play campaigns at the 0.10 m training radius: F2b / F2c, F3, F4, F5 Exp 1, F6, and X2's analysis of
-the earlier self-play pools. The fixed-pool experiments (D1, D1b, D1c, D2, F1, F2a, A-series, X3, X4) are left out.
-F7 is left out because its pursuers were trained for 0.15 m. F6b is still running. Numbers are copied from the
-sections below; their 0.15 m versions are there too.
+Only the self-play campaigns at the 0.10 m training radius: F2b / F2c, F3, F4, F5 Exp 1, F6, F6b, and X2's analysis
+of the earlier self-play pools. The fixed-pool experiments (D1, D1b, D1c, D2, F1, F2a, A-series, X3, X4) are left
+out. F7 is left out because its pursuers were trained for 0.15 m. Numbers are copied from the sections below; their
+0.15 m versions are there except for F6b, whose exact re-score is pending.
 
 **How much the evidence can carry.**
-- F2b / F2c (1 campaign per arm), F3 (2 seeds), F6 (2 seeds): descriptive; no difference can be called supported.
+- F2b / F2c (1 campaign per arm), F3 (2 seeds), F6 and F6b (2 seeds each): descriptive; no difference can be called supported.
 - F5 Exp 1 (3 seed pairs): a CI that excludes 0 counts as supported, with coarse 3-pair CIs and the disclosed
   optional-stopping risk of amendment 2.
 - F4 (3 seeds per arm): the only fully inferential self-play experiment.
@@ -141,7 +180,8 @@ In self-play: no. Roncero's Hedge is the best sampler; more evader diversity goe
 | QD-DPP (F3) | Not better than uniform (held-out RL -0.041, worst cluster -0.052); below Hedge (-0.140 / -0.213) |
 | PFSP, hard opponents only (F3) | Most diverse evaders (Vendi +0.529 vs uniform), most specialised pursuer (other campaigns' evaders -0.226) |
 | Diversity term in evader training (F6, Hedge + PSD-PSRO) | Evaders more diverse (Vendi 3.253 vs 2.499); pursuer much weaker (held-out RL -0.262, other campaigns' evaders -0.471) |
-| Exploitability | 0.97-0.98 for every sampler (F3) and 0.979 for F6: no sampler changes it |
+| Redesigned diversity term (F6b, 2 seeds) | Did not increase diversity (Vendi 2.365 vs 2.499); held-out RL -0.128, worst cluster -0.190, other campaigns -0.002 vs Hedge. In-campaign lure crash rates restored to 0.949-0.991. |
+| Exploitability | 0.97-0.98 for every sampler (F3); 0.979 for F6 and 0.983 for F6b: no sampler or diversity term changes it materially |
 
 - H1c (QD sampling improves the worst case and lowers exploitability) did not hold in self-play.
 - H1b (robustness to duplicated opponents) was tested on a fixed pool only (D1b, D1c), not in self-play.
@@ -163,11 +203,12 @@ evaders; online adaptation (RLS) does not; neither lowers exploitability.**
 - H2a / H2b (adaptation gap, oracles) were measured on a fixed pool only (X3, X4).
 
 **Common to both questions.** Every self-play pursuer with the true evader velocity stays ~0.94-0.98 exploitable
-(F2c, F3, F5, F6), whatever the sampler, diversity term or opponent model, and the fresh exploiters win almost only by
-pursuer crash. Inside the campaigns each evader stage lures the current pursuers (pursuer crash 0.79-0.99) and the
-next pursuer stage patches it (F5 post-hoc). F4 (noisy, estimated velocity) is the exception (0.675-0.872, partly by
-timeout). Interpretation (not tested): in self-play the pursuer's robustness is limited by this one exploitable
-failure mode more than by opponent sampling or opponent modelling.
+(F2c, F3, F5, F6, F6b), whatever the sampler, diversity term or opponent model, and the fresh exploiters win almost
+only by pursuer crash. Inside the campaigns each evader stage lures the current pursuers (pursuer crash 0.79-0.99)
+and the next pursuer stage patches it (F5 post-hoc); F6b's redesigned term also restored high in-campaign lure rates
+but did not improve diversity or final-pursuer robustness. F4 (noisy, estimated velocity) is the exception
+(0.675-0.872, partly by timeout). Interpretation (not tested): in self-play the pursuer's robustness is limited by
+this one exploitable failure mode more than by opponent sampling or opponent modelling.
 
 ## Relation to the reference papers (updated 2026-11-09 11:45)
 
