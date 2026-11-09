@@ -4,6 +4,12 @@
 
 *Updated 2026-11-04: every section-1 entry checked against the full text (results bullets added, contradicted fields corrected), one paper added (Gavin, Lacroix & Bronz 2025), citation chases run for (A), (B) and (C) with revised verdicts in section 2, reference list and caveats updated. Section 4 lists what is still unverified.*
 
+*Added 2026-11-08 (after F6): a separate check of diversity methods that keep the trained agent as strong as a
+hardness sampler (SMERL, DOMiNO, DGPO, RSPO / SIPO, AlphaStar exploiters, FXP, Minimax Exploiter, RPPO, PSRO
+variants), with fit to our F6 failure modes and a ranked shortlist:
+[diversity_quality_2026-11-08.md](diversity_quality_2026-11-08.md). About 30 searches, not systematic; unverified
+claims are marked there.*
+
 ---
 
 ## 1. Per-paper summaries
@@ -66,6 +72,38 @@
 - **AgilePE:** no capture event. The metric is the in-FOV rate (evader inside the pursuer's detection cone). Episodes
   terminate on "collision when the inter-agent distance drops below a safety threshold", with a proximity penalty
   P_close below a safety distance; the threshold value is not given in the text.
+
+### Episode endings and crash-luring in the reference papers (checked in the full PDFs, 2026-11-09)
+Why this matters: in the thesis, self-play evaders beat pursuers almost only by luring them into a floor crash (F2c,
+F3, F5, F6, F7 in [RESULTS.md](../RESULTS.md)). Whether an evader gains from a pursuer crash depends on how the episode
+ends.
+- **Thesis rules:** any crash ends the episode (terminated, value 0); the evader gets 0 when the pursuer crashes, +100
+  at the timeout and -100 if captured. Ending at 0 beats a likely capture, so luring pays.
+- **Roncero et al. v3 (Sec. II-B, Eqs. 8-11):** capture is the only terminal event; out-of-bounds (incl. crashes) and
+  the timeout are truncations whose value target bootstraps from the critic: "This prevents a pursuer crash from
+  artificially reducing the evader's survival return." Each agent gets -10 only for its own out-of-bounds, nothing for the
+  opponent's; the evader's capture penalty is -10 and its survival bonus 0.0025 per step; the pursuer's capture bonus
+  is scaled down above a 2 m/s closing speed. A pursuer crash therefore neither helps nor hurts the evader: no lure
+  incentive. His paper reports no crash rates. (His public code `KTH-RPL/AMSPB_PEG`, Aug 2025, differs from v3:
+  Hummingbird T/W 3.42, larger arena, 0.5 m capture radius, no Hedge; not used.) Tested in thesis F8.
+- **Gavin, Lacroix & Bronz (1v1, Sec. IV) and Gavin & Bronz (3v1, Sec. IV-C):** a ground crash or leaving the arena
+  terminates the episode with a penalty for the failing agent; "neither the evader nor the pursuer receive a reward when
+  the opponent reaches a failure state to promote actual pursuit-evasion behaviours rather than forcing the opponent to
+  crash". The evader has a positive per-step term (distance to the net in 1v1, a survival reward in 3v1) and
+  -lambda_catch = -10 if caught. Structurally the same incentive as the thesis: a pursuer crash ends the game at nothing
+  for the evader, which beats a capture. Their tables are consistent with crash-heavy evader wins (not shown to be floor
+  lures; their "crash" includes leaving the arena):
+  - 1v1 Table III, vs their learned evader (evade rate counts timeouts and pursuer crashes): learned pursuer, small
+    arena evade 16.5 % of which pursuer crash 14.2 %; large 31.9 % / 17.2 %. Pure pursuit: 40.0 % / 39.3 % (small),
+    74.6 % / 73.5 % (large). FRPN: 59.9 % / 59.8 % (small).
+  - 3v1 Table II, vs their PFSP evader: pursuer crash 69.7 % (FRPN), 84.3 % (pursuers trained without self-play), 32.1 %
+    (latest-opponent self-play), 4.5 % (PFSP velocity-command pursuer, which instead loses by timeout, 77.6 %), 7.7 %
+    (their final PFSP-CTBR pursuer, catch 88.4 %). No fresh-exploiter test, so the final pursuer's lure robustness is
+    untested.
+- **AgilePE (Sec. III-A/B):** a tracking game (evader inside the pursuer's FOV cone), no capture. Episodes end at
+  timeout, out-of-bounds or a close-distance "collision"; the dense zero-sum reward's signs and what each agent receives
+  at an episode end are not given, so whether a pursuer crash helps their evader cannot be determined. No crash rates
+  reported.
 
 ### ESN-OA paper — arXiv 2602.06326
 - **Title:** *Online Adaptive Reinforcement Learning with Echo State Networks for Non-Stationary Dynamics*
@@ -321,6 +359,56 @@
 - **AGen** (IEEE IV 2019) and **Cheng et al.** (arXiv:1810.00781): offline basis + online RLS last-layer prediction of other agents. **Must-cite for (B).**
 - **EO-MADDPG**, Wang, Wang, Bai, Ma, Sun & Li, *Aerospace* 13(3):296, 2026, DOI 10.3390/aerospace13030296 (verified from the Crossref abstract; full text not read). MADDPG + expert knowledge + an evader-action predictor trained against a fixed evader; 99.9 ± 0.3 % (3v1) and 97.5 ± 1.4 % (3v2) success vs. MADDPG 72.7 ± 6.0 % and 64.4 ± 34.4 %, 5 seeds. Optional; no opponent ID. A likely precursor is SSRN 2024, DOI 10.2139/ssrn.4853581 (inferred from title and authors).
 - **"Autonomous Decision Making for UAV Cooperative Pursuit-Evasion Game with RL"**, arXiv:2411.02983 (2024): optional broader-context citation, not opponent-modelling-specific.
+
+### (D) Open gaps relative to the three reference papers (added 2026-11-09, after F2-F7)
+
+Ranked by novelty vs. AgilePE / Roncero / Gavin and by support from our own data (numbers from
+[RESULTS.md](../RESULTS.md), 0.10 m unless noted). "Not found" below means not found in the ~30-query check of
+[diversity_quality_2026-11-08.md](diversity_quality_2026-11-08.md) and the 11-04 citation chase, not a proven gap.
+
+1. **Exploitability-aware self-play (strongest gap).**
+   - The papers: Roncero reads the "limited improvement from additional best-response training" as convergence; Gavin,
+     Lacroix & Bronz say training is "approaching a Nash equilibrium" without measuring exploitability; AgilePE says PFSP
+     "drives robust policy equilibria". None measures exploitability or tests held-out learned lineages.
+   - Our data: every self-play pursuer is ~0.94-0.98 exploitable by a fresh PPO exploiter, almost only by luring it
+     into a floor crash (F2c, F3, F5, F6), for every sampler (uniform, Hedge, PFSP, QD-DPP), diversity term (F6), opponent
+     model (F5) and the floor penalty / 0.15 m training radius (F7).
+   - Candidate method: an exploiter-augmented pool (AlphaStar main exploiters; FXP counter-population; optionally
+     Minimax-Exploiter shaping), i.e. evaders trained only to beat the current pursuer added to the Hedge pool. Not
+     found applied to quadrotor PE.
+2. **Dynamics-aware pursuit (closing the floor-lure exploit at its source).**
+   - The lure works because the low thrust-to-weight Crazyflie cannot pull out of a dive. Roncero only scales the
+     capture bonus by closing speed (v_safe = 2 m/s); Gavin and AgilePE do not address it.
+   - Our data: a reward penalty does not fix it (F7 floor_r15: pursuer crash 0.970 vs its exploiter).
+   - Candidate: a hard constraint (action filter limiting descent rate given altitude and available thrust, or a
+     time-to-floor observation), evaluated by exploitability. Combines naturally with gap 1.
+   - Episode-ending rules matter too (section 1, "Episode endings and crash-luring", 2026-11-09): Gavin's rules give
+     the evader the same lure incentive as ours, and their tables show crash-heavy evader wins; Roncero's
+     truncation-based endings remove the incentive (thesis F8 tests whether that removes the luring).
+3. **Opponent-intent estimation under realistic sensing.**
+   - The papers: Roncero and both Gavin papers use memoryless MLPs with perfect state; Gavin, Lacroix & Bronz blame the
+     missing history for the hovering-evader failure; Roncero lists online adaptation as future work; AgilePE uses a
+     temporal window and FOV masking but no explicit opponent model.
+   - Our data: the opponent's acceleration is the largest effect in the thesis (F1); a learned estimate is
+     noise-robust where finite differencing collapses (A3c, F4); in self-play it helps on held-out evaders (F5 clean
+     +0.091 / +0.128) but online RLS adds nothing.
+   - Prior art: **OPEN** (Chen et al., RA-L 2025) already feeds a learned evader prediction to an RL pursuer on
+     Crazyflies, and PSTO (RA-L 2026) does the same with MARL, so learned opponent prediction is not new in itself. The
+     open part is estimation under AgilePE-style partial observability (FOV limits, occlusion) and its effect in
+     self-play and on exploitability.
+4. **Capture definition and evaluation rigour (evaluation contribution, no new runs).**
+   - Roncero (and the thesis) capture at 0.1 m centre-to-centre, but Crazyflie bodies can touch at up to 0.145 m. At
+     0.15 m many gains shrink (F3 Hedge - uniform held-out RL +0.100 -> +0.022) and exploitability against the 0.10 m
+     exploiters drops (a lower bound; F7 shows exploiters trained under 0.15 m rules still fully exploit).
+   - Seeds: Roncero 3, AgilePE and Gavin none reported; F1 shows per-seed bimodality, and single-seed effects of
+     +/- 0.1-0.3 occur in our data.
+   - Candidate: a robustness protocol (held-out learned lineages, fresh exploiters, capture-radius sensitivity, seed
+     counts).
+5. **Not pursued here.**
+   - Real hardware: Roncero has 42 Crazyflie flights, the thesis none. A weakness of the thesis, not a gap in the
+     papers.
+   - Multi-pursuer play (Gavin 3v1) and obstacles (all three are obstacle-free in their quantitative results): too far
+     from the current setup.
 
 ---
 

@@ -38,11 +38,15 @@ class GAE(nn.Module):
         reward: torch.Tensor,
         terminated: torch.Tensor,
         value: torch.Tensor,
-        next_value: torch.Tensor
+        next_value: torch.Tensor,
+        done: torch.Tensor = None,
     ):
+        """done (optional, thesis F8): episode ends incl. truncations; the recursion stops there while the
+        bootstrap is cut only by terminated. Without it, terminated does both (the original behaviour)."""
         num_steps = terminated.shape[1]
         advantages = torch.zeros_like(reward)
         not_done = 1 - terminated.float()
+        not_end = not_done if done is None else 1 - done.float()
         gae = 0
         for step in reversed(range(num_steps)):
             delta = (
@@ -50,7 +54,7 @@ class GAE(nn.Module):
                 + self.gamma * next_value[:, step] * not_done[:, step]
                 - value[:, step]
             )
-            advantages[:, step] = gae = delta + (self.gamma * self.lmbda * not_done[:, step] * gae)
+            advantages[:, step] = gae = delta + (self.gamma * self.lmbda * not_end[:, step] * gae)
         returns = advantages + value
         return advantages, returns
 

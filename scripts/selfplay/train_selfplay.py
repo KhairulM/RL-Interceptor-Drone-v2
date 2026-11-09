@@ -182,7 +182,9 @@ def _diversity_overrides(db, role, retry_id, cfg):
     if not ckpts:
         return []
     return [f"diversity.ckpts=[{','.join(ckpts)}]", f"diversity.beta={float(cfg.diversity_beta)}",
-            f"diversity.cap={float(cfg.diversity_cap)}"]
+            f"diversity.cap={float(cfg.diversity_cap)}", f"diversity.mode={cfg.get('diversity_mode', 'kl')}",
+            f"diversity.tau={float(cfg.get('diversity_tau', 1.0))}",
+            f"diversity.centre={str(bool(cfg.get('diversity_centre', False))).lower()}"]
 
 
 def _pool_to_worker_spec(db, role, probs):

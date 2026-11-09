@@ -61,6 +61,9 @@ hedge_eta: 2.0
 diversity_roles: []                # thesis F6: roles trained with the policy-space diversity term (ppo.set_diversity)
 diversity_beta: 0.0
 diversity_cap: 2.0
+diversity_mode: kl                 # thesis F6b: action (see run_stage.yaml diversity.mode)
+diversity_tau: 1.0
+diversity_centre: false
 eval_extra_overrides: []           # extra hydra overrides for eval workers only
 # Thesis F4: extra hydra overrides for the workers of one role only (train and eval), e.g. the pursuer's sensor
 # restrictions vs the flags that let the evader's frozen pursuer opponents see the same inputs.

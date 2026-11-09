@@ -59,6 +59,10 @@ class PPOConfig:
 
     checkpoint_path: Union[str, None] = None
 
+    # Thesis F8: stop the GAE recursion at truncations too (bootstrap still only cut by `terminated`). Default off:
+    # earlier runs cut the recursion only at terminations.
+    gae_cut_at_truncation: bool = False
+
 
 cs = ConfigStore.instance()
 cs.store("ppo", node=PPOConfig, group="algo")
@@ -204,7 +208,10 @@ class PPOPolicy(TensorDictModuleBase):
         values = self.value_norm.denormalize(values)
         next_values = self.value_norm.denormalize(next_values)
 
-        adv, ret = self.gae(rewards, dones, values, next_values)
+        ends = None
+        if getattr(self.cfg, "gae_cut_at_truncation", False):
+            ends = einops.repeat(tensordict[("next", "done")], "t e 1 -> t e a 1", a=self.n_agents)
+        adv, ret = self.gae(rewards, dones, values, next_values, ends)
         adv_mean = adv.mean()
         adv_std = adv.std()
         adv = (adv - adv_mean) / adv_std.clip(1e-7)
@@ -253,9 +260,12 @@ class PPOPolicy(TensorDictModuleBase):
         div_info = {}
         if getattr(self, "div_refs", None):
             div = self._diversity_distance(tensordict, dist.mean)
-            div_loss = - self.div_beta * div.clamp(max=self.div_cap).mean()
+            bonus = self._div_bonus(div)
+            div_loss = - self.div_beta * bonus.mean()
             loss = loss + div_loss
             div_info = {"div_loss": div_loss.detach(), "div_distance": div.detach().mean()}
+            if self.div_mode == "action":
+                div_info.update(div_bonus=bonus.detach().mean(), div_sat=(bonus.detach() > 0.9).float().mean())
         self.actor_opt.zero_grad()
         self.critic_opt.zero_grad()
         loss.backward()
@@ -274,15 +284,23 @@ class PPOPolicy(TensorDictModuleBase):
             **div_info,
         }, [])
 
-    def set_diversity(self, ckpt_paths, beta: float, cap: float):
+    def set_diversity(self, ckpt_paths, beta: float, cap: float, mode: str = "kl", tau: float = 1.0,
+                      centre: bool = False):
         """Thesis F6: PSD-PSRO's policy-space diversity regulariser (Yao et al. 2023, Eq. 14 / 17), adapted to
         continuous actions. Both parts of its gradient: -beta * mean_s min(min_j d_j(s), cap) in the loss (direct KL
         gradient) and the same quantity per step as an intrinsic reward (_intrinsic_reward). d_j(s) = 0.5 * sum_k
         ((mu(s) - mu_j(s)) / sigma_j)_k^2 is the KL between the learner's and frozen policy j's action Gaussians with
         the learner's std replaced by sigma_j (mean-only KL: the learner cannot raise it by changing its own std).
-        The j are earlier same-role policies loaded from ``ckpt_paths`` (min over them, not over their convex hull)."""
+        The j are earlier same-role policies loaded from ``ckpt_paths`` (min over them, not over their convex hull).
+
+        Thesis F6b (mode="action", F6 saturated and acted as a survival bonus): d_j(s) = RMS over action dims of
+        mu(s) - mu_j(s) (action units, no division by sigma_j), bonus = 1 - exp(-d / tau) instead of min(d, cap) (no
+        cap); centre=True subtracts the batch mean from the intrinsic reward, so it is zero-mean (no per-step bonus
+        for staying alive). beta = 0 measures d without changing training."""
         import copy
+        assert mode in ("kl", "action"), mode
         self.div_beta, self.div_cap = float(beta), float(cap)
+        self.div_mode, self.div_tau, self.div_centre = mode, float(tau), bool(centre)
         self.div_refs = []
         for path in ckpt_paths:
             state = torch.load(path, map_location=self.device)
@@ -299,7 +317,16 @@ class PPOPolicy(TensorDictModuleBase):
         step, added to the task reward before GAE, so the policy also seeks states where it differs. Shape of the
         reward ([..., agents, 1])."""
         loc = self.actor.get_dist(tensordict.select(*self.actor.in_keys).clone(False)).mean
-        return (self.div_beta * self._diversity_distance(tensordict, loc).clamp(max=self.div_cap)).unsqueeze(-1)
+        r = self.div_beta * self._div_bonus(self._diversity_distance(tensordict, loc))
+        if self.div_centre:
+            r = r - r.mean()
+        return r.unsqueeze(-1)
+
+    def _div_bonus(self, d: torch.Tensor) -> torch.Tensor:
+        """F6: min(d, cap); F6b (mode="action"): 1 - exp(-d / tau)."""
+        if self.div_mode == "action":
+            return 1.0 - torch.exp(-d / self.div_tau)
+        return d.clamp(max=self.div_cap)
 
     def _diversity_distance(self, tensordict: TensorDict, loc: torch.Tensor) -> torch.Tensor:
         """min_j d_j(s) per sample and agent (see set_diversity)."""
@@ -307,7 +334,10 @@ class PPOPolicy(TensorDictModuleBase):
         for ref in self.div_refs:
             with torch.no_grad():
                 ref_dist = ref.get_dist(tensordict.select(*ref.in_keys).clone(False))
-            d.append((0.5 * ((loc - ref_dist.mean) / ref_dist.base_dist.scale) ** 2).sum(-1))
+            if self.div_mode == "action":
+                d.append((((loc - ref_dist.mean) ** 2).mean(-1) + 1e-8).sqrt())
+            else:
+                d.append((0.5 * ((loc - ref_dist.mean) / ref_dist.base_dist.scale) ** 2).sum(-1))
         return torch.stack(d).min(0).values
 
 

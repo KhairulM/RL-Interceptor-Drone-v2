@@ -43,6 +43,10 @@ diversity:
   ckpts: []
   beta: 0.0
   cap: 2.0
+  mode: kl        # F6b: action = RMS action-mean distance, bonus 1 - exp(-d / tau) (cap unused)
+  tau: 1.0
+  centre: false   # F6b: zero-mean intrinsic reward (batch mean subtracted)
+  measure: false  # F6b pilot: load the references and log div_distance even when beta = 0
 
 # Opponent re-sampling inside one training run (thesis D1): every `every_frames`, recompute the opponent
 # probabilities from the episodes played since the last refresh and reassign envs. 0 = fixed probabilities.

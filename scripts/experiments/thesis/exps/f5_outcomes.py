@@ -122,14 +122,14 @@ def contact_table():
     return lines
 
 
-def stage_table(camp):
+def stage_table(camp, n_stages=9):
     pools = {r: {p["id"]: (os.path.basename(p["checkpoint_path"]).split("_")[1].split(".")[0]
                            if p["checkpoint_path"] else p["metadata"]["heuristic"])
                  for p in json.load(open(os.path.join(CAMPAIGNS, camp, "db", f"{r}_pool.json")))["policies"]}
              for r in ("pursuer", "evader")}
     lines = [f"**{camp}**", "", "| stage | role | vs | capture | pursuer crash | evader crash + OOB | timeout |",
              "|---" * 7 + "|"]
-    for s in range(9):
+    for s in range(n_stages):
         role = "pursuer" if s % 2 == 0 else "evader"
         other = "evader" if role == "pursuer" else "pursuer"
         m = json.load(open(os.path.join(CAMPAIGNS, camp, "stages", f"stage{s}_{role}_eval_out.json")))["matchups"]

@@ -128,8 +128,10 @@ def _f3_camps():
     return [(s, k, f3_name(s, k)) for k in range(len(SEEDS)) for s in SAMPLERS]
 
 
-def run_f6c(args):
-    camps = [name(k) for k in range(len(SEEDS))]
+def run_f6c(args, camps=None, root=None, arm="hedge_div", exploit_seed=600):
+    """F6c; F6b reuses it with its own campaigns / root / arm label / exploiter seeds."""
+    root = root or F6
+    camps = camps or [name(k) for k in range(len(SEEDS))]
     while not all(os.path.isfile(_done(c)) for c in camps):
         time.sleep(60)
     split = load_split()
@@ -140,25 +142,25 @@ def run_f6c(args):
     for i, c in enumerate(camps):
         p = _policies(c, "pursuer")[-1]
         for g, opps in (("train", split["train"]), ("test", test), ("campaign_evaders", f3_ev + f6_ev)):
-            evaluate(os.path.join(F6, "evals", f"{c}_final_{g}.json"), opps, policy_ckpt=p["checkpoint_path"])
+            evaluate(os.path.join(root, "evals", f"{c}_final_{g}.json"), opps, policy_ckpt=p["checkpoint_path"])
         target = {"id": f"f6/pursuer:{c}", "kind": "rl", "checkpoint_path": p["checkpoint_path"], "metadata": {}}
-        ex_ck = train(os.path.join(F6, "ckpt", f"exploiter_{c}.pt"), [target], EXPLOIT_FRAMES, role="evader",
-                      seed=600 + i)
+        ex_ck = train(os.path.join(root, "ckpt", f"exploiter_{c}.pt"), [target], EXPLOIT_FRAMES, role="evader",
+                      seed=exploit_seed + i)
         if ex_ck:
             ex = {"id": f"f6/evader:exploit_{c}", "kind": "rl", "checkpoint_path": ex_ck, "metadata": {}}
-            evaluate(os.path.join(F6, "evals", f"{c}_final_vs_exploiter.json"), [ex], policy_ckpt=p["checkpoint_path"])
+            evaluate(os.path.join(root, "evals", f"{c}_final_vs_exploiter.json"), [ex], policy_ckpt=p["checkpoint_path"])
         log_progress(f"F6c {c} done")
     for _, _, c in f3:                                  # probes for the F6 evaders' descriptors
-        evaluate(os.path.join(F6, "evals", f"probe_{c}_vs_f6_evaders.json"), f6_ev,
+        evaluate(os.path.join(root, "evals", f"probe_{c}_vs_f6_evaders.json"), f6_ev,
                  policy_ckpt=_policies(c, "pursuer")[-1]["checkpoint_path"])
-    need = [os.path.join(F6, "evals", f"{c}_final_{g}.json") for c in camps
+    need = [os.path.join(root, "evals", f"{c}_final_{g}.json") for c in camps
             for g in ("train", "test", "campaign_evaders", "vs_exploiter")]
-    need += [os.path.join(F6, "evals", f"probe_{c}_vs_f6_evaders.json") for _, _, c in f3]
+    need += [os.path.join(root, "evals", f"probe_{c}_vs_f6_evaders.json") for _, _, c in f3]
     missing = [x for x in need if not os.path.isfile(x)]
     if missing:                                   # the other lane is still producing them and analyses after
         log_progress(f"F6c: {len(missing)} eval files missing on this lane, analysis left to the other lane")
         return
-    analyse_f6(camps, split, test)
+    analyse_f6(camps, split, test, root=root, arm=arm)
 
 
 def _descriptors(recs, probes, evs):
@@ -170,7 +172,7 @@ def _descriptors(recs, probes, evs):
     return resp, traj
 
 
-def evader_vendi(f3, f6_camps):
+def evader_vendi(f3, f6_camps, root=None):
     """Vendi per campaign in F3's descriptor space: z-score parameters and RBF bandwidth from the 32 F3 evaders only
     (so the F3 values are reproduced exactly), F6 evaders projected into that space."""
     import analysis as an
@@ -178,7 +180,7 @@ def evader_vendi(f3, f6_camps):
     recs = {c: json.load(open(os.path.join(F3C, "evals", f"{c}_final_campaign_evaders.json")))["matchups"]
             for c in probes}
     f3_evs = sorted(set.intersection(*(set(m) for m in recs.values())))
-    f6_recs = {c: json.load(open(os.path.join(F6, "evals", f"probe_{c}_vs_f6_evaders.json")))["matchups"]
+    f6_recs = {c: json.load(open(os.path.join(root or F6, "evals", f"probe_{c}_vs_f6_evaders.json")))["matchups"]
                for c in probes}
     f6_evs = sorted(set.intersection(*(set(m) for m in f6_recs.values())))
     blocks3 = _descriptors(recs, probes, f3_evs)
@@ -202,32 +204,33 @@ def evader_vendi(f3, f6_camps):
     return out
 
 
-def analyse_f6(camps, split, test):
+def analyse_f6(camps, split, test, root=None, arm="hedge_div"):
     import analysis as an
+    root = root or F6
     with open(os.path.join(OUT, "X2_descriptors", "clusters.json")) as f:
         labels = json.load(f)["labels"]
     f3 = _f3_camps()
     f3_names = {c for _, _, c in f3}
-    vendi = evader_vendi(f3, camps)
+    vendi = evader_vendi(f3, camps, root)
     f3res = json.load(open(os.path.join(F3C, "results.json")))["per_campaign"]
     rows = {}
     for k, c in enumerate(camps):
-        r = _outcome_metrics(c, split, test, labels, "neutralization_rate", root=F6)
+        r = _outcome_metrics(c, split, test, labels, "neutralization_rate", root=root)
         if r is None:
             continue
-        r.update({f"{m}_cap": v for m, v in _outcome_metrics(c, split, test, labels, "capture_rate", root=F6).items()})
+        r.update({f"{m}_cap": v for m, v in _outcome_metrics(c, split, test, labels, "capture_rate", root=root).items()})
         for key, m in (("neutralization_rate", "other_campaign_evaders"), ("capture_rate", "other_campaign_evaders_cap")):
-            Jc = _J(os.path.join(F6, "evals", f"{c}_final_campaign_evaders.json"), key)
+            Jc = _J(os.path.join(root, "evals", f"{c}_final_campaign_evaders.json"), key)
             r[m] = np.mean([v for kk, v in Jc.items() if not kk.endswith(":s1") and kk.split("/")[0] in f3_names])
         r["evader_vendi"] = vendi[c]["vendi"]
-        rows[("hedge_div", k)] = {m: float(v) for m, v in r.items()}
+        rows[(arm, k)] = {m: float(v) for m, v in r.items()}
     for s, k, c in f3:
         rows[(s, k)] = dict(f3res[f"{s}/{k}"])
         rows[(s, k)]["evader_vendi_check"] = vendi[c]["vendi"]   # must equal F3's evader_vendi
     metrics = ["train", "heldout_rl", "heldout_worst_cluster", "heldout_scripted", "x3_exploiters",
                "other_campaign_evaders", "own_campaign_evaders", "exploitability", "evader_vendi"]
     cap = [f"{m}_cap" for m in metrics[:8]]
-    arms = ["hedge_div"] + list(SAMPLERS)
+    arms = [arm] + list(SAMPLERS)
     agg, diffs = {}, {}
     for s in arms:
         agg[s] = {}
@@ -236,17 +239,18 @@ def analyse_f6(camps, split, test):
             if v:
                 agg[s][m] = {"mean": float(np.mean(v)), "ci": list(an.bootstrap_ci(v)[1:]), "per_seed": v}
     for b in ("hedge", "qd_dpp", "uniform", "pfsp"):
-        diffs[f"hedge_div-{b}"] = {}
+        diffs[f"{arm}-{b}"] = {}
         for m in metrics + cap:
-            d = [rows[("hedge_div", k)][m] - rows[(b, k)][m] for k in range(len(SEEDS))
-                 if ("hedge_div", k) in rows and (b, k) in rows and m in rows[("hedge_div", k)] and m in rows[(b, k)]]
+            d = [rows[(arm, k)][m] - rows[(b, k)][m] for k in range(len(SEEDS))
+                 if (arm, k) in rows and (b, k) in rows and m in rows[(arm, k)] and m in rows[(b, k)]]
             if d:
-                diffs[f"hedge_div-{b}"][m] = {"mean": float(np.mean(d)), "ci": list(an.bootstrap_ci(d)[1:]),
+                diffs[f"{arm}-{b}"][m] = {"mean": float(np.mean(d)), "ci": list(an.bootstrap_ci(d)[1:]),
                                                 "per_seed": d}
-    save_json(os.path.join(F6, "results.json"), {"per_campaign": {f"{s}/{k}": r for (s, k), r in rows.items()},
+    save_json(os.path.join(root, "results.json"), {"per_campaign": {f"{s}/{k}": r for (s, k), r in rows.items()},
                                                 "aggregate": agg, "paired": diffs, "evader_vendi": vendi})
-    lines = ["# F6_div_sp summary", "", "hedge_div = F3 hedge + PSD-PSRO diversity regulariser for evaders. F3 arms "
-             "copied from F3_sampler_sp/results.json. Mean over 2 seeds [range]. other_campaign_evaders: for hedge_div "
+    lines = [f"# {os.path.basename(root)} summary", "", f"{arm} = F3 hedge + PSD-PSRO diversity regulariser for evaders"
+             f"{' (F6b form)' if arm != 'hedge_div' else ''}. F3 arms "
+             f"copied from F3_sampler_sp/results.json. Mean over 2 seeds [range]. other_campaign_evaders: for {arm} "
              "the F3 evaders (stage-1 excluded); for F3 arms as in F3. Descriptive (2 seeds).", "",
              "| arm | " + " | ".join(metrics) + " |", "|---" * (len(metrics) + 1) + "|"]
     for s in arms:
@@ -261,5 +265,5 @@ def analyse_f6(camps, split, test):
             for m in metrics) + " |")
     lines += ["", "Vendi check (F3 values recomputed in the frozen space): " + ", ".join(
         f"{c}: {vendi[c]['vendi']:.3f}" for _, _, c in f3)]
-    with open(os.path.join(F6, "summary.md"), "w") as f:
+    with open(os.path.join(root, "summary.md"), "w") as f:
         f.write("\n".join(lines) + "\n")

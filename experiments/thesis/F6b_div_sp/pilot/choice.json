@@ -1,0 +1,47 @@
+{
+  "beta": 0.03,
+  "tau": 0.07265548408031464,
+  "reference": {
+    "J": 0.1842135265469551,
+    "timeout": 0.1336903969446818,
+    "f3_stage5": [
+      0.1842135265469551,
+      0.1336903969446818
+    ]
+  },
+  "rows": {
+    "0.0": {
+      "J_vs_training_pursuers": 0.49829841653505963,
+      "timeout": 0.15603482723236084,
+      "pursuer_crash": 0.3671640654404958,
+      "div_distance_end": 0.6533380150794983,
+      "div_bonus_end": 0.14064282178878784
+    },
+    "0.03": {
+      "J_vs_training_pursuers": 0.1407035713394483,
+      "timeout": 0.21651734908421835,
+      "pursuer_crash": 0.6589428509275118,
+      "div_distance_end": 0.07758514732122421,
+      "div_bonus_end": 0.5400432705879211
+    },
+    "0.1": {
+      "J_vs_training_pursuers": 0.11063055321574211,
+      "timeout": 0.23749709129333496,
+      "pursuer_crash": 0.6605192745725313,
+      "div_distance_end": 0.09158543944358825,
+      "div_bonus_end": 0.6373095393180848
+    },
+    "0.3": {
+      "J_vs_training_pursuers": 0.08643905818462372,
+      "timeout": 0.267840047677358,
+      "pursuer_crash": 0.6560158443947633,
+      "div_distance_end": 0.13557971864938737,
+      "div_bonus_end": 0.7816107273101807
+    }
+  },
+  "kept": [
+    0.03
+  ],
+  "active": [],
+  "rule": "amendment 1: tau = median beta0 d over the last quarter; reference = stricter of beta0 and F3's stage-5 evader; keep J <= J_ref + 0.05 and timeout <= timeout_ref + 0.10; largest active (d >= 1.25 tau, bonus <= 0.9), else largest kept; none kept -> stop"
+}

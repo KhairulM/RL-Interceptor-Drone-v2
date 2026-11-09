@@ -179,9 +179,24 @@ class SelfplayOrchestratorTests(unittest.TestCase):
                 self.assertEqual(args["diversity.ckpts"], "[" + ",".join(evader_ckpts) + "]")
                 self.assertEqual(float(args["diversity.beta"]), 0.1)
                 self.assertEqual(float(args["diversity.cap"]), 2.0)
+                self.assertEqual((args["diversity.mode"], float(args["diversity.tau"]), args["diversity.centre"]),
+                                 ("kl", 1.0, "false"))                  # F6 defaults
             if args["task.role"] == orchestrator.EVADER:
                 evader_ckpts.append(args["stage_ckpt"])
         self.assertEqual(len(evader_ckpts), 3)
+
+    def test_diversity_action_mode_overrides(self):                     # thesis F6b
+        self.cfg.diversity_roles = [orchestrator.EVADER]
+        self.cfg.diversity_beta = 0.1
+        self.cfg.diversity_mode = "action"
+        self.cfg.diversity_tau = 0.07
+        self.cfg.diversity_centre = True
+        self.run_campaign()
+        div = [args for args, _ in self.calls if args["mode"] == "train" and "diversity.ckpts" in args]
+        self.assertTrue(div)
+        for args in div:
+            self.assertEqual((args["diversity.mode"], float(args["diversity.tau"]), args["diversity.centre"]),
+                             ("action", 0.07, "true"))
 
     def test_no_diversity_term_by_default(self):
         self.run_campaign()

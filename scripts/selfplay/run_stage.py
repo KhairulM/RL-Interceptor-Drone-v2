@@ -216,9 +216,11 @@ def _run_train(cfg, env, base_env, policy):
         _load_state_dict(policy, cfg.init_policy, base_env.device)
         logging.info(f"warm-started from {cfg.init_policy}")
     dcfg = cfg.get("diversity", None)
-    if dcfg is not None and dcfg.get("ckpts", None) and float(dcfg.beta) > 0:
-        policy.set_diversity(list(dcfg.ckpts), float(dcfg.beta), float(dcfg.cap))
-        logging.info(f"diversity term: beta={dcfg.beta} cap={dcfg.cap} vs {list(dcfg.ckpts)}")
+    if dcfg is not None and dcfg.get("ckpts", None) and (float(dcfg.beta) > 0 or dcfg.get("measure", False)):
+        mode, tau, centre = str(dcfg.get("mode", "kl")), float(dcfg.get("tau", 1.0)), bool(dcfg.get("centre", False))
+        policy.set_diversity(list(dcfg.ckpts), float(dcfg.beta), float(dcfg.cap), mode=mode, tau=tau, centre=centre)
+        logging.info(f"diversity term: beta={dcfg.beta} cap={dcfg.cap} mode={mode} tau={tau} centre={centre} "
+                     f"vs {list(dcfg.ckpts)}")
 
     use_wandb = (
         wandb is not None and init_wandb is not None

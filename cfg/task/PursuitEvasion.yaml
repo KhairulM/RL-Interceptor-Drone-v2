@@ -52,6 +52,11 @@ reward_bounds_weight: 1.0          # evader-only dense penalty ramping up within
 bounds_margin: 0.5
 reward_floor_weight: 0.0           # pursuer-only floor penalty (the evader's floor ramp, no walls / ceiling); 0 = off
 reward_step: 0.1                   # evader per-step survival reward; must exceed the per-step penalties
+# Thesis F8: reward_mode roncero = Sanchez Roncero et al. 2026 Eqs. (8)-(11) and endings (capture terminal; crash /
+# out-of-arena of either agent and the timeout are truncations); the thesis reward terms above are then unused.
+# Pair with algo.gae_cut_at_truncation=true. Coefficients from the paper (Sec. III-A c); see roncero_reward.py.
+reward_mode: thesis
+roncero: {k_br: 0.001, k_sm: 0.002, k_b: 10.0, k_c: 10.0, k_app: 0.25, k_s: 0.0025, v_safe: 2.0, alpha_close: 3.0}
 # Optional dense distance penalty (pursuer only), matching Intercept's
 # reward_distance = reward_distance_weight * distance. Negative weight penalizes
 # being far from the evader. Toggle with use_distance.

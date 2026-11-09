@@ -1,0 +1,55 @@
+{
+  "policies": [
+    {
+      "checkpoint_path": null,
+      "generation": 0,
+      "id": "pursuer:heuristic0",
+      "kind": "heuristic",
+      "metadata": {
+        "heuristic": "pure_pursuit"
+      },
+      "role": "pursuer"
+    },
+    {
+      "checkpoint_path": null,
+      "generation": 1,
+      "id": "pursuer:heuristic1",
+      "kind": "heuristic",
+      "metadata": {
+        "heuristic": "apf"
+      },
+      "role": "pursuer"
+    },
+    {
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F6b-hedge_divb-s1/checkpoints/pursuer_stage0.pt",
+      "generation": 2,
+      "id": "pursuer:s2",
+      "kind": "rl",
+      "metadata": {
+        "stage": 0
+      },
+      "role": "pursuer"
+    },
+    {
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F6b-hedge_divb-s1/checkpoints/pursuer_stage2.pt",
+      "generation": 3,
+      "id": "pursuer:s3",
+      "kind": "rl",
+      "metadata": {
+        "stage": 2
+      },
+      "role": "pursuer"
+    },
+    {
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F6b-hedge_divb-s1/checkpoints/pursuer_stage4.pt",
+      "generation": 4,
+      "id": "pursuer:s4",
+      "kind": "rl",
+      "metadata": {
+        "stage": 4
+      },
+      "role": "pursuer"
+    }
+  ],
+  "role": "pursuer"
+}

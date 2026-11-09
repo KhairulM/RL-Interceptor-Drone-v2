@@ -1,0 +1,33 @@
+{
+  "policies": [
+    {
+      "id": "pursuer:s2",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F3-hedge-both-s0/checkpoints/pursuer_stage0.pt",
+      "metadata": {
+        "stage": 0
+      }
+    },
+    {
+      "id": "pursuer:s3",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F3-hedge-both-s0/checkpoints/pursuer_stage2.pt",
+      "metadata": {
+        "stage": 2
+      }
+    },
+    {
+      "id": "pursuer:s4",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F3-hedge-both-s0/checkpoints/pursuer_stage4.pt",
+      "metadata": {
+        "stage": 4
+      }
+    }
+  ],
+  "probs": {
+    "pursuer:s2": 0.25214206970997133,
+    "pursuer:s3": 0.23359613661824846,
+    "pursuer:s4": 0.5142617936717802
+  }
+}

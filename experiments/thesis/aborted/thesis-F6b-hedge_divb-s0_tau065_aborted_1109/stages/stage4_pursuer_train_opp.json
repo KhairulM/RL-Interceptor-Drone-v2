@@ -1,0 +1,24 @@
+{
+  "policies": [
+    {
+      "id": "evader:s4",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F6b-hedge_divb-s0/checkpoints/evader_stage1.pt",
+      "metadata": {
+        "stage": 1
+      }
+    },
+    {
+      "id": "evader:s5",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F6b-hedge_divb-s0/checkpoints/evader_stage3.pt",
+      "metadata": {
+        "stage": 3
+      }
+    }
+  ],
+  "probs": {
+    "evader:s4": 0.3500269472656437,
+    "evader:s5": 0.6499730527343562
+  }
+}

@@ -46,8 +46,12 @@ EXPERIMENTS = {
     "F5c": "f5_acc_sp:run_f5c",
     "F6": "f6_div_sp:run_f6",
     "F6c": "f6_div_sp:run_f6c",
+    "F6b": "f6b_div_sp:run_f6b",
+    "F6bc": "f6b_div_sp:run_f6bc",
     "F7": "f7_floor_sp:run_f7",
     "F7c": "f7_floor_sp:run_f7c",
+    "F8": "f8_roncero_sp:run_f8",
+    "F8c": "f8_roncero_sp:run_f8c",
 }
 
 

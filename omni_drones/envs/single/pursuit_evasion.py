@@ -48,6 +48,7 @@ from omni_drones.controllers import ControllerBase
 from omni_drones.controllers.apf_controller import APFController
 from omni_drones.controllers.intercept_baseline_common import GeometricCTBR
 from omni_drones.envs.isaac_env import AgentSpec, IsaacEnv
+from omni_drones.envs.single import roncero_reward
 from omni_drones.robots.drone import MultirotorBase
 from omni_drones.utils.selfplay.opponents import FrozenPolicyBank
 from omni_drones.utils.torch import (
@@ -137,6 +138,11 @@ class PursuitEvasion(IsaacEnv):
         self.reward_floor_weight = float(task_cfg.get("reward_floor_weight", 0.0))
         self.bounds_margin = float(task_cfg.get("bounds_margin", 1.0))
         self.reward_step = float(task_cfg.get("reward_step", 0.005))
+        # Thesis F8: "roncero" = Sanchez Roncero et al. 2026 Eqs. (8)-(11) and endings (roncero_reward.py) instead of
+        # the thesis rewards / endings above. Default "thesis": unchanged.
+        self.reward_mode = str(task_cfg.get("reward_mode", "thesis"))
+        assert self.reward_mode in ("thesis", "roncero"), self.reward_mode
+        self.roncero_k = dict(roncero_reward.DEFAULTS, **dict(task_cfg.get("roncero", {}) or {}))
         # Dense per-step distance penalty (pursuer only; matches Intercept's
         # _reward_distance_to_evader = reward_distance_weight * distance). With a
         # negative weight it penalizes being far from the evader. Disabled by
@@ -312,6 +318,8 @@ class PursuitEvasion(IsaacEnv):
         self.opp_prev_action = torch.zeros(
             self.num_envs, 1, self.agent_drone.action_spec.shape[-1], device=self.device)
         self.action_error_order1 = torch.zeros(self.num_envs, 1, device=self.device)
+        self._prev_rate_action = torch.zeros(self.num_envs, 3, device=self.device)   # F8 (roncero) smoothness term
+        self._rate_jerk_sq = torch.zeros(self.num_envs, 1, device=self.device)
         self.agent_effort = torch.zeros(self.num_envs, 1, device=self.device)
         self._opp_obs = torch.zeros(
             self.num_envs, 1, self._opp_obs_dim, device=self.device)
@@ -730,6 +738,7 @@ class PursuitEvasion(IsaacEnv):
         self.prev_distance[env_ids] = torch.norm(rel0, dim=-1)
         self.stats["min_distance"][env_ids] = self.prev_distance[env_ids]
         self.opp_prev_action[env_ids] = 0.0
+        self._prev_rate_action[env_ids] = 0.0
         self._just_reset[env_ids] = True
         self._oracle_vel_prev[env_ids] = 0.0
         self._oracle_vel_curr[env_ids] = 0.0
@@ -758,6 +767,9 @@ class PursuitEvasion(IsaacEnv):
         self.agent_effort = self.agent_drone.apply_action(agent_action)
         self.current_action = tensordict[("info", "policy_action")]
         self.action_error_order1 = tensordict[("stats", "action_error_order1")]
+        rate = self.current_action[..., :3].reshape(self.num_envs, 3)
+        self._rate_jerk_sq = ((rate - self._prev_rate_action) ** 2).sum(-1, keepdim=True)
+        self._prev_rate_action = rate.detach().clone()
 
         if self._any_esn:
             self._esn_stepped[:] = False
@@ -1283,6 +1295,17 @@ class PursuitEvasion(IsaacEnv):
         # latched before these stats are cloned into the observation below.
         self._truncated = (self.progress_buf >= self.max_episode_length - 1).reshape(
             self.num_envs, 1)
+        if self.reward_mode == "roncero":
+            # F8: capture terminal; any crash / out-of-arena (either agent) and the timeout are truncations.
+            self._terminated, self._truncated, self._timeout = roncero_reward.outcome(
+                self._captured, self._agent_crash, self._opp_crash, self._agent_oob, self._opp_oob, self._truncated)
+            own_end = self._agent_crash | self._agent_oob
+            self._win = self._captured if self.role == PURSUER else self._timeout
+            self._loss = (own_end | self._timeout if self.role == PURSUER else self._captured | own_end) & ~self._win
+            self._terminal_reward = torch.zeros(self.num_envs, 1, device=self.device)   # Eq. (9)-(11) have none
+            self.stats["reward_terminal"][:] = self._terminal_reward
+            self.stats["timeout"][:] = torch.maximum(self.stats["timeout"], self._timeout.float())
+            return self._finish_state(obs, state)
         # Only the evader is confined to the arena; the pursuer may leave freely.
         evader_oob = self._agent_oob if self.role == EVADER else self._opp_oob
         self._terminated = (
@@ -1302,7 +1325,9 @@ class PursuitEvasion(IsaacEnv):
         self.stats["reward_terminal"][:] = self._terminal_reward
         self.stats["timeout"][:] = torch.maximum(
             self.stats["timeout"], self._timeout.float())
+        return self._finish_state(obs, state)
 
+    def _finish_state(self, obs, state):
         intrinsics = self.agent_drone.intrinsics
         intrinsics_flat = torch.cat([
             intrinsics["mass"], intrinsics["inertia"], intrinsics["com"],
@@ -1364,6 +1389,28 @@ class PursuitEvasion(IsaacEnv):
             bounds_pen = self.reward_floor_weight * self._floor_proximity(agent_pos)
         else:
             bounds_pen = torch.zeros(self.num_envs, 1, device=self.device)
+
+        if self.reward_mode == "roncero":
+            pursuer = self.role == PURSUER
+            pd, ed = (self.agent_drone, self.opp_drone) if pursuer else (self.opp_drone, self.agent_drone)
+            v_close = roncero_reward.closing_speed(pd.pos[:, 0], pd.vel_w[:, 0, :3], ed.pos[:, 0], ed.vel_w[:, 0, :3])
+            reward = roncero_reward.reward(pursuer, self._captured, delta, body_rate, self._rate_jerk_sq,
+                                           self._agent_crash | self._agent_oob, v_close, self.roncero_k)
+            zero = torch.zeros_like(reward)
+            self.stats["reward_approach"].lerp_(self.roncero_k["k_app"] * delta if pursuer else zero, 1 - self.alpha)
+            self.stats["reward_precision"].lerp_(zero, 1 - self.alpha)
+            self.stats["reward_survival"].lerp_(zero if pursuer else zero + self.roncero_k["k_s"], 1 - self.alpha)
+            self.stats["return"] += reward
+            self.stats["episode_len"][:] = self.progress_buf.unsqueeze(1)
+            self.stats["capture_radius"][:] = self.active_capture_radius
+            self.global_step += 1
+            self._update_success_radius()
+            return TensorDict({
+                "agents": {"reward": reward.unsqueeze(-1)},
+                "done": done_mask,
+                "terminated": terminated,
+                "truncated": truncated,
+            }, self.batch_size)
 
         # Optional dense distance penalty (pursuer shaping; see __init__).
         if self.role == PURSUER and self.use_distance:

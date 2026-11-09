@@ -145,6 +145,66 @@ class DiversityTest(unittest.TestCase):
         self.assertAlmostEqual(info["div_reward"], 0.03, places=5)
         self.assertTrue(torch.all(td["next", "agents", "reward"] == 0))      # stored task reward untouched
 
+    # ---- F6b: mode="action" (action-unit distance, 1 - exp(-d / tau), centred intrinsic reward)
+    def test_action_mode_distance_and_bonus(self):
+        p = _policy()
+        ref = _policy()
+        with torch.no_grad():
+            ref.actor.module[0].module[1].actor_mean.bias.add_(0.5)     # mean shift 0.5 in every action dim
+            ref.actor.module[0].module[1].actor_std.fill_(-3.5)         # tiny sigma_j: must not matter
+        p.set_diversity([_save(ref, os.path.join(self.tmp.name, "r.pt"))], beta=1.0, cap=2.0, mode="action", tau=0.25)
+        td = _batch()
+        d = p._diversity_distance(td, self._loc(p, td))
+        self.assertTrue(torch.allclose(d, torch.full((64, 1), 0.5), atol=1e-5))                 # RMS = 0.5
+        self.assertTrue(torch.allclose(p._div_bonus(d), torch.full((64, 1), 1 - torch.exp(torch.tensor(-2.0)).item()),
+                                       atol=1e-5))
+
+    def test_action_mode_has_gradient_far_from_reference(self):
+        # F6's capped KL had no gradient once saturated; the action-mode bonus keeps one (smaller, never zero)
+        p = _policy()
+        ref = _policy()
+        with torch.no_grad():
+            ref.actor.module[0].module[1].actor_mean.bias.add_(0.3)
+        p.set_diversity([_save(ref, os.path.join(self.tmp.name, "r.pt"))], beta=1.0, cap=0.5, mode="action", tau=0.1)
+        td = self._train_batch(p)
+        p.entropy_coef = 0.0
+        before = p._diversity_distance(td, self._loc(p, td)).mean()
+        w0 = p.actor.module[0].module[1].actor_mean.weight.clone()
+        for _ in range(5):
+            info = p._update(td.clone())
+        self.assertFalse(torch.allclose(w0, p.actor.module[0].module[1].actor_mean.weight))
+        self.assertGreater(p._diversity_distance(td, self._loc(p, td)).mean(), before)
+        for k in ("div_distance", "div_bonus", "div_sat"):
+            self.assertIn(k, info.keys())
+
+    def test_centred_intrinsic_reward_is_zero_mean(self):
+        p = _policy()
+        ref = _policy()
+        with torch.no_grad():
+            ref.actor.module[0].module[1].actor_mean.weight.add_(0.3)   # state-dependent distance
+        path = _save(ref, os.path.join(self.tmp.name, "r.pt"))
+        p.set_diversity([path], beta=0.3, cap=2.0, mode="action", tau=0.2, centre=True)
+        td = self._rollout(p)
+        r = p._intrinsic_reward(td)
+        self.assertEqual(r.shape, td["next", "agents", "reward"].shape)
+        self.assertAlmostEqual(r.mean().item(), 0.0, places=6)
+        self.assertGreater(r.std().item(), 0.0)
+        p.set_diversity([path], beta=0.3, cap=2.0, mode="action", tau=0.2, centre=False)
+        self.assertGreater(p._intrinsic_reward(td).min().item(), 0.0)          # uncentred: a positive bonus
+
+    def test_measure_only_beta_zero(self):
+        p = _policy()
+        ref = _policy()
+        with torch.no_grad():
+            ref.actor.module[0].module[1].actor_mean.bias.add_(0.5)
+        p.set_diversity([_save(ref, os.path.join(self.tmp.name, "r.pt"))], beta=0.0, cap=2.0, mode="action", tau=0.1,
+                        centre=True)
+        td = self._rollout(p)
+        self.assertTrue(torch.all(p._intrinsic_reward(td) == 0))
+        info = p._update(self._train_batch(p))
+        self.assertAlmostEqual(float(info["div_distance"]), 0.5, places=4)
+        self.assertEqual(float(info["div_loss"]), 0.0)
+
     def test_no_diversity_by_default(self):
         p = _policy()
         info = p._update(self._train_batch(p))

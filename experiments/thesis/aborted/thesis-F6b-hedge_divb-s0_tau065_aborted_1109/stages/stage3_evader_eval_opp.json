@@ -1,0 +1,24 @@
+{
+  "policies": [
+    {
+      "id": "pursuer:s2",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F6b-hedge_divb-s0/checkpoints/pursuer_stage0.pt",
+      "metadata": {
+        "stage": 0
+      }
+    },
+    {
+      "id": "pursuer:s3",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F6b-hedge_divb-s0/checkpoints/pursuer_stage2.pt",
+      "metadata": {
+        "stage": 2
+      }
+    }
+  ],
+  "probs": {
+    "pursuer:s2": 0.5,
+    "pursuer:s3": 0.5
+  }
+}
