@@ -1,6 +1,6 @@
 # F8_roncero_sp summary
 
-Final pursuers (stage 8). roncero/k = F8 campaign seed k (Roncero's reward and endings, Hedge both roles, 9 x 50M); hedge/k = F3 hedge-both seed k (thesis rules, Hedge both roles, 9 x 300M). All evals clean under the thesis rules except vs_exploiter_roncero (Roncero's rules). exploitability_<rules> = 1 - J vs a fresh exploiter trained under those rules; for hedge/k the thesis-rules exploiter is F3c's. other_f3 / other_f8 / own evaders exclude stage-1 evaders. J at 0.15 m is the exact re-score (eval-only). 2 seeds, descriptive; F8 = 26 stages x 50M (13 generations), F3 = 9 stages x 300M.
+Final pursuers (F8: stage 24; F3: stage 8). roncero/k = F8 campaign seed k (Roncero's reward and endings, Hedge both roles, 26 stages x 50M = 13 generations); hedge/k = F3 hedge-both seed k (thesis rules, Hedge both roles, 9 x 300M). All evals clean under the thesis rules except vs_exploiter_roncero (Roncero's rules). exploitability_<rules> = 1 - J vs a fresh exploiter trained under those rules; for hedge/k the thesis-rules exploiter is F3c's. other_f3 / other_f8 / own evaders exclude stage-1 evaders. J at 0.15 m is the exact re-score (eval-only). 2 seeds, descriptive; F8 = 26 stages x 50M (13 generations), F3 = 9 stages x 300M.
 
 ## Capture radius 0.10 m
 

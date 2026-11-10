@@ -52,6 +52,8 @@ EXPERIMENTS = {
     "F7c": "f7_floor_sp:run_f7c",
     "F8": "f8_roncero_sp:run_f8",
     "F8c": "f8_roncero_sp:run_f8c",
+    "F9": "f9_ablation_sp:run_f9",
+    "F9c": "f9_ablation_sp:run_f9c",
 }
 
 

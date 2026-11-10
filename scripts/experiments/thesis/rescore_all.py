@@ -29,7 +29,7 @@ ORIG = common.OUT
 # Experiment -> original run.py arguments (driver_log "=== start" lines).
 RUNS = [("X1", {}), ("X3", {"seeds": 5}), ("X4", {}), ("D1", {"seeds": 5}), ("D1b", {}), ("D1c", {"seeds": 3}),
         ("D2", {"seeds": 5}), ("F1", {"seeds": 5}), ("A1b", {"seeds": 5}), ("A2b", {"seeds": 5}), ("A3b", {}),
-        ("A3c", {}), ("A3d", {}), ("F2a", {}), ("F2c", {}), ("F3c", {}), ("F4c", {}), ("F5c", {}), ("F6c", {})]
+        ("A3c", {}), ("A3d", {}), ("F2a", {}), ("F2c", {}), ("F3c", {}), ("F4c", {}), ("F5c", {}), ("F6c", {}), ("F6bc", {})]
 
 
 class Blocked(RuntimeError):

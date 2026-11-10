@@ -42,7 +42,9 @@ METRICS = ["heldout_rl", "heldout_worst_cluster", "other_f3_evaders", "other_f8_
 
 
 def name(k, smoke=False):
-    return "thesis-F8-smoke-roncero" if smoke else f"thesis-F8-roncero-s{SEEDS[k]}"
+    """F8 re-run (user, 2026-11-10 19:25) after the k_sm fix: new names; the k_sm = 0 campaigns stay on disk as
+    thesis-F8-roncero-s{0,100} (and thesis-F8-smoke-roncero)."""
+    return "thesis-F8b-smoke-roncero" if smoke else f"thesis-F8b-roncero-s{SEEDS[k]}"
 
 
 def arm_cfg(k):
@@ -82,10 +84,17 @@ def _src(c, g):
     return p
 
 
+def all_stages(c, role):
+    """Every RL stage of a campaign. f3_sampler_sp._policies stops at stage 8 (F3 has 9 stages); before the
+    2026-11-10 fix F8c used it, so it evaluated pursuer stage 8 and evader stages 1-7 only."""
+    common.CAMPAIGNS[c] = c
+    return common.rl_policies(c, role)
+
+
 def _exploiter(c, rules, i):
     tag = "roncero" if rules else "thesis"
     path = os.path.join(F8, "ckpt", f"exploiter_{tag}_{c}.pt")
-    ck = _policies(c, "pursuer")[-1]["checkpoint_path"]
+    ck = all_stages(c, "pursuer")[-1]["checkpoint_path"]
     target = {"id": f"f8/pursuer:{c}", "kind": "rl", "checkpoint_path": ck, "metadata": {}}
     train(path, [target], EXPLOIT_FRAMES, role="evader", seed=(830 if rules else 820) + i, extra=list(rules))
     return ([{"id": f"f8/evader:exploit_{tag}_{c}", "kind": "rl", "checkpoint_path": path, "metadata": {}}]
@@ -102,9 +111,9 @@ def run_f8c(args):
     split = load_split()
     test = test_set(split)
     f3_ev = [e for s in F3_ARMS for k in range(2) for e in _policies(f3_name(s, k), "evader")]
-    f8_ev = [e for k in range(len(SEEDS)) for e in _policies(name(k), "evader")]
+    f8_ev = [e for k in range(len(SEEDS)) for e in all_stages(name(k), "evader")]
     for i, (lab, c, kind) in enumerate(pursuers()):
-        ck = _policies(c, "pursuer")[-1]["checkpoint_path"]
+        ck = all_stages(c, "pursuer")[-1]["checkpoint_path"]
         jobs = [("f8_evaders", f8_ev, None), ("vs_exploiter_roncero", _exploiter(c, RULES, i), RULES)]
         if kind == "f8":
             jobs = [("train", split["train"], None), ("test", test, None), ("f3_evaders", f3_ev, None),
@@ -183,8 +192,8 @@ def analyse_f8(split, test):
                  for i in range(len(SEEDS))} for k, v in res.items()}
     save_json(os.path.join(F8, "results.json"), {"metrics": res, "differences": diffs, "lure_rates": lures})
     lines = ["# F8_roncero_sp summary", "",
-             "Final pursuers (stage 8). roncero/k = F8 campaign seed k (Roncero's reward and endings, Hedge both roles, "
-             "9 x 50M); hedge/k = F3 hedge-both seed k (thesis rules, Hedge both roles, 9 x 300M). All evals clean "
+             "Final pursuers (F8: stage 24; F3: stage 8). roncero/k = F8 campaign seed k (Roncero's reward and endings, "
+             "Hedge both roles, 26 stages x 50M = 13 generations); hedge/k = F3 hedge-both seed k (thesis rules, Hedge both roles, 9 x 300M). All evals clean "
              "under the thesis rules except vs_exploiter_roncero (Roncero's rules). exploitability_<rules> = 1 - J vs a "
              "fresh exploiter trained under those rules; for hedge/k the thesis-rules exploiter is F3c's. other_f3 / "
              "other_f8 / own evaders exclude stage-1 evaders. J at 0.15 m is the exact re-score (eval-only). 2 seeds, "

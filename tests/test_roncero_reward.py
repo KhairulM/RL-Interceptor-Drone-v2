@@ -51,6 +51,45 @@ class RonceroRewardTest(unittest.TestCase):
         self.assertEqual([round(x, 6) for x in r.flatten().tolist()], [0.0025, round(0.0025 - 10, 6), round(0.0025 - 10, 6)])
 
 
+class AblationTest(unittest.TestCase):
+    """F9: one Roncero component at a time on the thesis outcome (rows: capture, own crash, opponent crash, timeout)."""
+
+    def _thesis(self, pursuer):
+        cap, own, opp, tmo = B(1, 0, 0, 0), B(0, 1, 0, 0), B(0, 0, 1, 0), B(0, 0, 0, 1)
+        term = cap | own | opp
+        trunc = tmo.clone()
+        win = cap if pursuer else tmo
+        loss = (own | tmo) if pursuer else (cap | own)
+        return 100.0 * (win.float() - (loss & ~win).float()), term, trunc, tmo, cap
+
+    def test_all_off_is_identity(self):
+        t, te, tr, tmo, cap = self._thesis(True)
+        t2, te2, tr2 = rr.ablate(t, te, tr, tmo, cap, F(0.5, 1, 1, 1), 100.0, True)
+        self.assertTrue(torch.equal(t, t2) and torch.equal(te, te2) and torch.equal(tr, tr2))
+
+    def test_no_timeout(self):
+        for pursuer, expect in ((True, [100, -100, 0, 0]), (False, [-100, -100, 0, 0])):
+            t, te, tr, tmo, cap = self._thesis(pursuer)
+            t2, te2, tr2 = rr.ablate(t, te, tr, tmo, cap, F(1, 1, 1, 1), 100.0, pursuer, no_timeout=True)
+            self.assertEqual(t2.flatten().tolist(), expect)
+            self.assertTrue(torch.equal(te, te2) and torch.equal(tr, tr2))
+
+    def test_closing_discount_pursuer_only(self):
+        t, te, tr, tmo, cap = self._thesis(True)
+        t2, _, _ = rr.ablate(t, te, tr, tmo, cap, F(0.25, 1, 1, 1), 100.0, True, closing_discount=True)
+        self.assertEqual(t2.flatten().tolist(), [25.0, -100.0, 0.0, -100.0])
+        t, te, tr, tmo, cap = self._thesis(False)
+        t3, _, _ = rr.ablate(t, te, tr, tmo, cap, F(0.25, 1, 1, 1), 100.0, False, closing_discount=True)
+        self.assertTrue(torch.equal(t, t3))                                 # the evader's -W is not scaled
+
+    def test_truncate_failures(self):
+        t, te, tr, tmo, cap = self._thesis(False)
+        t2, te2, tr2 = rr.ablate(t, te, tr, tmo, cap, F(1, 1, 1, 1), 100.0, False, truncate_failures=True)
+        self.assertTrue(torch.equal(t, t2))                                 # rewards unchanged
+        self.assertEqual(te2.flatten().tolist(), [True, False, False, False])
+        self.assertEqual(tr2.flatten().tolist(), [False, True, True, True])
+
+
 class GaeTruncationTest(unittest.TestCase):
 
     def test_default_unchanged_and_truncation_cuts_recursion_only(self):
@@ -70,6 +109,24 @@ class GaeTruncationTest(unittest.TestCase):
         self.assertAlmostEqual(a2[0, 1, 0].item(), d[0, 1, 0].item(), places=6)        # no leak from step 2
         self.assertAlmostEqual(a2[0, 0, 0].item(), d[0, 0, 0].item() + 0.45 * d[0, 1, 0].item(), places=6)
         self.assertNotAlmostEqual(a0[0, 1, 0].item(), a2[0, 1, 0].item(), places=4)     # the old path leaked
+
+    def test_rate_jerk_once_per_control_step(self):
+        acts = [torch.tensor([[1., 0., 0.]]), torch.tensor([[0., 1., 0.]]), torch.tensor([[0., 1., 0.]])]
+        prev, out = torch.zeros(1, 3), []
+        for a in acts:                     # 2 physics substeps per control step must not touch the jerk
+            jerk, prev = rr.rate_jerk(a, prev)
+            out.append(jerk.item())
+        self.assertEqual(out, [1.0, 2.0, 0.0])
+
+    def test_env_updates_rate_jerk_in_reward_not_per_substep(self):
+        # Regression (11-10): the jerk was computed in _pre_sim_step, which IsaacEnv runs once per physics substep with
+        # the same action, so the reward always read 0. Parse the env source (no Isaac import needed).
+        import ast
+        src = (_P.parent / "pursuit_evasion.py").read_text()
+        fns = {n.name: ast.get_source_segment(src, n) for n in ast.walk(ast.parse(src)) if isinstance(n, ast.FunctionDef)}
+        self.assertNotIn("_rate_jerk_sq", fns["_pre_sim_step"])
+        self.assertNotIn("_prev_rate_action", fns["_pre_sim_step"])
+        self.assertIn("roncero_reward.rate_jerk(", fns["_compute_reward_and_done"])
 
     def test_ppo_config_flag_default_off(self):
         from omni_drones.learning.ppo.ppo import PPOConfig

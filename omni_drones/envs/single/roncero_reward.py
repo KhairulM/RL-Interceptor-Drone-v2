@@ -41,3 +41,29 @@ def reward(pursuer, captured, delta_dist, omega_b, rate_jerk_sq, own_oob, v_clos
         beta = torch.exp(-k["alpha_close"] * torch.relu(v_close - k["v_safe"]))
         return k["k_c"] * cap * beta + k["k_app"] * delta_dist + reg
     return k["k_s"] - k["k_c"] * cap + reg
+
+
+def rate_jerk(rate, prev):
+    """(||a_rate - a_rate_prev||^2 [N, 1], new previous rate) for Eq. (8)'s k_sm term. Call once per control step:
+    IsaacEnv calls _pre_sim_step once per physics substep with the same action, so computing it there gave 0
+    (bug in every Roncero-rules run before 2026-11-10)."""
+    return ((rate - prev) ** 2).sum(-1, keepdim=True), rate.detach().clone()
+
+
+def ablate(terminal, terminated, truncated, timeout, captured, beta, w_terminal, pursuer,
+           no_timeout=False, closing_discount=False, truncate_failures=False):
+    """Thesis F9: one Roncero component at a time on top of the thesis rules. Inputs are the thesis outcome
+    (terminal reward [N, 1], terminated / truncated / timeout / captured [N, 1] bool, beta [N, 1] from Eq. (10)).
+    no_timeout: the timeout gives 0 to both roles (thesis: pursuer -W, evader +W).
+    closing_discount: the pursuer's capture reward is W * beta (thesis: W).
+    truncate_failures: every terminal ending except capture (crash, evader leaving) becomes a truncation (value
+    bootstrapped); its rewards are unchanged. Returns (terminal, terminated, truncated)."""
+    if no_timeout:
+        terminal = torch.where(timeout, torch.zeros_like(terminal), terminal)
+    if closing_discount and pursuer:
+        terminal = torch.where(captured, w_terminal * beta, terminal)
+    if truncate_failures:
+        fail = terminated & ~captured
+        truncated = truncated | fail
+        terminated = captured.clone()
+    return terminal, terminated, truncated

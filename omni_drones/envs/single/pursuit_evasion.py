@@ -143,6 +143,11 @@ class PursuitEvasion(IsaacEnv):
         self.reward_mode = str(task_cfg.get("reward_mode", "thesis"))
         assert self.reward_mode in ("thesis", "roncero"), self.reward_mode
         self.roncero_k = dict(roncero_reward.DEFAULTS, **dict(task_cfg.get("roncero", {}) or {}))
+        # Thesis F9: single Roncero components on top of the thesis rules (roncero_reward.ablate); all off by default.
+        abl = dict(task_cfg.get("ablation", {}) or {})
+        self.abl_no_timeout = bool(abl.get("no_timeout", False))
+        self.abl_closing_discount = bool(abl.get("closing_discount", False))
+        self.abl_truncate_failures = bool(abl.get("truncate_failures", False))
         # Dense per-step distance penalty (pursuer only; matches Intercept's
         # _reward_distance_to_evader = reward_distance_weight * distance). With a
         # negative weight it penalizes being far from the evader. Disabled by
@@ -767,9 +772,6 @@ class PursuitEvasion(IsaacEnv):
         self.agent_effort = self.agent_drone.apply_action(agent_action)
         self.current_action = tensordict[("info", "policy_action")]
         self.action_error_order1 = tensordict[("stats", "action_error_order1")]
-        rate = self.current_action[..., :3].reshape(self.num_envs, 3)
-        self._rate_jerk_sq = ((rate - self._prev_rate_action) ** 2).sum(-1, keepdim=True)
-        self._prev_rate_action = rate.detach().clone()
 
         if self._any_esn:
             self._esn_stepped[:] = False
@@ -1322,6 +1324,15 @@ class PursuitEvasion(IsaacEnv):
         # The opponent crashing or (evader) leaving the arena is neutral for the agent.
         self._terminal_reward = self.reward_terminal_weight * (
             self._win.float() - self._loss.float())
+        if self.abl_no_timeout or self.abl_closing_discount or self.abl_truncate_failures:
+            pursuer = self.role == PURSUER
+            pd, ed = (self.agent_drone, self.opp_drone) if pursuer else (self.opp_drone, self.agent_drone)
+            v_close = roncero_reward.closing_speed(pd.pos[:, 0], pd.vel_w[:, 0, :3], ed.pos[:, 0], ed.vel_w[:, 0, :3])
+            beta = torch.exp(-self.roncero_k["alpha_close"] * torch.relu(v_close - self.roncero_k["v_safe"]))
+            self._terminal_reward, self._terminated, self._truncated = roncero_reward.ablate(
+                self._terminal_reward, self._terminated, self._truncated, self._timeout, self._captured, beta,
+                self.reward_terminal_weight, pursuer, self.abl_no_timeout, self.abl_closing_discount,
+                self.abl_truncate_failures)
         self.stats["reward_terminal"][:] = self._terminal_reward
         self.stats["timeout"][:] = torch.maximum(
             self.stats["timeout"], self._timeout.float())
@@ -1394,6 +1405,8 @@ class PursuitEvasion(IsaacEnv):
             pursuer = self.role == PURSUER
             pd, ed = (self.agent_drone, self.opp_drone) if pursuer else (self.opp_drone, self.agent_drone)
             v_close = roncero_reward.closing_speed(pd.pos[:, 0], pd.vel_w[:, 0, :3], ed.pos[:, 0], ed.vel_w[:, 0, :3])
+            rate = self.current_action[..., :3].reshape(self.num_envs, 3)       # once per control step
+            self._rate_jerk_sq, self._prev_rate_action = roncero_reward.rate_jerk(rate, self._prev_rate_action)
             reward = roncero_reward.reward(pursuer, self._captured, delta, body_rate, self._rate_jerk_sq,
                                            self._agent_crash | self._agent_oob, v_close, self.roncero_k)
             zero = torch.zeros_like(reward)
