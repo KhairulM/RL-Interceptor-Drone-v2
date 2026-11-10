@@ -165,8 +165,8 @@ was trained for 0.10 m. Most directions hold; many 0.10 m gaps were partly final
 **Self-play only (0.10 m)**: see [Self-play synthesis](#self-play-synthesis-rq1-and-rq2-from-the-self-play-campaigns-only-010-m-written-2026-11-09) below: RQ1 no (Hedge best, descriptive); RQ2 partly (opponent model helps on held-out evaders, RLS does not).
 
 **Running / pending (updated 2026-11-10 17:05)**: F9 (one-change-at-a-time ablation of Roncero's rules) running since
-15:29; F8c re-run on pursuer stage 24 (see the F8 correction) takes the next free GPU slots (~19:25-21:30),
-then the rest of F9 and F9c (~03:30, 11-11). No freeze date
+15:29 (control / no_timeout done ~19:35). F8 is being re-run from scratch with the k_sm fix (`thesis-F8b-*`,
+~03:30 11-11), then F8c on its stage-24 pursuers (~05:30), then the rest of F9 and F9c (~11:30, 11-11). No freeze date
 (user, 11-09). Open (user): F5 Exp 2 (paused), the exploiter-augmented pool.
 
 ## Self-play synthesis: RQ1 and RQ2 from the self-play campaigns only (0.10 m; written 2026-11-09)
@@ -2323,8 +2323,9 @@ Eq. 8) was **0 in practice** in every Roncero-rules run (both F8 campaigns, all 
 computed in `_pre_sim_step`, which runs once per physics substep (2 per control step), so the second call compared the
 action with itself. F8 therefore used Roncero's rules without that term (at typical ||Δa||² of 1-4 it would cost
 ~3-12 per 1,500-step episode, the order of the capture bonus 10). Not affected: thesis-rules runs and F9 (their
-smoothness term is computed once per step). Not fixed in code yet, so the F8c re-run stays consistent with the F8
-campaigns.
+smoothness term is computed once per step). Fixed 19:25 (`roncero_reward.rate_jerk`, once per control step); F8 is
+being re-run from scratch as `thesis-F8b-roncero-s{0,100}` (amendment 2), and this section will be rewritten from it.
+The k_sm = 0 campaigns stay on disk as a 'Roncero without smoothness' variant.
 
 **Question:** do evaders still beat self-play pursuers by luring them into the floor when the game uses Roncero et
 al.'s reward and episode endings? (Is the weakness created by the thesis rules, or is it in the pursuer?)

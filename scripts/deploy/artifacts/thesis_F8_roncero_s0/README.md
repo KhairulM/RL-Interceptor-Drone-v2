@@ -19,10 +19,12 @@ Run: set `artifact_dir: artifacts/thesis_F8_roncero_s0/pursuer` (or `evader`) in
 the opponent drone's `artifact_dir` to the other folder for policy-vs-policy.
 
 Caveats for flight tests:
+- These come from the original F8 campaign, trained with the k_sm bug. F8 is being re-run with the fix as
+  `thesis-F8b-roncero-s{0,100}` (done ~11-11 03:30); export its final policies for a like-for-like Roncero test.
 - Roncero's action-smoothness term (k_sm) was 0 in practice during F8 training (computed per physics substep; found
   11-10). The only smoothness pressure was the body-rate penalty k_br = 0.001, so expect aggressive rate commands:
   start with `controller.command_rate_lpf_tau` 0.02-0.05 (see the controller config comment).
-- In simulation the F8c evaluation of these final policies is still running (11-10); the evaluated numbers in
-  RESULTS.md before then are for pursuer stage 8. In-campaign (Roncero rules, 0.10 m): this pursuer neutralises its
+- These final policies have no F8c evaluation (F8c evaluated stage 8 of this campaign, and the re-run evaluates the
+  F8b campaigns instead). In-campaign (Roncero rules, 0.10 m): this pursuer neutralises its
   campaign's older evaders in 0.93-0.99 of episodes; this evader beats every pursuer stage (pursuer J 0.14-0.29).
 - `notes.trained_against` in metadata.json shows the YAML default opponent, not the self-play pool.
