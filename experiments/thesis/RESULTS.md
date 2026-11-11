@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-11-11 11:30; details in the sections below)
+## Summary (updated 2026-11-11 13:25; details in the sections below)
 
 J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over
 seeds; "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position +
@@ -142,6 +142,9 @@ velocity, no acceleration).
   +0.078, train pool +0.283 / +0.262, X3 exploiters +0.044 / +0.026; exploitability 0.631 / 0.513 vs 0.974 / 0.985,
   by near-miss timeouts (0.000 / 0.026 at 0.15 m). H-rules held, H-pursuer did not. Post-hoc: the F8 game is as
   transitive as F3's (reversals 0.3-0.8 %) and its early evaders are no more diverse.
+  F8d (stronger held-out test, eval only): against the final evaders of 16 other campaigns the final F8 pursuer beats
+  Hedge's by +0.189 / +0.126 (0.858 / 0.875 vs 0.669 / 0.749; worst case 0.653 / 0.603 vs 0.326 / 0.446), and F8
+  already beats Hedge's final pursuer at stage 8 (250M pursuer frames vs Hedge's 1.5B).
 - **F9 (one Roncero component at a time on the thesis rules, 13 x 50M with the GAE truncation fix, 1 seed,
   descriptive): the control arm is already hardly lurable** (in-campaign lure 0.36, exploiter crash 0.056,
   exploitability 0.440), unlike F3 hedge (0.97-0.98): the GAE fix and / or the shorter stages matter, and F9 cannot
@@ -2460,6 +2463,54 @@ Findings:
   1's late spread against the probes is the only hint of more variety.
 - Limitations: 2 seeds; in-campaign evals only at the training radius and only between stages of one campaign; the
   shared space has 4 probes; the Vendi descriptors include J, so part of the spread is strength, not style.
+
+### F8d: stronger held-out test and F8 learning curve (pre-registered 2026-11-11 12:21; eval only, done 13:21; written up 13:25; 2 seeds, descriptive)
+
+**Question (user):** v10 no longer separates the strong pursuers (F8 0.94-0.95, everyone >= 0.96 at 0.15 m). Is F8's
+final pursuer still better than Hedge's against stronger held-out learned evaders, and how early does it overtake?
+
+**Setup:** pursuers = F8 stages 8 / 16 / 24 (250M / 450M / 650M pursuer frames) and the F3 hedge-both final pursuers
+(stage 8, 1.5B pursuer frames; not matched by stage count, since F8's final pursuer already has fewer frames). Clean
+evals under the thesis rules vs the test set (F8c / F3c evals reused for F8 stage 24 / hedge) and vs the **final evader
+of 20 campaigns**: a common "strong" set of 16 none of these pursuers trained with (F2-plain, F3 uniform-s1, qd_dpp x2,
+pfsp x2, F6 x2, F6b x2, F7 r15 / floor_r15, F9 x4) plus the F3 hedge and F8 finals (own campaign excluded).
+[F8d_heldout/summary.md](F8d_heldout/summary.md) (per-evader tables), `results.json`, `exps/f8d_heldout.py`.
+
+| J at 0.10 m (0.15 m) | F8 s0 P8 | F8 s0 P16 | F8 s0 P24 | F8 s1 P8 | F8 s1 P16 | F8 s1 P24 | hedge s0 | hedge s1 |
+|---|---|---|---|---|---|---|---|---|
+| held-out RL (v10) | 0.889 (0.977) | 0.960 (0.998) | 0.948 (0.995) | 0.925 (0.992) | 0.968 (0.995) | 0.941 (0.996) | 0.791 (0.960) | 0.882 (0.989) |
+| held-out worst cluster | 0.828 (0.949) | 0.938 (0.997) | 0.917 (0.993) | 0.871 (0.982) | 0.961 (0.994) | 0.893 (0.992) | 0.692 (0.874) | 0.816 (0.921) |
+| **strong finals, mean (16)** | 0.753 (0.898) | 0.864 (0.966) | **0.858** (0.959) | 0.849 (0.937) | 0.861 (0.955) | **0.875** (0.955) | **0.669** (0.879) | **0.749** (0.927) |
+| strong finals, worst | 0.179 (0.471) | 0.662 (0.915) | 0.653 (0.898) | 0.482 (0.604) | 0.620 (0.833) | 0.603 (0.820) | 0.326 (0.671) | 0.446 (0.795) |
+| strong finals, pursuer crash | 0.100 (0.028) | 0.139 (0.037) | 0.152 (0.042) | 0.078 (0.026) | 0.147 (0.047) | 0.142 (0.050) | 0.357 (0.123) | 0.275 (0.076) |
+| F3 hedge finals | 0.899 (0.979) | 0.845 (0.945) | 0.867 (0.952) | 0.947 (0.991) | 0.866 (0.953) | 0.870 (0.935) | 0.740 (0.929) | 0.846 (0.958) |
+| F8 finals (other seed for F8) | 0.553 (0.582) | 0.222 (0.231) | 0.863 (0.953) | 0.190 (0.469) | 0.780 (0.981) | 0.864 (0.976) | 0.783 (0.945) | 0.817 (0.959) |
+
+Findings:
+- **The strong set separates the pursuers where v10 does not.** Mean J on it is 0.07-0.13 below v10 for every final
+  pursuer, and the worst final evader (F7 floor_r15's, on both seeds) holds Hedge to 0.326 / 0.446.
+- **F8's final pursuer beats Hedge's on the strong set: +0.189 / +0.126** (0.858 / 0.875 vs 0.669 / 0.749; at 0.15 m
+  +0.080 / +0.028). Its worst case is much higher (0.653 / 0.603 vs 0.326 / 0.446), and it crashes half as often
+  (0.15 vs 0.28-0.36). The gain is largest against evaders that lure or press hard: the PFSP finals (0.83-0.94 vs
+  0.38-0.60), F6's (0.93-0.97 vs 0.53-0.75) and F7's (0.80-0.90 vs 0.33-0.68). Against the F3 uniform / qd_dpp, F6b
+  and F9 endings finals the two are level (0.84-0.99 both). The hardest final for F8 is F9 no_timeout's (0.65 / 0.60;
+  Hedge 0.53 / 0.55).
+- **F8 overtakes early.** Already at stage 8 (250M pursuer frames, 1/6 of Hedge's) F8 is above Hedge's final pursuer on
+  v10 (0.889 / 0.925 vs 0.791 / 0.882) and above it on the strong set (0.753 / 0.849 vs 0.669 / 0.749), with
+  one weak spot on s0 (F7 floor_r15's final 0.18). By stage 16 it is at its final level (strong finals 0.864 / 0.861;
+  v10 peaks at stage 16, 0.960 / 0.968, then 0.948 / 0.941 at stage 24).
+- **F8's own late evaders stay hard for earlier F8 pursuers** (stages 8 / 16 vs the other seed's final evader: 0.19-0.78)
+  but not for its final pursuers (0.863 / 0.864), consistent with the staircase.
+- **Predictions (pre-registered 12:21):**
+  - (1) strong set harder than v10 for all four final pursuers: **held** (by 0.07-0.13).
+  - (2) F8 final >= Hedge final + 0.05 on the strong set, both seeds: **held** (+0.189 / +0.126; at 0.15 m only s0
+    clears 0.05, +0.080 / +0.028).
+  - (3) F8 rises from stage 8 to 24 on held-out RL and the strong set, both seeds: **held** (not monotone: held-out RL
+    peaks at stage 16); F8 stage 8 below Hedge's final on held-out RL, both seeds: **did not hold** (0.889 / 0.925 vs
+    0.791 / 0.882).
+- Limitations: 2 seeds; one final evader per campaign; the strong set is 16 evaders from our own campaigns (all with
+  thesis or near-thesis rules), not an external lineage; F8 vs F3 still differ in rules, schedule and the GAE fix (F9,
+  F10); eval at the training radius only for the 0.10 m column.
 
 ## F9_ablation_sp / F9c (one Roncero component at a time on the thesis rules; campaigns done 2026-11-10 19:31 (control, no_timeout) and 2026-11-11 09:28 (beta, endings); F9c done 10:58; written up 2026-11-11 11:30; 1 seed, descriptive)
 
