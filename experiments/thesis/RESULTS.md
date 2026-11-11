@@ -4,7 +4,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 seeds/episodes, and any deviation from [the plan](../../docs/research_plan.md). Predictions are in the plan and are
 compared here as "prediction held / did not hold".
 
-## Summary (updated 2026-11-10 17:05; details in the sections below)
+## Summary (updated 2026-11-11 11:30; details in the sections below)
 
 J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over
 seeds; "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position +
@@ -134,17 +134,20 @@ velocity, no acceleration).
   - Predictions (1), (3), (4), (5) did not hold; (2) held in part. **Decision rule: the rules stay** (0.10 m, no floor
     penalty).
 
-- **F8 (Roncero et al.'s reward and episode endings, Hedge both roles, 26 stages x 50M, 2 seeds, descriptive): the
-  floor-lure exploit disappears.** *Correction 11-10 17:05: F8c tested pursuer stage 8 of 0-24, not the final stage
-  (loader bug), so every F8c number here is for the stage-8 pursuer; re-run pending.* No evader stage lures (pursuer crash 0.00 at stages 3 / 5 / 7; F3 hedge 0.95-0.98),
-  and the stage-8 pursuers are not lured even by an exploiter trained under the thesis rules, where luring pays
-  (pursuer crash 0.002 on both seeds; F3 hedge 0.975 / 0.988). The exploiters win by timeout instead, mostly near
-  misses (exploitability 0.755 / 0.770 at 0.10 m, 0.177 / 0.132 at 0.15 m). The pursuer is safer and better on the
-  train pool (+0.21 / +0.18) and scripted evaders (+0.18 / +0.12) but weaker on held-out RL (-0.37 / -0.28) and X3
-  exploiters (-0.41 / -0.40) than F3 hedge. Prediction H-pursuer did not hold; **H-rules held: the weakness depends on
-  the episode-ending / reward rules.** Endings, closing-speed factor and schedule change together, so which part
-  matters is not yet known (F9 running). Post-hoc: the F8 game is as transitive as F3's and its evaders are no more
-  diverse (reversals 0.003-0.020; evader Vendi 1.5-2.5 of 4 vs F3 hedge 2.0-2.4).
+- **F8 (Roncero et al.'s reward and episode endings, Hedge both roles, 26 stages x 50M, 2 seeds, descriptive;
+  re-run 11-11 after two bugs in the first run, see the section): the floor-lure exploit disappears, and the final
+  pursuer is better than Hedge's.** No evader stage lures (pursuer crash 0.00 at stages 3 / 5 / 7; F3 hedge
+  0.95-0.98), and even an exploiter trained under the thesis rules makes the final pursuer crash in only 0.010 /
+  0.030 of episodes (F3 hedge 0.975 / 0.988). Against F3 hedge: held-out RL +0.157 / +0.060, worst cluster +0.225 /
+  +0.078, train pool +0.283 / +0.262, X3 exploiters +0.044 / +0.026; exploitability 0.631 / 0.513 vs 0.974 / 0.985,
+  by near-miss timeouts (0.000 / 0.026 at 0.15 m). H-rules held, H-pursuer did not. Post-hoc: the F8 game is as
+  transitive as F3's (reversals 0.3-0.8 %) and its early evaders are no more diverse.
+- **F9 (one Roncero component at a time on the thesis rules, 13 x 50M with the GAE truncation fix, 1 seed,
+  descriptive): the control arm is already hardly lurable** (in-campaign lure 0.36, exploiter crash 0.056,
+  exploitability 0.440), unlike F3 hedge (0.97-0.98): the GAE fix and / or the shorter stages matter, and F9 cannot
+  separate them. Removing the timeout terms restores F3-level luring (0.75; exploiter crash 0.955); truncation
+  endings stop evaders from learning to lure (0.03) but leave the pursuer lurable by an exploiter (0.834); beta is in
+  between (0.18; 0.395). Predictions: (2) and (3) held, (1) did not, (4) half.
 
 **0.15 m capture radius (eval-only exact re-score of every closed-loop eval; F6b added 2026-11-10; F8 reports both radii itself).**
 J at 0.15 m is an upper bound and exploitability a lower bound for a 0.15 m game, because every policy and exploiter
@@ -164,10 +167,10 @@ was trained for 0.10 m. Most directions hold; many 0.10 m gaps were partly final
 
 **Self-play only (0.10 m)**: see [Self-play synthesis](#self-play-synthesis-rq1-and-rq2-from-the-self-play-campaigns-only-010-m-written-2026-11-09) below: RQ1 no (Hedge best, descriptive); RQ2 partly (opponent model helps on held-out evaders, RLS does not).
 
-**Running / pending (updated 2026-11-10 17:05)**: F9 (one-change-at-a-time ablation of Roncero's rules) running since
-15:29 (control / no_timeout done ~19:35). F8 is being re-run from scratch with the k_sm fix (`thesis-F8b-*`,
-~03:30 11-11), then F8c on its stage-24 pursuers (~05:30), then the rest of F9 and F9c (~11:30, 11-11). No freeze date
-(user, 11-09). Open (user): F5 Exp 2 (paused), the exploiter-augmented pool.
+**Running / pending (updated 2026-11-11 11:30)**: nothing running. F8 (re-run) / F8c and F9 / F9c are done and
+written up (both radii). No freeze date (user, 11-09). Open (user): opponent sensor noise in the noisy runs (A3b-d,
+F4, F5; audit), the seed-CI method, F5 Exp 2 (paused), the exploiter-augmented pool, and an arm separating the GAE
+fix from the stage schedule (F9 control).
 
 ## Self-play synthesis: RQ1 and RQ2 from the self-play campaigns only (0.10 m; written 2026-11-09)
 
@@ -221,12 +224,14 @@ only by pursuer crash. Inside the campaigns each evader stage lures the current 
 and the next pursuer stage patches it (F5 post-hoc); F6b's redesigned term also restored high in-campaign lure rates
 but did not improve diversity or final-pursuer robustness. F4 (noisy, estimated velocity) is the exception
 (0.675-0.872, partly by timeout). Interpretation (not tested): in self-play the pursuer's robustness is limited by
-this one exploitable failure mode more than by opponent sampling or opponent modelling. **F8 (added 2026-11-10)**: the
-failure mode depends on the rules. Under Roncero et al.'s reward and truncation endings no evader stage lures and the
-stage-8 pursuers (F8c tested stage 8, not the final 24; re-run pending) are not lured even by a thesis-rules exploiter (pursuer crash 0.002), but they are weaker on held-out
-RL evaders (-0.37 / -0.28 vs F3 hedge) and lose to exploiters by near-miss timeouts instead.
+this one exploitable failure mode more than by opponent sampling or opponent modelling. **F8 / F9 (added 2026-11-10, rewritten 11-11)**:
+the failure mode depends on the training setup. Under Roncero et al.'s reward and truncation endings no evader stage
+lures and the final pursuers are not lured even by a thesis-rules exploiter (pursuer crash 0.010 / 0.030); they also
+beat F3 hedge on held-out RL (+0.157 / +0.060) and are exploitable only by near-miss timeouts. F9 shows that the
+thesis rules with the GAE truncation fix and 50M-frame stages are already hardly lurable (exploiter crash 0.056), so
+the robustness ceiling seen in F2-F7 is partly a training-setup effect, not only the rules or the sampler.
 
-## Relation to the reference papers (updated 2026-11-10 17:05)
+## Relation to the reference papers (updated 2026-11-11 11:30)
 
 Reference papers (the thesis is positioned against these three):
 **[AgilePE]** Tang et al. 2026, arXiv:2608.14135; **[Roncero]** Sanchez Roncero et al. 2026 (AMSPBH),
@@ -258,7 +263,7 @@ All numbers in this table are at the 0.10 m training radius. At 0.15 m (see the 
 | 1 | Prioritising hard opponents (Hedge / PFSP) improves on uniform population sampling. Roncero Fig. 5: Hedge beats uniform AMSPB by +0.05 to +0.27 win rate in 8 of 9 settings (3 seeds). AgilePE: PFSP stronger than FSP (single runs). | D1, 5 seeds, fixed 20-evader pool: win-rate softmax (S-W, closest to Hedge/PFSP) minus uniform: train **-0.054 [-0.081, -0.026]**, held-out RL **-0.088 [-0.145, -0.035]**, worst held-out cluster **-0.088 [-0.147, -0.030]**, worse on 5/5 seeds. Multi-metric softmax (S-M, closest to Gavin's outcome score): train **-0.150 [-0.259, -0.047]**, exploiters **-0.166 [-0.302, -0.047]**, held-out RL -0.143 [-0.306, +0.021]. D2: no sampler lowers exploitability. In full self-play with the sampler on both roles (F3, 2 seeds, descriptive): Roncero's Hedge beats uniform on held-out RL (+0.100) and the worst held-out cluster (+0.161) on both seeds; PFSP without a uniform share is mixed on held-out RL (+0.038) and much worse against other campaigns' evaders (-0.226). | **Replicates directionally in self-play (Hedge, F3, 2 seeds), not on a fixed pool (D1).** PFSP without a uniform share specialises (F3, D1c). Differences of the fixed-pool test: we train one pursuer against a fixed pool (no co-evolving generations); our uniform floor is 0.5 (Roncero 0.7) and we use a softmax (T = 0.9) instead of a power eta = 2. We did not run latest-opponent-only self-play (Roncero's AMSDRL, Gavin's SP), so we do not test "population beats latest-only". D1c (exploratory): with **no** uniform floor, hardness prioritisation collapses (train -0.29); this agrees with Roncero's advice to keep gamma large, and is a warning for PFSP without a uniform share (AgilePE does not report one). |
 | 2 | Self-play with PFSP "sustains tactical diversity" (AgilePE); the population "contains distinct pursuit and evasion behaviours" (Roncero). Neither paper measures diversity. | X2: 22 RL evaders from three self-play campaigns amount to **3.8 effectively distinct behaviours** (Vendi score), 7 clusters; consecutive stages are 36 % closer than random same-campaign pairs. F3 (2 seeds): evader Vendi per campaign (4 RL evaders, max 4): pfsp 2.985 > hedge 2.499 ~ uniform 2.456 > qd_dpp 2.350; pfsp - uniform +0.529 on both seeds. F6 (2 seeds): adding a PSD-PSRO diversity term for the evaders to Hedge raises evader Vendi to 3.253 (+0.754 vs Hedge, both seeds), but the term was saturated (a survival bonus), its evaders stopped luring, and its pursuer is much weaker (held-out RL -0.262, other campaigns' evaders -0.471). Redesigned so it neither saturates nor pays a survival bonus (F6b, 2 seeds), the term keeps the evaders luring but no longer adds diversity (Vendi 2.365 vs Hedge 2.499) and the pursuer stays below Hedge on held-out RL (-0.128, mixed seeds). | **Extends:** first quantitative measure; the pool is diverse across campaigns but highly redundant within one. **Consistent with AgilePE:** PFSP self-play produces the most diverse evaders (F3), but its pursuer is the most specialised. **More evader diversity does not by itself give a better pursuer** (F3 pfsp, F6), and a diversity term weak enough to keep the evaders effective adds no diversity (F6b). |
 | 3 | Our addition: sample by quality *and* diversity (QD-DPP). No reference paper uses diversity in sampling. | D1: QD-DPP beats both hardness samplers (vs S-M held-out RL +0.185 [+0.110, +0.259]; vs S-W +0.131 [+0.038, +0.223]) but is **not** better than uniform (+0.042 [-0.069, +0.131]). D1b: bounds the sampling mass of duplicates but does not protect performance. F1: no sampler effect once the acceleration input is present. D2: not less exploitable. F3 (self-play, both roles, 2 seeds): not better than uniform (held-out RL -0.041, worst cluster -0.052) and below Hedge (-0.140 / -0.213); produces the least diverse evaders (Vendi 2.350). F6 / F6b (diversity in training instead of sampling, 2 seeds each): F6 more diverse evaders but a much weaker pursuer; F6b no more diverse and below Hedge on held-out RL (see row 2). | **New, negative:** diversity repairs the damage of badly tuned hardness prioritisation on a fixed pool (D1); in self-play it is no better than uniform and worse than Roncero's Hedge (F3). |
-| 4 | Population training generalises to unseen opponents (Roncero: unseen APF evader; Gavin: SP/PFSP pursuers vs other evaders). | Consistent for scripted opponents: held-out scripted evaders (zigzag, fast flee, 4 switching evaders) are neutralised at J 0.99-1.00 by every pursuer. **Not** for learned opponents: against the independent v10 lineage the generalist loses up to 0.37 J to a specialist; fresh exploiters (PPO best responses, 100M frames) reach J 0.22-0.43 against it (X3), and the mean exploitability per sampler is 0.44-0.69 (D2; one failed exploiter included). With the reference papers' own co-evolution protocol (F2b/F2c, 1 seed per arm), the final self-play pursuers neutralise held-out scripted evaders at only 0.83-0.88, the thesis train pool's v9 evaders at 0.34-0.48, and are **~fully exploitable (0.97)**: a fresh exploiter makes them crash in 97 % of episodes. The same holds for every later self-play pursuer (F3c 0.97-0.98; F5 Exp 1 uniform_rls 0.95-0.97, pursuer crash 95-97 % against its exploiter; F6 0.98). Training with a 0.15 m capture radius, with or without a pursuer floor penalty, does not change this: 0.963 / 0.968 vs exploiters trained under the 0.15 m rules, pursuer crash 0.97 (F7, 1 seed per arm). **Under Roncero's own reward and episode endings (F8, 2 seeds, Hedge, 13 generations x 50M) the crash exploit disappears**: no evader stage lures, and (for the stage-8 pursuer that F8c tested by mistake instead of the final stage 24; re-run pending) even an exploiter trained under the thesis rules makes the pursuer crash in only 0.002 of episodes; exploitability is still 0.755 / 0.770 at 0.10 m, by near-miss timeouts (0.177 / 0.132 at 0.15 m). Gavin's rules give the evader the same lure incentive as the thesis rules, and their tables show crash-heavy evader wins (literature notes). | **Consistent for scripted, contradicted for learned opponents.** None of the three papers reports exploitability or held-out RL lineages; under their protocol the gap is larger, not smaller. **Extends Roncero:** his truncation endings and closing-speed factor remove the crash exploit that the thesis and Gavin's rules allow (F8), at a cost in held-out capture at 0.10 m. |
+| 4 | Population training generalises to unseen opponents (Roncero: unseen APF evader; Gavin: SP/PFSP pursuers vs other evaders). | Consistent for scripted opponents: held-out scripted evaders (zigzag, fast flee, 4 switching evaders) are neutralised at J 0.99-1.00 by every pursuer. **Not** for learned opponents: against the independent v10 lineage the generalist loses up to 0.37 J to a specialist; fresh exploiters (PPO best responses, 100M frames) reach J 0.22-0.43 against it (X3), and the mean exploitability per sampler is 0.44-0.69 (D2; one failed exploiter included). With the reference papers' own co-evolution protocol (F2b/F2c, 1 seed per arm), the final self-play pursuers neutralise held-out scripted evaders at only 0.83-0.88, the thesis train pool's v9 evaders at 0.34-0.48, and are **~fully exploitable (0.97)**: a fresh exploiter makes them crash in 97 % of episodes. The same holds for every later self-play pursuer (F3c 0.97-0.98; F5 Exp 1 uniform_rls 0.95-0.97, pursuer crash 95-97 % against its exploiter; F6 0.98). Training with a 0.15 m capture radius, with or without a pursuer floor penalty, does not change this: 0.963 / 0.968 vs exploiters trained under the 0.15 m rules, pursuer crash 0.97 (F7, 1 seed per arm). **Under Roncero's own reward and episode endings (F8, 2 seeds, Hedge, 13 generations x 50M; re-run 11-11) the crash exploit disappears**: no evader stage lures, an exploiter trained under the thesis rules makes the final pursuer crash in only 0.010 / 0.030 of episodes, and the pursuer beats F3 hedge on held-out RL (+0.157 / +0.060); exploitability is 0.631 / 0.513 at 0.10 m, by near-miss timeouts (0.000 / 0.026 at 0.15 m). F9 (1 seed): the thesis rules with the GAE truncation fix and 50M-frame stages are already hardly lurable (exploiter crash 0.056); without the timeout terms the pursuer is fully lurable again (0.955). Gavin's rules give the evader the same lure incentive as the thesis rules, and their tables show crash-heavy evader wins (literature notes). | **Consistent for scripted, contradicted for learned opponents.** None of the three papers reports exploitability or held-out RL lineages; under their protocol the gap is larger, not smaller. **Extends Roncero:** his rules remove the crash exploit that the thesis and Gavin's rules allow and give a pursuer that generalises better than Hedge under the thesis rules (F8); part of the effect comes from the training setup (GAE truncation fix, 50M-frame stages; F9). |
 | 5 | Seeds may converge to different strategies (Roncero, limitations). | Generalist (uniform sampler) train J 0.56-0.87 across 5 seeds; held-out generalisation is **bimodal per seed**: 1-2 of 5 seeds fail on all later v10 evaders (J 0.10-0.29) while the others reach 0.74-0.97 (F1). | **Extends:** quantifies it; with 3 seeds (Roncero) effects of +/- 0.1 can come from one seed. |
 | 6 | Observation design: Roncero and Gavin give the pursuer opponent position + velocity to a memoryless MLP; Gavin leaves "trajectory prediction" out of scope; AgilePE adds a temporal window of opponent state. | Adding the opponent's acceleration (finite difference of two consecutive observations) is the **largest effect in this thesis**: train 0.722 -> 0.940 (+0.199 [+0.128, +0.270]), exploiters 0.497 -> 0.983 (+0.464 [+0.239, +0.638]), held-out RL 0.634 -> 0.838 (CI includes 0 because of the bimodal seeds) (F1, 5 seeds). A learned acceleration estimate does the same (A2b, 5 seeds: all paired differences to the finite difference within +/- 0.04, n.s.). It also lowers exploitability: 0.672 -> 0.397, paired -0.275 [-0.522, -0.044] (F2a). A raw 10-step history stack (our analogue of a temporal window) was *worse* than no history (train -0.254 [-0.355, -0.152]) (A1b). Under co-evolution (F2c, 1 seed per arm, descriptive) the gain is smaller: final pursuer +0.12 on held-out RL, +0.07 on the whole test set, but worse on the other campaign's evaders (0.74 vs 0.86) and no lower exploitability (0.965 vs 0.974); the acc campaign also leapfrogs much less. With a learned estimate instead (F5 Exp 1, 3 seed pairs): held-out RL +0.091 [+0.055, +0.116], worst held-out cluster +0.128 [+0.042, +0.174] (all 3 pairs positive), but other campaigns' evaders -0.027 and train pool +0.024 (seed 300 negative on both), exploitability unchanged (0.96 vs 0.97). At a 0.15 m capture radius (eval-only re-score) the held-out gain shrinks to +0.021. | **New:** a memoryless pursuer with position + velocity (Roncero, Gavin) is limited by the missing opponent acceleration far more than by opponent sampling, when trained against a fixed pool; under co-evolution the gain is smaller and limited to held-out evaders with a learned estimate (F5 Exp 1, 3 pairs: held-out +0.09 / +0.13, other campaigns -0.03), mixed with finite differences (F2c, 1 seed), largely final-approach precision (0.15 m re-score), and it never lowers exploitability. Caveat: AgilePE's window length and architecture are not given, so the history-stack result is not a test of AgilePE itself. |
 | 7 | Future work in Roncero: online adaptation, recurrent policies. | Noise-free, online RLS adaptation of a learned opponent model adds nothing in closed loop (A1b, A2b; within or across episodes); a random reservoir (ESN) is worse than no adaptation. **Under sensor noise it helps**: RLS vs frozen basis +0.09 train, +0.24 exploiters, CIs exclude 0 (A3c, policies trained noise-free). Recurrent policies (GRU) **not tested**; a recurrent *estimator* (GRU, trained on noisy inputs) is the most accurate opponent-state estimator under noise offline (A3e: velocity -36 % vs the MLP used in closed loop). In self-play (F5 Exp 1, 3 pairs): RLS vs frozen changes nothing clean (all within +/- 0.015); under noise it is mixed: held-out RL +0.031, but other campaigns' evaders -0.103 [-0.140, -0.069], train pool -0.025, exploitability +0.027. | **New, conditional:** online opponent-model adaptation pays off under sensor noise against a fixed pool (A3c), not with perfect state (Roncero's setting); in self-play (F5) it does not pay off. |
@@ -2308,147 +2313,234 @@ Findings:
     rule would have chosen beta 0.1); one weight tested in campaigns.
   - Vendi in F3's frozen descriptor space; one exploiter per pursuer.
 
-## F8_roncero_sp / F8c (Roncero et al. 2026's rules; campaigns done 2026-11-10 00:24; F8c done 02:18; written up 2026-11-10 14:52; 2 seeds, descriptive)
-
-**Correction (2026-11-10 17:05):** F8c evaluated **pursuer stage 8** of each F8 campaign, not the final stage 24,
-and only F8 evader stages 1-7. It reused F3's policy loader, which stops at stage 8 (F3 has 9 stages). Every F8c number
-below (the J table, both exploitability rows, the outcome table, the exploiters' training) is for the stage-8 pursuer
-(250M pursuer training frames of 650M); read "final pursuers" in this section as "stage-8 pursuers" until F8c is
-re-run on stage 24. Not affected: the in-campaign lure rates (every evader stage vs every pursuer stage, from the stage
-evals) and the F3 hedge columns (F3's real final pursuers). Fixed in code (`f8_roncero_sp.all_stages`, also used by
-F9c); re-run pending.
-
-**Second correction (2026-11-10 17:30, code audit):** Roncero's action-smoothness term (k_sm ||a_rate - a_rate_prev||²,
-Eq. 8) was **0 in practice** in every Roncero-rules run (both F8 campaigns, all Roncero-rules exploiters): it was
-computed in `_pre_sim_step`, which runs once per physics substep (2 per control step), so the second call compared the
-action with itself. F8 therefore used Roncero's rules without that term (at typical ||Δa||² of 1-4 it would cost
-~3-12 per 1,500-step episode, the order of the capture bonus 10). Not affected: thesis-rules runs and F9 (their
-smoothness term is computed once per step). Fixed 19:25 (`roncero_reward.rate_jerk`, once per control step); F8 is
-being re-run from scratch as `thesis-F8b-roncero-s{0,100}` (amendment 2), and this section will be rewritten from it.
-The k_sm = 0 campaigns stay on disk as a 'Roncero without smoothness' variant.
+## F8_roncero_sp / F8c (Roncero et al. 2026's rules; re-run with the k_sm fix: campaigns done 2026-11-11 03:39, F8c done 05:36; written up 2026-11-11 11:30; 2 seeds, descriptive)
 
 **Question:** do evaders still beat self-play pursuers by luring them into the floor when the game uses Roncero et
 al.'s reward and episode endings? (Is the weakness created by the thesis rules, or is it in the pursuer?)
 
-**Setup** (pre-registered 11-09 12:21; amendment 1, 12:28):
-- Campaigns `thesis-F8-roncero-s{0,100}`: our Crazyflie, observations, 4 x 4 x 2.9 m arena and 0.10 m capture radius;
+**Superseded first run (11-10).** The first F8 run (`thesis-F8-roncero-s{0,100}`, written up 11-10 14:52) had two
+bugs found in the 11-10 audit ([AUDIT_2026-11-10.md](AUDIT_2026-11-10.md)): Roncero's k_sm smoothness term was 0 in
+the reward (computed once per physics substep), and F8c evaluated pursuer stage 8 instead of 24 (stage-capped policy
+loader). Its numbers are withdrawn. Its campaigns stay on disk as a "Roncero without smoothness" variant (in-campaign
+lure rates were also 0.00 at evader stages 3 / 5 / 7); the stage-8 F8c outputs are in
+`F8_roncero_sp/archive_stage8_pursuer_20261110/`, the k_sm = 0 Roncero-rules exploiters of the F3 hedge pursuers in
+`archive_ksm0_roncero_exploiters_20261110/`. Everything below is from the re-run (amendment 2, 11-10 19:25).
+
+**Setup** (pre-registered 11-09 12:21; amendment 1, 12:28; amendment 2, 11-10 19:25):
+- Campaigns `thesis-F8b-roncero-s{0,100}`: our Crazyflie, observations, 4 x 4 x 2.9 m arena and 0.10 m capture radius;
   Hedge on both roles (gamma 0.7, eta 2); **26 stages x 50M frames = Roncero's 13 generations** (650M frames per agent).
-- `reward_mode=roncero` = Roncero v3 Eqs. (8)-(11) with his coefficients: shared regularisation incl. -10 for the
-  agent's own out-of-bounds (own crash or leaving the arena, both agents); pursuer capture bonus 10 x beta(closing
-  speed > 2 m/s) + approach 0.25 x distance closed; evader +0.0025 per step and -10 if captured, **nothing when the
-  pursuer fails**. **Capture is terminal; crashes, leaving the arena and the timeout are truncations** (the value
-  target bootstraps; PPO `gae_cut_at_truncation`). Not copied: his drone, arena, domain randomisation.
+- `reward_mode=roncero` = Roncero v3 Eqs. (8)-(11) with his coefficients: shared regularisation (body rate k_br,
+  action smoothness k_sm, -10 for the agent's own out-of-bounds: own crash or leaving the arena, both agents); pursuer
+  capture bonus 10 x beta(closing speed > 2 m/s) + approach 0.25 x distance closed; evader +0.0025 per step and -10 if
+  captured, **nothing when the pursuer fails**. **Capture is terminal; crashes, leaving the arena and the timeout are
+  truncations** (the value target bootstraps; PPO `gae_cut_at_truncation`). Not copied: his drone, arena, domain
+  randomisation.
 - F8c: both final pursuers (stage 24) evaluated under the thesis rules vs train pool, test set, the F3 campaigns'
-  evaders and both F8 campaigns' evaders, plus two fresh 100M-frame exploiters each: one under the **thesis rules**
-  (a pursuer crash ends the game at 0 for the evader, so luring pays) and one under **Roncero's rules**. The F3
-  hedge-both s0 / s1 final pursuers get a Roncero-rules exploiter too (their thesis-rules exploiters are F3c's).
-  [F8_roncero_sp/summary.md](F8_roncero_sp/summary.md), `results.json`.
-- Comparison: roncero/k vs F3 hedge/k (same seed; thesis rules, 9 x 300M). Rules, capture-bonus scaling and schedule
-  all differ together.
+  evaders and all F8 campaigns' evaders (13 stages each), plus two fresh 100M-frame exploiters each: one under the
+  **thesis rules** (a pursuer crash ends the game at 0 for the evader, so luring pays) and one under **Roncero's
+  rules**. The F3 hedge-both s0 / s1 final pursuers get a Roncero-rules exploiter too (their thesis-rules exploiters
+  are F3c's). [F8_roncero_sp/summary.md](F8_roncero_sp/summary.md), `results.json`.
+- Comparison: roncero/k vs F3 hedge/k (same seed; thesis rules, 9 x 300M, no GAE truncation fix). Rules,
+  capture-bonus scaling, schedule and the GAE fix all differ together; F9 (below) shows that the schedule and GAE fix
+  alone already change the result a lot.
 
-| pursuer (F8: stage 8, see correction; hedge: final), J at 0.10 m (0.15 m) | roncero s0 | roncero s1 | hedge s0 | hedge s1 |
+| final pursuer, J at 0.10 m (0.15 m) | roncero s0 | roncero s1 | hedge s0 | hedge s1 |
 |---|---|---|---|---|
-| held-out RL (v10) | 0.424 (0.576) | 0.597 (0.817) | 0.791 (0.960) | 0.882 (0.989) |
-| held-out worst cluster | 0.211 (0.432) | 0.515 (0.778) | 0.692 (0.874) | 0.816 (0.921) |
-| F3 campaigns' evaders (stage 1 excl.) | 0.852 (0.956) | 0.819 (0.942) | 0.871 (0.957) | 0.906 (0.973) |
-| other F8 campaign's evaders | 0.946 (0.994) | 0.987 (1.000) | 0.898 (0.980) | 0.919 (0.987) |
-| thesis train pool | 0.804 (0.911) | 0.825 (0.941) | 0.594 (0.759) | 0.640 (0.810) |
-| held-out scripted | 0.991 (0.999) | 0.971 (0.999) | 0.808 (0.905) | 0.853 (0.936) |
-| pursuer crash vs held-out scripted | 0.009 (0.001) | 0.018 (0.001) | 0.197 (0.096) | 0.149 (0.065) |
-| X3 exploiters | 0.541 (0.861) | 0.577 (0.944) | 0.955 (0.987) | 0.973 (0.992) |
-| exploitability vs thesis-rules exploiter | 0.755 (0.177) | 0.770 (0.132) | 0.974 (0.773) | 0.985 (0.855) |
-| exploitability vs Roncero-rules exploiter | 0.557 (0.526) | 0.886 (0.027) | 0.760 (0.540) | 0.932 (0.734) |
+| held-out RL (v10) | 0.948 (0.995) | 0.941 (0.996) | 0.791 (0.960) | 0.882 (0.989) |
+| held-out worst cluster | 0.917 (0.993) | 0.893 (0.992) | 0.692 (0.874) | 0.816 (0.921) |
+| F3 campaigns' evaders (stage 1 excl.) | 0.887 (0.975) | 0.877 (0.967) | 0.871 (0.957) | 0.906 (0.973) |
+| F8 campaigns' evaders (roncero: the other campaign's; stage 1 excl.) | 0.877 (0.950) | 0.935 (0.987) | 0.826 (0.959) | 0.874 (0.979) |
+| own campaign's evaders (roncero: 12, hedge: 3) | 0.916 (0.939) | 0.940 (0.971) | 0.957 (0.993) | 0.961 (0.995) |
+| thesis train pool | 0.877 (0.963) | 0.902 (0.974) | 0.594 (0.759) | 0.640 (0.810) |
+| held-out scripted | 0.983 (0.997) | 0.990 (0.999) | 0.808 (0.905) | 0.853 (0.936) |
+| pursuer crash vs held-out scripted | 0.018 (0.003) | 0.011 (0.002) | 0.197 (0.096) | 0.149 (0.065) |
+| X3 exploiters | 0.999 (1.000) | 0.999 (1.000) | 0.955 (0.987) | 0.973 (0.992) |
+| exploitability vs thesis-rules exploiter | 0.631 (0.000) | 0.513 (0.026) | 0.974 (0.773) | 0.985 (0.855) |
+| exploitability vs Roncero-rules exploiter | 0.512 (0.064) | 0.755 (0.331) | 0.816 (0.683) | 0.939 (0.825) |
 
-How the exploiters win (fractions of episodes at 0.10 m; the thesis-rules exploiter of hedge s0 / s1 is F3c's):
+How the exploiters win (fractions of episodes at 0.10 m; the thesis-rules exploiter of hedge s0 / s1 is F3c's;
+leaving the arena is non-terminal under the thesis rules and ends the episode under Roncero's):
 
 | pursuer | exploiter | capture | pursuer crash | pursuer leaves arena | timeout | evader crash / leaves |
 |---|---|---|---|---|---|---|
-| roncero s0 / s1 | thesis rules | 0.201 / 0.152 | **0.002 / 0.002** | 0.006 / 0.006 | 0.753 / 0.768 | 0.044 / 0.079 |
-| roncero s0 / s1 | Roncero rules | 0.021 / 0.025 | 0.001 / 0.000 | 0.011 / 0.007 | 0.546 / 0.879 | 0.422 / 0.088 |
+| roncero s0 / s1 | thesis rules | 0.304 / 0.441 | **0.010 / 0.030** | 0.054 / 0.012 | 0.622 / 0.484 | 0.066 / 0.046 |
+| roncero s0 / s1 | Roncero rules | 0.032 / 0.077 | 0.001 / 0.006 | 0.289 / 0.094 | 0.241 / 0.658 | 0.456 / 0.169 |
 | hedge s0 / s1 | thesis rules (F3c) | | **0.975 / 0.988** | | | |
-| hedge s0 / s1 | Roncero rules | 0.144 / 0.045 | 0.115 / 0.021 | **0.653 / 0.905** | 0.000 / 0.009 | 0.096 / 0.023 |
+| hedge s0 / s1 | Roncero rules | 0.040 / 0.028 | 0.106 / 0.023 | **0.718 / 0.915** | 0.001 / 0.004 | 0.144 / 0.032 |
 
 In-campaign pursuer crash caused by each evader stage in the stage >= 2 pursuers (its own training opponents, under
 Roncero's rules, 0.10 m): evader stages 3 / 5 / 7: **0.00 / 0.00 / 0.00** on both seeds (F3 hedge under the thesis
-rules: 0.97 / 0.98 / 0.98 and 0.95 / 0.98 / 0.97). Later evader stages 9-25: mean 0.00-0.11 per stage (seed 0, at most
-0.39 against one pursuer), 0.00-0.02 (seed 1).
+rules: 0.97 / 0.98 / 0.98 and 0.95 / 0.98 / 0.97). Later evader stages 9-25: per-stage means 0.00-0.05 on both seeds
+(at most 0.18 against one pursuer in s0, 0.26 in s1).
 
 Findings:
-- **Under Roncero's rules the floor-lure exploit disappears.** No evader stage learns to lure (0.00 at stages 3 / 5 /
-  7, at most 0.11 later), and the final pursuers are not lured **even by an exploiter trained under the thesis rules,
-  where luring pays**: pursuer crash 0.002 on both seeds (F3 hedge pursuers: 0.975 / 0.988). That exploiter never found
-  a lure during training (pursuer crash at most 0.028 in all 39 / 41 logged updates of its 762 iterations).
-- **The exploiters win by timeout instead, mostly near misses.** Against the thesis-rules exploiter the F8 pursuers
-  time out in 0.753 / 0.768 of episodes; at 0.15 m exploitability falls to 0.177 / 0.132 (lower bounds), so in most of
-  those episodes the pursuer came within 0.15 m but not 0.10 m.
-- **The F8 pursuer is safer and better against easy opponents, but weaker against agile learned evaders.** Train pool
-  +0.210 / +0.184 and held-out scripted +0.183 / +0.118 vs hedge, with almost no crashes against scripted evaders
-  (0.009 / 0.018 vs 0.197 / 0.149). But held-out RL -0.367 / -0.284, worst cluster -0.482 / -0.301, X3 exploiters
-  -0.414 / -0.395 (at 0.15 m: held-out RL -0.383 / -0.172, X3 exploiters -0.126 / -0.049). Against the other F8
-  campaign's evaders it is near perfect (0.946 / 0.987).
+- **Under Roncero's rules the floor-lure exploit disappears** (as in the first run). No evader stage learns to lure,
+  and the final pursuers are not lured **even by an exploiter trained under the thesis rules, where luring pays**:
+  pursuer crash 0.010 / 0.030 (F3 hedge pursuers: 0.975 / 0.988).
+- **The final F8 pursuer is better than F3 Hedge's on every opponent group except its own campaign.** Held-out RL
+  +0.157 / +0.060, worst cluster +0.225 / +0.078, train pool +0.283 / +0.262, held-out scripted +0.175 / +0.136 with
+  almost no crashes (0.018 / 0.011 vs 0.197 / 0.149), X3 exploiters +0.044 / +0.026; F3 campaigns' evaders level
+  (+0.017 / -0.029). Own campaign -0.041 / -0.022, but against its 12 own evaders (including stage 25, trained against it) vs Hedge's 3. The first
+  run's "weaker against agile learned evaders" came from the stage-8 pursuer and does not hold for the final one.
+- **It is much less exploitable, and what remains is near misses.** Thesis-rules exploiter: 0.631 / 0.513 vs
+  0.974 / 0.985 (-0.342 / -0.472), winning by timeout (0.622 / 0.484); at 0.15 m exploitability is **0.000 / 0.026**
+  (lower bounds; Hedge 0.773 / 0.855). Roncero-rules exploiter: 0.512 / 0.755 vs 0.816 / 0.939 (0.064 / 0.331 at
+  0.15 m); against seed 0 it wins as much by crashing or leaving itself (0.456) as by timeout.
 - **Roncero's rules would not have shown our pursuers' weakness as crashes.** His-rules exploiters beat the F3 hedge
-  pursuers mainly by making them leave the arena (0.653 / 0.905), which the thesis rules never penalised, and rarely
-  by crashing them (0.115 / 0.021).
-- Interpretation (post-hoc, not tested): the endings remove the evader's reason to lure, and the closing-speed factor
-  (beta) rewards slow, controlled final approaches, which avoids the dives a lure needs but also loses captures that
-  need a fast last 5-10 cm. F8 cannot separate the endings, beta and the 26 x 50M schedule.
-- **Predictions (pre-registered 11-09 12:21):**
+  pursuers mainly by making them leave the arena (0.718 / 0.915), which the thesis rules never penalised, and rarely
+  by crashing them (0.106 / 0.023).
+- At 0.15 m the F8 pursuers are near perfect against every learned and scripted set (held-out RL 0.995 / 0.996,
+  worst cluster 0.993 / 0.992, train pool 0.963 / 0.974).
+- **Predictions (pre-registered 11-09 12:21; unchanged by amendment 2):**
   - (1) In-campaign lure rate < 0.50 on both seeds: **held** (0.00).
-  - (2) H-rules (crash vs the thesis-rules exploiter < 0.50) vs H-pursuer (>= 0.50): **H-rules held** (0.002 /
-    0.002). The predicted H-pursuer **did not hold**.
+  - (2) H-rules (crash vs the thesis-rules exploiter < 0.50) vs H-pursuer (>= 0.50): **H-rules held** (0.010 /
+    0.030). The predicted H-pursuer **did not hold**.
   - (3) Under Roncero's rules the F3 hedge pursuers' exploiter wins mostly by timeout, crash share of its wins < 0.5:
-    the crash share **held** (0.15 / 0.02), "mostly by timeout" **did not hold** (it wins by the pursuer leaving the
+    the crash share **held** (0.13 / 0.02), "mostly by timeout" **did not hold** (it wins by the pursuer leaving the
     arena).
-- **Consequence:** the floor-lure weakness of every thesis self-play pursuer depends on the episode-ending and reward
-  rules. With rules in which a pursuer crash ends the game in the evader's favour (thesis, and Gavin's), luring pays
-  and self-play pursuers stay lurable; with Roncero's truncation rules it does not arise, at a cost in capture
-  performance against agile learned evaders at 0.10 m.
+- **Consequence:** with Roncero's rules (plus the GAE truncation fix and 50M-frame stages) self-play produces a pursuer
+  that is not lurable, beats Hedge's on held-out learned evaders, and is exploitable at 0.10 m only by near-miss
+  timeouts. F9 shows that part of this comes from the GAE fix / schedule rather than from Roncero's rules.
 - Limitations:
   - 2 seeds; one exploiter per pursuer and rule set.
-  - F8 and F3 differ in rules, closing-speed factor and schedule (26 x 50M vs 9 x 300M) at once; a component ablation
-    (endings only, beta only, thesis rules at 26 x 50M) was not run.
+  - F8 and F3 differ in rules, closing-speed factor, schedule (26 x 50M vs 9 x 300M) and the GAE truncation fix at
+    once; F9's control arm (thesis rules + GAE fix, 13 x 50M) is already much less lurable than F3.
   - The F3 pursuers' Roncero-rules evaluation uses rules they were not trained with (leaving the arena ends the game).
+  - Own- and other-campaign evader sets differ in size between arms (see the table).
   - In-campaign evals at the training radius only; no domain randomisation, our drone (T/W 1.44), not Roncero's.
 
-### F8 post-hoc: transitivity and evader diversity (added 2026-11-10 17:05; not pre-registered, no new runs)
+### F8 post-hoc: transitivity and evader diversity (added 2026-11-10 17:05, re-run 2026-11-11 11:30 on the F8 re-run; not pre-registered, no new runs)
 
 Question (user): under Roncero's rules, is there room for diversity-aware training (QD-DPP / PSD-PSRO style)? Those
 methods target non-transitive games with several distinct strategies to cover. Same measures as the F3 post-hoc
 transitivity (additive-logit R², rank-reversal fraction at delta 0.1). In-campaign evals are under each campaign's own
 rules at 0.10 m. [F8_roncero_sp/transitivity.md](F8_roncero_sp/transitivity.md) (matrices included),
-`transitivity.json`, `exps/f8_transitivity.py`.
+`transitivity.json`, `exps/f8_transitivity.py`. (The 11-10 version used the k_sm = 0 campaigns and stage-8 probes;
+archived with the stage-8 outputs.)
 
 | | F8 s0 | F8 s1 | F3 hedge s0 | F3 hedge s1 |
 |---|---|---|---|---|
-| within campaign, P2-24 x E1-25: R² (J) / reversals | 0.721 / 0.020 | 0.717 / 0.003 | - | - |
-| within campaign, P2-8 x E1-7: R² (J) / reversals | 0.627 / 0.028 | 0.559 / 0.111 | 0.651 / 0.000 | 0.690 / 0.000 |
-| new pursuer stage beats every older evader (J >= 0.5) | 12 / 12 | 12 / 12 | 4 / 4 | 4 / 4 |
-| newest pursuer, min J vs older evaders | 0.95 | 0.93 | 0.91 | 0.90 |
-| new evader stage beats every older pursuer (J < 0.5) | 10 / 12 | 10 / 12 | 3 / 3 | 3 / 3 |
-| evader Vendi, shared 4-probe space, stages 1-7 (max 4) | 1.536 | 2.044 | 1.991 | 2.126 |
-| evader Vendi, own-campaign space, E1-7 vs P2-8 (max 4) | 2.511 | 2.329 | 2.401 | 2.384 |
-| evader Vendi, own-campaign space, all 13 evaders vs P2-24 | 3.845 | 3.330 | - | - |
-| - in that space, first 4 (E1-7) / last 4 (E19-25) | 2.054 / 2.237 | 1.497 / 2.093 | - | - |
+| within campaign, P2-24 x E1-25: R² (J) / reversals | 0.731 / 0.008 | 0.673 / 0.003 | - | - |
+| within campaign, P2-8 x E1-7: R² (J) / reversals | 0.670 / 0.000 | 0.606 / 0.000 | 0.651 / 0.000 | 0.690 / 0.000 |
+| new pursuer stage beats every older evader (J >= 0.5) | 11 / 12 | 11 / 12 | 4 / 4 | 4 / 4 |
+| newest pursuer, min J vs older evaders | 0.92 | 0.91 | 0.91 | 0.90 |
+| new evader stage beats every older pursuer (J < 0.5) | 11 / 12 | 12 / 12 | 3 / 3 | 3 / 3 |
+| evader Vendi, shared 4-probe space, E1-7 (max 4) | 1.659 | 1.567 | 2.011 | 2.217 |
+| evader Vendi, shared 4-probe space, E19-25 (max 4) | 1.991 | 2.771 | - | - |
+| evader Vendi, own-campaign space, E1-7 vs P2-8 (max 4) | 2.462 | 2.356 | 2.401 | 2.384 |
+| evader Vendi, own-campaign space, all 13 evaders vs P2-24 | 3.514 | 3.514 | - | - |
+| - in that space, first 4 (E1-7) / last 4 (E19-25) | 1.912 / 1.707 | 1.809 / 1.729 | - | - |
 
 Shared space = F3's Vendi construction (J and censored time vs each probe, behaviour mean / std; one RBF kernel over
-all 40 RL evaders) with the 4 probes that played both F3 and F8 evaders: F3 hedge s0 / s1 final and F8 s0 / s1 stage 8
-(F8c's pursuers). Not F3's frozen 8-probe space; in this space the other F3 samplers give uniform 2.07-2.35, QD-DPP
-1.96-2.13, PFSP 2.87-2.89 (PFSP highest and QD-DPP lowest, as in F3's official values; uniform and Hedge swap places). Across campaigns, with the same 4 probes (thesis rules):
-F8 evaders stages 3-7 R² 0.850, reversals 0.000; all 30 RL evaders 0.512 / 0.050 (0.15 m: 0.644 / 0.000).
+all 32 F3 + 26 F8 RL evaders) with the 4 probes that played both F3 and F8 evaders (F3 hedge s0 / s1 and F8 s0 / s1
+final pursuers). Not F3's frozen 8-probe space; Vendi grows with the number of evaders, so F8 is reported for 4-evader
+subsets as F3. In this space the other F3 samplers give uniform 1.97-2.16, QD-DPP 2.00-2.02, PFSP 2.62-2.80. Across
+campaigns, with the same 4 probes (thesis rules): F8 evaders stages 3-25 R² 0.619, reversals 0.050; F3 evaders 0.560 /
+0.048; all 48 RL evaders 0.362 / 0.064 (0.15 m: reversals 0.000-0.002).
 
 Findings:
-- **The F8 game is as transitive as F3 Hedge's.** Over the full 26-stage campaigns only 0.3-2 % of comparisons
-  reverse; every new pursuer stage beats every older evader (newest: min J 0.93-0.95) and 10 of 12 evader stages beat
-  every older pursuer. The exceptions are small: in s0, pursuer stage 8 gets J 0.43-0.76 against evader stages 13-23,
-  where the newer pursuers they trained against get 0.19-0.46 (so the stage-8 pursuer that F8c tested is not
-  representative of the later ones); in s1 the matched block's 0.111 comes from pursuer stage 2.
-- **F8's evaders are not more diverse.** Shared space 1.5 / 2.0 of 4 (F3 hedge 2.0 / 2.1, PFSP 2.9); own-campaign
-  space 2.5 / 2.3 (F3 hedge 2.4 / 2.4). Its 13 evaders behave like 3.3-3.8 distinct ones, close to X2's 3.8 for 22
-  pool evaders; the late evaders are about as diverse as the early ones in s0 (2.05 -> 2.24) and more diverse in s1
-  (1.50 -> 2.09).
-- Interpretation (not tested): removing the lure did not make the game more cyclic or the evaders more varied, so
-  diversity-aware training probably has as little room under Roncero's rules as under the thesis rules, where QD-DPP
-  (F3) and the diversity rewards (F6, F6b) did not beat Hedge.
+- **The F8 game is as transitive as F3 Hedge's.** Over the full 26-stage campaigns only 0.3-0.8 % of comparisons
+  reverse; every new pursuer stage beats every older evader except one per campaign (s0: pursuer 18 vs evader 17,
+  J 0.15; s1: pursuer 16 vs evader 15, 0.13), and the newest pursuer's worst J against older evaders is 0.91-0.92.
+- **Early F8 evaders are no more diverse than F3's; one seed's late evaders are.** Shared space E1-7: 1.66 / 1.57 (F3
+  hedge 2.01 / 2.22); own-campaign space 2.46 / 2.36 (F3 hedge 2.40 / 2.38). The last four evaders reach 1.99 (s0,
+  hedge-like) and 2.77 (s1, close to PFSP's 2.62-2.80) in the shared space, but not in the own-campaign space (1.71 /
+  1.73). The 13 evaders of a campaign behave like 3.5 distinct ones.
+- Across campaigns the few reversals (0.05 at 0.10 m) vanish at 0.15 m: they are near misses.
+- Cross-generation win-rate matrices (Roncero Fig. 3 style, added 11-11; `scripts/selfplay/plot_winrate_matrix.py`
+  on each campaign's db, metric win_rate = pursuer wins / decisive episodes, in-campaign evals under Roncero's rules,
+  0.10 m): [s0](F8_roncero_sp/winrate_matrix_s0.png), [s1](F8_roncero_sp/winrate_matrix_s100.png). Generation g =
+  pursuer stage 2(g-1), evader stage 2g-1. Every pursuer generation >= 2 beats every older evader generation (win rate
+  0.88-1.00) except one cell per seed, its newest opponent (s0: generation 10 vs 9, 0.11; s1: 9 vs 8, 0.10), which the
+  next pursuer generation fixes (0.93 / 0.99); each evader generation beats the pursuer it trained against (diagonal,
+  pursuer win rate 0.03-0.32) and almost all older ones (exceptions: s0 pursuer generation 2 vs evader generation 6,
+  0.52; s1 pursuer generation 7 vs evader generation 13, 0.53).
+- Interpretation (not tested): removing the lure did not make the game cyclic, so diversity-aware training probably has
+  little room under Roncero's rules either, as under the thesis rules (QD-DPP in F3, F6, F6b did not beat Hedge). Seed
+  1's late spread against the probes is the only hint of more variety.
 - Limitations: 2 seeds; in-campaign evals only at the training radius and only between stages of one campaign; the
-  shared space has 4 probes (two are F8 stage-8 pursuers) and F8 evader stages 1-7 only; the Vendi descriptors include
-  J, so part of the spread is strength, not style.
+  shared space has 4 probes; the Vendi descriptors include J, so part of the spread is strength, not style.
+
+## F9_ablation_sp / F9c (one Roncero component at a time on the thesis rules; campaigns done 2026-11-10 19:31 (control, no_timeout) and 2026-11-11 09:28 (beta, endings); F9c done 10:58; written up 2026-11-11 11:30; 1 seed, descriptive)
+
+**Question:** which part of Roncero et al.'s rules removes the floor-lure exploit that F8 removed?
+
+**Setup** (pre-registered 11-10 15:19, before any F9 run; user request after F8):
+- Four campaigns `thesis-F9-{control,no_timeout,beta,endings}-s0`, seed 0, our drone / observations / arena, 0.10 m
+  radius, Hedge on both roles, **13 stages x 50M**, all with the GAE truncation fix (`algo.gae_cut_at_truncation`).
+- **control** = thesis rules. **no_timeout** = the timeout gives 0 to both roles (thesis: pursuer -100, evader +100).
+  **beta** = the pursuer's +100 capture reward x Roncero's closing-speed factor exp(-3 max(0, v_close - 2 m/s)).
+  **endings** = every terminal ending except capture (crash of either agent, evader leaving) becomes a truncation
+  (value bootstrapped), rewards unchanged. Not tested: Roncero's weak distance shaping and reward magnitudes.
+- F9c: each final pursuer (stage 12) evaluated clean under the thesis rules vs train pool, test set, the 8 F3
+  campaigns' and the F9 campaigns' evaders (stage 1 excluded), and **one fresh 100M-frame thesis-rules exploiter**
+  (luring pays). Measures: (a) in-campaign lure rate (pursuer crash caused by evader stages 3-11 in the stage >= 2
+  pursuers; mean over stages of each stage's mean); (b) pursuer crash vs the exploiter. "Lure present" = >= 0.50.
+- Deviations: F9c uses the stage-loader fix of 11-10 17:05 (made before F9c ran), so it tests stage 12 and all F9
+  evaders, as pre-registered; beta / endings ran after the F8 re-run (user), with unchanged code for these arms (the
+  k_sm fix touches only Roncero mode). [F9_ablation_sp/summary.md](F9_ablation_sp/summary.md), `results.json`.
+
+| final pursuer (stage 12), J at 0.10 m (0.15 m) | control | no_timeout | beta | endings | F8 roncero s0 | F3 hedge s0 |
+|---|---|---|---|---|---|---|
+| held-out RL (v10) | 0.893 (0.989) | 0.916 (0.995) | 0.941 (0.996) | 0.890 (0.992) | 0.948 (0.995) | 0.791 (0.960) |
+| held-out worst cluster | 0.859 (0.973) | 0.884 (0.965) | 0.914 (0.992) | 0.849 (0.989) | 0.917 (0.993) | 0.692 (0.874) |
+| F3 campaigns' evaders | 0.766 (0.948) | 0.845 (0.970) | 0.836 (0.965) | 0.702 (0.924) | 0.887 (0.975) | 0.871 (0.957) |
+| other F9 campaigns' evaders | 0.866 (0.972) | 0.887 (0.980) | 0.879 (0.975) | 0.714 (0.901) | - | - |
+| own campaign's evaders | 0.933 (0.995) | 0.872 (0.981) | 0.959 (0.997) | 0.993 (1.000) | 0.916 (0.939) | 0.957 (0.993) |
+| thesis train pool | 0.688 (0.840) | 0.718 (0.847) | 0.859 (0.959) | 0.756 (0.928) | 0.877 (0.963) | 0.594 (0.759) |
+| held-out scripted | 0.918 (0.978) | 0.917 (0.978) | 0.969 (0.995) | 0.976 (0.995) | 0.983 (0.997) | 0.808 (0.905) |
+| pursuer crash vs held-out scripted | 0.085 (0.023) | 0.085 (0.022) | 0.033 (0.005) | 0.025 (0.005) | 0.018 (0.003) | 0.197 (0.096) |
+| X3 exploiters | 0.983 (0.998) | 0.983 (0.999) | 0.996 (1.000) | 0.999 (1.000) | 0.999 (1.000) | 0.955 (0.987) |
+| exploitability (thesis-rules exploiter) | 0.440 (0.095) | **0.950** (0.571) | 0.370 (0.085) | **0.823** (0.127) | 0.631 (0.000) | 0.974 (0.773) |
+
+How the thesis-rules exploiter wins (fractions of episodes, 0.10 m; leaving the arena is non-terminal here):
+
+| arm | capture | pursuer crash (b) | timeout | evader crash / leaves | pursuer leaves arena |
+|---|---|---|---|---|---|
+| control | 0.318 | 0.056 | 0.385 | 0.243 | 0.682 |
+| no_timeout | 0.036 | **0.955** | 0.000 | 0.015 | 0.053 |
+| beta | 0.401 | 0.395 | 0.000 | 0.237 | 0.051 |
+| endings | 0.130 | **0.834** | 0.000 | 0.047 | 0.483 |
+
+In-campaign lure rate (a) per evader stage (mean over the stage >= 2 pursuers):
+
+| arm | E3 | E5 | E7 | E9 | E11 | (a) mean |
+|---|---|---|---|---|---|---|
+| control | 0.09 | 0.41 | 0.37 | 0.42 | 0.53 | 0.36 |
+| no_timeout | 0.67 | 0.82 | 0.75 | 0.73 | 0.79 | **0.75** |
+| beta | 0.03 | 0.04 | 0.20 | 0.28 | 0.33 | 0.18 |
+| endings | 0.00 | 0.02 | 0.05 | 0.04 | 0.03 | 0.03 |
+| F3 hedge s0 (9 x 300M, no GAE fix) | 0.97 | 0.98 | 0.98 | | | |
+
+Findings:
+- **The control arm is the main surprise: the thesis rules alone, with the GAE truncation fix and 13 x 50M stages,
+  give a pursuer that is hardly lurable.** In-campaign lure 0.36 (rising from 0.09 to 0.53 over the stages; F3 hedge
+  0.97-0.98), and the thesis-rules exploiter makes the final pursuer crash in only 0.056 of episodes (F3 hedge 0.975).
+  It wins by timeout (0.385), mostly near misses (exploitability 0.440 -> 0.095 at 0.15 m), and drags the pursuer out
+  of the arena in 0.682 of episodes (allowed under the thesis rules). Control differs from F3 hedge in two ways at
+  once, the GAE fix and the schedule (50M vs 300M frames per stage, 13 vs 9 stages), and F9 cannot say which matters.
+- **no_timeout restores F3-level luring on both measures**: lure 0.67-0.82 at every evader stage, exploiter crash
+  0.955, exploitability 0.950.
+- **endings stops evaders from learning to lure but leaves the pursuer lurable**: lure 0.00-0.05 at every stage, yet
+  the exploiter makes the pursuer crash in 0.834 of episodes (exploitability 0.823; 0.127 at 0.15 m, so the crashes
+  are dives that pass within 0.15 m). It is also the weakest against other campaigns' evaders (F3 0.702, other F9
+  0.714; control 0.766 / 0.866). As with F6's lure-free pursuers, a pursuer that never meets lurers in training does not
+  learn to resist them.
+- **beta lowers in-campaign luring (0.18) and is best on easy opponents** (train +0.171, held-out RL +0.049, crashes
+  vs scripted 0.033 vs 0.085), but its exploiter crashes it more than control's does (0.395 vs 0.056); exploitability
+  is similar (0.370 vs 0.440; 0.085 vs 0.095 at 0.15 m) because control's exploiter wins by timeout instead.
+- At 0.15 m every arm except no_timeout is near perfect on held-out evaders (0.989-0.996) with exploitability
+  0.085-0.127 (no_timeout 0.571).
+- **Predictions (pre-registered 11-10 15:19):**
+  - (1) control: (a) and (b) present: **did not hold** ((a) 0.36, (b) 0.056).
+  - (2) endings: (a) absent, (b) present: **held** (0.03; 0.834).
+  - (3) no_timeout: (a) present, (b) present (low confidence): **held** (0.75; 0.955).
+  - (4) beta: (a) present, (b) absent: (a) **did not hold** (0.18), (b) **held** (0.395).
+- **Use (as registered):** an arm with (b) absent was to identify a pursuer-side cause of F8's lure-resistance. Since
+  the control already has (b) absent, F9 does not isolate one Roncero component: under the F8/F9 schedule with the GAE
+  fix, the thesis rules already give a lure-resistant pursuer; removing the timeout terms makes it lurable again;
+  truncation endings remove the evader's incentive, so the pursuer never learns to resist; beta sits in between.
+- **Consequence for F8:** the F8 - F3 contrast mixes Roncero's rules with the GAE fix and the shorter stages. Separating
+  them needs a 9 x 300M arm with the GAE fix, or a 13 x 50M arm without it (not run).
+- Limitations: 1 seed per arm; one exploiter each; 13 stages (F8: 26); in-campaign evals at the training radius only;
+  the "other F9 campaigns' evaders" set excludes a different campaign for each arm.

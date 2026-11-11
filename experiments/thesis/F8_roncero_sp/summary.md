@@ -1,6 +1,6 @@
 # F8_roncero_sp summary
 
-Final pursuers (F8: stage 24; F3: stage 8). roncero/k = F8 campaign seed k (Roncero's reward and endings, Hedge both roles, 26 stages x 50M = 13 generations); hedge/k = F3 hedge-both seed k (thesis rules, Hedge both roles, 9 x 300M). All evals clean under the thesis rules except vs_exploiter_roncero (Roncero's rules). exploitability_<rules> = 1 - J vs a fresh exploiter trained under those rules; for hedge/k the thesis-rules exploiter is F3c's. other_f3 / other_f8 / own evaders exclude stage-1 evaders. J at 0.15 m is the exact re-score (eval-only). 2 seeds, descriptive; F8 = 26 stages x 50M (13 generations), F3 = 9 stages x 300M.
+Final pursuers (roncero/0: stage 24; roncero/1: stage 24; hedge/0: stage 8; hedge/1: stage 8). roncero/k = F8 campaign seed k (Roncero's reward and endings, Hedge both roles, 26 stages x 50M = 13 generations); hedge/k = F3 hedge-both seed k (thesis rules, Hedge both roles, 9 x 300M). All evals clean under the thesis rules except vs_exploiter_roncero (Roncero's rules). exploitability_<rules> = 1 - J vs a fresh exploiter trained under those rules; for hedge/k the thesis-rules exploiter is F3c's. other_f3 / other_f8 / own evaders exclude stage-1 evaders. J at 0.15 m is the exact re-score (eval-only). 2 seeds, descriptive; F8 = 26 stages x 50M (13 generations), F3 = 9 stages x 300M.
 
 ## Capture radius 0.10 m
 
@@ -19,6 +19,7 @@ Final pursuers (F8: stage 24; F3: stage 8). roncero/k = F8 campaign seed k (Ronc
 | exploiter_thesis_pursuer_crash | 0.010 | 0.030 | 0.975 | 0.988 | -0.965 | -0.957 |
 | exploitability_roncero | 0.512 | 0.755 | 0.816 | 0.939 | -0.304 | -0.185 |
 | exploiter_roncero_pursuer_crash | 0.001 | 0.006 | 0.106 | 0.023 | -0.105 | -0.017 |
+| exploiter_roncero_pursuer_oob | 0.289 | 0.094 | 0.718 | 0.915 | -0.429 | -0.821 |
 | exploiter_roncero_timeout | 0.241 | 0.658 | 0.001 | 0.004 | +0.240 | +0.654 |
 
 ## Capture radius 0.15 m
@@ -38,6 +39,7 @@ Final pursuers (F8: stage 24; F3: stage 8). roncero/k = F8 campaign seed k (Ronc
 | exploiter_thesis_pursuer_crash | 0.000 | 0.003 | 0.774 | 0.856 | -0.774 | -0.854 |
 | exploitability_roncero | 0.064 | 0.331 | 0.683 | 0.825 | -0.619 | -0.493 |
 | exploiter_roncero_pursuer_crash | 0.000 | 0.001 | 0.085 | 0.017 | -0.085 | -0.016 |
+| exploiter_roncero_pursuer_oob | 0.068 | 0.057 | 0.605 | 0.806 | -0.537 | -0.749 |
 | exploiter_roncero_timeout | 0.003 | 0.275 | 0.000 | 0.004 | +0.003 | +0.271 |
 
 ## In-campaign lure rates (pursuer crash caused by each evader stage in the stage >= 2 pursuers)

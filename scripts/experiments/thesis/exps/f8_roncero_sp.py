@@ -38,7 +38,8 @@ F3_ARMS = ("uniform", "hedge", "qd_dpp", "pfsp")
 METRICS = ["heldout_rl", "heldout_worst_cluster", "other_f3_evaders", "other_f8_evaders", "own_campaign_evaders",
            "train", "heldout_scripted", "heldout_scripted_pursuer_crash", "x3_exploiters",
            "exploitability_thesis", "exploiter_thesis_pursuer_crash",
-           "exploitability_roncero", "exploiter_roncero_pursuer_crash", "exploiter_roncero_timeout"]
+           "exploitability_roncero", "exploiter_roncero_pursuer_crash", "exploiter_roncero_pursuer_oob",
+           "exploiter_roncero_timeout"]
 
 
 def name(k, smoke=False):
@@ -160,8 +161,10 @@ def _metrics(c, radius, split, test, labels):
         if ex:
             r[f"exploitability_{tag}"] = 1 - float(next(iter(ex.values())))
             r[f"exploiter_{tag}_pursuer_crash"] = float(next(iter(rate(g, "pursuer_crash").values())))
-            if tag == "roncero":
-                r["exploiter_roncero_timeout"] = float(next(iter(rate(g, "timeout").values())))
+            if tag == "roncero":       # leaving the arena ends the episode under Roncero's rules
+                ro = lambda key: float(next(iter(rates_at(_src(c, g), key, radius, pursuer_oob_terminal=True).values())))
+                r["exploiter_roncero_pursuer_oob"] = ro("pursuer_oob")
+                r["exploiter_roncero_timeout"] = ro("timeout")
     return r
 
 
@@ -192,7 +195,8 @@ def analyse_f8(split, test):
                  for i in range(len(SEEDS))} for k, v in res.items()}
     save_json(os.path.join(F8, "results.json"), {"metrics": res, "differences": diffs, "lure_rates": lures})
     lines = ["# F8_roncero_sp summary", "",
-             "Final pursuers (F8: stage 24; F3: stage 8). roncero/k = F8 campaign seed k (Roncero's reward and endings, "
+             "Final pursuers (" + "; ".join(f"{lab}: stage {all_stages(c, 'pursuer')[-1]['metadata']['stage']}"
+                                            for lab, c, _ in pursuers()) + "). roncero/k = F8 campaign seed k (Roncero's reward and endings, "
              "Hedge both roles, 26 stages x 50M = 13 generations); hedge/k = F3 hedge-both seed k (thesis rules, Hedge both roles, 9 x 300M). All evals clean "
              "under the thesis rules except vs_exploiter_roncero (Roncero's rules). exploitability_<rules> = 1 - J vs a "
              "fresh exploiter trained under those rules; for hedge/k the thesis-rules exploiter is F3c's. other_f3 / "

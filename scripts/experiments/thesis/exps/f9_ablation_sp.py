@@ -60,8 +60,8 @@ def run_f9(args):
         run_campaign(name(arm), COMMON + ov, arm_cfg())
 
 
-def _src(c, g):
-    return os.path.join(F9, "evals", f"{c}_final_{g}.json")
+def _src(c, g, root=F9):
+    return os.path.join(root, "evals", f"{c}_final_{g}.json")
 
 
 def run_f9c(args):
@@ -96,8 +96,8 @@ def run_f9c(args):
     analyse_f9(split, test)
 
 
-def _metrics(c, radius, split, test, labels):
-    rate = lambda g, key="neutralization_rate": rates_at(_src(c, g), key, radius)
+def _metrics(c, radius, split, test, labels, root=F9):
+    rate = lambda g, key="neutralization_rate": rates_at(_src(c, g, root), key, radius)
     J = {**rate("train"), **rate("test")}
     no_s1 = lambda d: {k: v for k, v in d.items() if not k.endswith(":s1")}
     J3, J9 = no_s1(rate("f3_evaders")), no_s1(rate("f9_evaders"))

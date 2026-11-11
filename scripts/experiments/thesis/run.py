@@ -54,6 +54,9 @@ EXPERIMENTS = {
     "F8c": "f8_roncero_sp:run_f8c",
     "F9": "f9_ablation_sp:run_f9",
     "F9c": "f9_ablation_sp:run_f9c",
+    "F8d": "f8d_heldout:run_f8d",
+    "F10": "f10_gae_sp:run_f10",
+    "F10c": "f10_gae_sp:run_f10c",
 }
 
 

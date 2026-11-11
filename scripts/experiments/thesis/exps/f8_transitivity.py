@@ -5,12 +5,13 @@ diversity-aware training (QD-DPP / PSD-PSRO style) have room to help under Ronce
 1. Within each F8 campaign (in-campaign stage evals, Roncero's rules, 0.10 m): pursuer stages 2-24 x evader stages
    1-25, and the F3-matched block P2-8 x E1-7. Same measures as f3_transitivity (additive-logit R^2, rank-reversal
    fraction, delta 0.1), plus how often a new stage beats every older opponent.
-2. Across campaigns (F8c / F3c evals, thesis rules, 0.10 m and 0.15 m): 4 probe pursuers (F3 hedge s0 / s1 final and
-   F8 s0 / s1 stage 8: F8c evaluated stage 8, not the final stage 24, see f8_roncero_sp.all_stages) x the RL evaders of the 8 F3 campaigns and the 2 F8 campaigns (stage 1 excluded). F8c evaluated
-   only F8 evader stages 1-7 (f3_sampler_sp._policies caps stages at 8), so stages 9-25 are not in this part.
+2. Across campaigns (F8c / F3c evals, thesis rules, 0.10 m and 0.15 m): 4 probe pursuers (F3 hedge s0 / s1 final,
+   stage 8; F8 s0 / s1 final, stage 24) x the RL evaders of the 8 F3 campaigns and the 2 F8 campaigns (all 13 stages;
+   stage 1 excluded). Re-run 2026-11-11 on the F8 re-run (thesis-F8b-*, k_sm fixed; f8_roncero_sp amendment 2).
 3. Evader Vendi:
    a. Shared space: F3's descriptor construction (J and censored time vs each probe, mean / std behaviour features;
-      one RBF kernel, median bandwidth) with the 4 probes above, over all 32 F3 + 8 F8 RL evaders (stages 1-7).
+      one RBF kernel, median bandwidth) with the 4 probes above, over all 32 F3 + 26 F8 RL evaders. Vendi grows with
+      the number of evaders, so each F8 campaign is reported for 4-evader subsets (E1-7, as F3's E1-7, and E19-25).
       Not F3's frozen 8-probe space (the other 6 F3 pursuers never played the F8 evaders), so values are compared
       within this space only.
    b. Within-campaign space: each evader described by J, censored time and behaviour vs the campaign's own pursuer
@@ -131,7 +132,11 @@ def across(out):
             res[g] = stats(np.array([[J[p][e] for e in cols] for p in probes]))
         out["across"][f"r{rad:.2f}"] = res
     X = _descr(rows, evs, probes)
-    vg = {c: [i for i, e in enumerate(evs) if e.startswith(c + "/")] for c in F3_CAMPS + F8_CAMPS}
+    vg = {c: [i for i, e in enumerate(evs) if e.startswith(c + "/")] for c in F3_CAMPS}
+    st = lambda e: int(e.rsplit(":s", 1)[1])
+    for c in F8_CAMPS:                        # equal n = 4 as the F3 campaigns (Vendi's maximum is n)
+        vg[f"{c} E1-7"] = [i for i, e in enumerate(evs) if e.startswith(c + "/") and st(e) <= 7]
+        vg[f"{c} E19-25"] = [i for i, e in enumerate(evs) if e.startswith(c + "/") and st(e) >= 19]
     out["vendi_shared"] = vendi_of(X, vg)
     f3v = json.load(open(os.path.join(F3C, "results.json")))["evader_vendi"]
     out["vendi_shared_f3_official"] = {c: f3v[c]["vendi"] for c in F3_CAMPS if c in f3v}
@@ -166,7 +171,7 @@ def within(out):
 
 
 def report(out):
-    L = ["# F8 transitivity and evader diversity (post-hoc, 2026-11-10; no new runs)", "",
+    L = ["# F8 transitivity and evader diversity (post-hoc, 2026-11-10, re-run 2026-11-11 on thesis-F8b-*; no new runs)", "",
          "X1's measures: additive-logit R^2 (one strength per player) and rank-reversal fraction (delta 0.1).", "",
          "## 1. Within each campaign (in-campaign evals, training rules, 0.10 m)", "",
          "| campaign | block | R^2 (J) | reversals (J) | R^2 (capture) | reversals (capture) | pursuers beat all older | "
@@ -178,14 +183,13 @@ def report(out):
                      f"{d['capture']['reversal_fraction']:.3f} | {d['pursuers_beat_all_older']:.2f} | "
                      f"{d['evaders_beat_all_older']:.2f} | {d['newest_pursuer_min_vs_older']:.2f} |")
     L += ["", "## 2. Across campaigns (F3c / F8c evals, thesis rules; probes: " + ", ".join(out["across_probes"]) +
-          " (F3 final pursuers; F8 pursuer stage 8, which F8c evaluated instead of stage 24); stage-1 evaders "
-          "excluded; F8 evaders are stages 3-7 only)", "",
+          " (final pursuers: F3 stage 8, F8 stage 24); stage-1 evaders excluded; F8 evaders stages 3-25)", "",
           "| evader set | n | R^2 0.10 m | reversals 0.10 m | R^2 0.15 m | reversals 0.15 m |", "|---|---|---|---|---|---|"]
     for g in out["across"]["r0.10"]:
         a, b = out["across"]["r0.10"][g], out["across"]["r0.15"][g]
         L.append(f"| {g} | {a['shape'][1]} | {a['r2']:.3f} | {a['reversal_fraction']:.3f} | {b['r2']:.3f} | "
                  f"{b['reversal_fraction']:.3f} |")
-    L += ["", "## 3a. Evader Vendi in a shared 4-probe space (stages 1-7, 4 evaders per campaign, max 4)", "",
+    L += ["", "## 3a. Evader Vendi in a shared 4-probe space (4 evaders per row, max 4; F8 as E1-7 and E19-25)", "",
           "| campaign | Vendi (this space) | F3 official (8 probes) |", "|---|---|---|"]
     for c, d in out["vendi_shared"].items():
         o = out["vendi_shared_f3_official"].get(c)

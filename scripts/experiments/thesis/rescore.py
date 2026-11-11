@@ -4,7 +4,8 @@ An episode is identical up to the first step whose centre distance is <= the new
 ends it. So an episode becomes a capture iff its closest sampled distance (`min_distance`) is <= the radius. Crashes,
 leaving the arena and timeouts end an episode, so they happen at or after that step and are cleared for such episodes
 (a same-step coincidence counts as a capture, as in the env). Not re-scored: times, motor effort, behaviour features and
-pursuer out-of-bounds (non-terminal, timing unknown).
+pursuer out-of-bounds (non-terminal under the thesis rules, timing unknown; under Roncero's rules it ends the episode,
+so pass pursuer_oob_terminal=True for those evals).
 """
 
 import json
@@ -15,9 +16,9 @@ import torch
 _CACHE = {}
 
 
-def rescore(json_path: str, radius: float) -> dict:
+def rescore(json_path: str, radius: float, pursuer_oob_terminal: bool = False) -> dict:
     """The eval JSON with every matchup's outcome rates recomputed at `radius` (needs `<json>_episodes.pt`)."""
-    key = (os.path.abspath(json_path), radius)
+    key = (os.path.abspath(json_path), radius, pursuer_oob_terminal)
     if key in _CACHE:
         return _CACHE[key]
     with open(json_path) as f:
@@ -37,7 +38,7 @@ def rescore(json_path: str, radius: float) -> dict:
         cap0 = e["capture"] > .5
         cap = cap0 | (e["min_distance"] <= radius)
         new = cap & ~cap0
-        for k in ("pursuer_crash", "evader_crash", "evader_oob", "timeout"):
+        for k in ("pursuer_crash", "evader_crash", "evader_oob", "timeout") + (("pursuer_oob",) if pursuer_oob_terminal else ()):
             flag[k] = flag[k] & ~new
         n = int(sel.sum())
         assert n == m["episodes"], f"{json_path} {opp}: {n} episodes in the file vs {m['episodes']} in the JSON"
@@ -53,12 +54,12 @@ def rescore(json_path: str, radius: float) -> dict:
     return d
 
 
-def rates_at(json_path: str, key: str, radius: float) -> dict:
+def rates_at(json_path: str, key: str, radius: float, pursuer_oob_terminal: bool = False) -> dict:
     """{opponent: rate} at `radius`; key = a matchup field (e.g. neutralization_rate) or an `outcomes` field. {} if the
     eval does not exist."""
     if not os.path.isfile(json_path):
         return {}
     out = {}
-    for opp, m in rescore(json_path, radius)["matchups"].items():
+    for opp, m in rescore(json_path, radius, pursuer_oob_terminal)["matchups"].items():
         out[opp] = m[key] if key in m else m["outcomes"][key]
     return out
