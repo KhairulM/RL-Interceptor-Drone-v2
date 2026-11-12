@@ -59,9 +59,10 @@ class PPOConfig:
 
     checkpoint_path: Union[str, None] = None
 
-    # Thesis F8: stop the GAE recursion at truncations too (bootstrap still only cut by `terminated`). Default off:
-    # earlier runs cut the recursion only at terminations.
-    gae_cut_at_truncation: bool = False
+    # Stop the GAE recursion at every episode end, truncations included (the bootstrap is still cut only by
+    # `terminated`). Default on since 2026-11-11 (thesis); before that the recursion was cut only at terminations and
+    # leaked across timeouts / truncations. Thesis experiments registered before then pin it off (thesis run.py).
+    gae_cut_at_truncation: bool = True
 
 
 cs = ConfigStore.instance()

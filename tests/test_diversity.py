@@ -114,7 +114,8 @@ class DiversityTest(unittest.TestCase):
             "agents": TensorDict({"observation": obs}, [E, T]),
             "next": TensorDict({"agents": TensorDict({"observation": torch.randn(E, T, 1, OBS),
                                                       "reward": torch.zeros(E, T, 1, 1)}, [E, T]),
-                                "terminated": torch.zeros(E, T, 1, dtype=torch.bool)}, [E, T]),
+                                "terminated": torch.zeros(E, T, 1, dtype=torch.bool),
+                                "done": torch.zeros(E, T, 1, dtype=torch.bool)}, [E, T]),   # as env rollouts
         }, [E, T])
         with torch.no_grad():
             p(td)

@@ -131,7 +131,7 @@ def run_campaign(name, task_overrides, extra_cfg=None, smoke_stages=None, role_o
         if smoke_stages:
             cfg.update(n_stages=smoke_stages, max_total_stages=smoke_stages, frames_per_stage=2_000_000, num_envs=256)
         cli = [f"{k}={v}" for k, v in cfg.items()]
-        cli.append("task_overrides=[" + ",".join(task_overrides) + "]")
+        cli.append("task_overrides=[" + ",".join(common.gae_pin(task_overrides)) + "]")
         cli.append("eval_extra_overrides=[eval_cutoff_steps=1500]")   # behaviour stats + multi-episode estimator
         for role, ov in (role_overrides or {}).items():
             cli.append(f"role_task_overrides.{role}=[" + ",".join(ov) + "]")

@@ -113,3 +113,10 @@ def analyse_f8d(split, test):
     with open(os.path.join(F8D, "summary.md"), "w") as f:
         f.write("\n".join(lines) + "\n")
     log_progress("F8d analysis done")
+
+
+def heldout_v2(split, exclude=()):
+    """Default held-out RL set from 2026-11-12 (user): the v10 held-out RL evaders plus the 16 strong final evaders
+    (COMMON), minus any campaign in `exclude` (e.g. campaigns the pursuer trained in or against)."""
+    strong = [f8.all_stages(c, "evader")[-1] for c in COMMON if c not in exclude]
+    return list(split["heldout_rl"]) + strong

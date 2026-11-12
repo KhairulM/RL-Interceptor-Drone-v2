@@ -10,6 +10,7 @@ from geometry_msgs.msg import TransformStamped
 from NatNetClient import NatNetClient
 import intercept_common as ic
 from drone import Drone
+from safety import MocapGate, SafetyConfig
 
 
 def _detect_local_ip_for_server(server_ip: str) -> str:
@@ -92,8 +93,12 @@ class MocapReceiver:
     """
 
     def __init__(self, cfg: ic.MocapConfig,
-                 tf_publisher: Optional[MocapTfPublisher] = None) -> None:
+                 tf_publisher: Optional[MocapTfPublisher] = None,
+                 gate: Optional[MocapGate] = None) -> None:
         self._cfg = cfg
+        # SAFETY_PLAN B3 / B5: every frame passes a plausibility gate (jumps, swaps) that also records per-body
+        # freshness, so the controller can tell when OptiTrack stops tracking a drone.
+        self._gate = gate or MocapGate(SafetyConfig())
         self._tf_publisher = tf_publisher
         self._targets: dict[int, tuple[Drone, str]] = {}
         self._marker_targets: dict[int, tuple[Drone, str]] = {}
@@ -157,16 +162,19 @@ class MocapReceiver:
                     return
                 self._last_send_stamp[rb_id] = now
 
-        drone, frame_id = target
+            # Send the first pose with orientation to align the EKF, then only position for the rest of the time.
+            first_send_stamp = self._first_send_stamp.get(rb_id)
+            if first_send_stamp is None:
+                self._first_send_stamp[rb_id] = now
+                first_send_stamp = now
 
-        # Send the first pose with orientation to align the EKF, then send only position for the rest of the time.
-        first_send_stamp = self._first_send_stamp.get(rb_id)
-        if first_send_stamp is None:
-            self._first_send_stamp[rb_id] = now
-            first_send_stamp = now
+        drone, frame_id = target
 
         pose = ic.transform_mocap_pose(
             self._cfg, rb_id, position, rotation, tracking_valid)
+        with self._lock:
+            if not self._gate.accept(rb_id, pose.position, now):
+                return                                   # implausible frame: not forwarded to the estimator
 
         try:
             if (now - first_send_stamp) < self._orientation_align_time:
@@ -181,6 +189,11 @@ class MocapReceiver:
 
         if self._tf_publisher is not None:
             self._tf_publisher.publish(frame_id, pose)
+
+    def health(self, rigid_body_id: int) -> dict:
+        """{'age': s since the last accepted frame, 'rejects': consecutive rejected frames, 'swap': bool}."""
+        with self._lock:
+            return self._gate.health(int(rigid_body_id), time.monotonic())
 
     def _on_labeled_marker(self, marker_id, position, size, occluded) -> None:
         """Handle labelled marker callback from NatNet."""

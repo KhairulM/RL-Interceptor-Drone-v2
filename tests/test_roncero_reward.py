@@ -74,6 +74,14 @@ class AblationTest(unittest.TestCase):
             self.assertEqual(t2.flatten().tolist(), expect)
             self.assertTrue(torch.equal(te, te2) and torch.equal(tr, tr2))
 
+    def test_no_timeout_evader_only(self):
+        # thesis v2d: the evader's timeout bonus becomes 0, the pursuer keeps its -100 timeout (rows as _thesis)
+        for pursuer, expect in ((True, [100, -100, 0, -100]), (False, [-100, -100, 0, 0])):
+            t, te, tr, tmo, cap = self._thesis(pursuer)
+            t2, te2, tr2 = rr.ablate(t, te, tr, tmo, cap, F(1, 1, 1, 1), 100.0, pursuer, no_timeout_evader=True)
+            self.assertEqual(t2.flatten().tolist(), expect)
+            self.assertTrue(torch.equal(te, te2) and torch.equal(tr, tr2))
+
     def test_closing_discount_pursuer_only(self):
         t, te, tr, tmo, cap = self._thesis(True)
         t2, _, _ = rr.ablate(t, te, tr, tmo, cap, F(0.25, 1, 1, 1), 100.0, True, closing_discount=True)
@@ -128,9 +136,24 @@ class GaeTruncationTest(unittest.TestCase):
         self.assertNotIn("_prev_rate_action", fns["_pre_sim_step"])
         self.assertIn("roncero_reward.rate_jerk(", fns["_compute_reward_and_done"])
 
-    def test_ppo_config_flag_default_off(self):
+    def test_ppo_config_flag_default_on(self):
         from omni_drones.learning.ppo.ppo import PPOConfig
-        self.assertFalse(PPOConfig().gae_cut_at_truncation)
+        self.assertTrue(PPOConfig().gae_cut_at_truncation)        # default since 2026-11-11
+
+    def test_legacy_experiments_pin_the_old_gae(self):
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts/experiments/thesis"))
+        import common
+        old = common.LEGACY_GAE
+        try:
+            common.LEGACY_GAE = False
+            self.assertEqual(common.gae_pin(["a=1"]), ["a=1"])                 # new experiments: PPO default
+            common.LEGACY_GAE = True
+            self.assertEqual(common.gae_pin(["a=1"]), ["a=1", "algo.gae_cut_at_truncation=false"])
+            keep = ["algo.gae_cut_at_truncation=true"]                         # an explicit setting wins
+            self.assertEqual(common.gae_pin(keep), keep)
+        finally:
+            common.LEGACY_GAE = old
 
 
 if __name__ == "__main__":

@@ -25,6 +25,7 @@ Run with:  python pursuit_evasion_controller.py [--config config_pursuit_evasion
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import importlib
 import logging
 import math
@@ -39,6 +40,7 @@ import torch
 import pursuit_evasion_common as pec
 from drone import CrazyflieDrone, ScriptedDrone, DronePosePublisher
 from mocap import MocapReceiver, MocapTfPublisher
+from safety import Arena, Level, MocapGate, SafetyConfig, SafetyMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -357,6 +359,21 @@ class PursuitEvasionController:
         self.opponent_drone_config = pec.load_drone_config_from_yaml(
             self.config_path, self.opponent_role)
         self.mocap_config = pec.load_mocap_config_from_yaml(self.config_path)
+        self._rigid_ids = {
+            'pursuer': self.mocap_config.pursuer_rigid_body_id,
+            'evader': self.mocap_config.evader_rigid_body_id,
+        }
+
+        # Safety layer (SAFETY_PLAN.md): per-tick checks over both drones, graded responses, pre-flight checks.
+        self.safety_cfg = SafetyConfig.from_dict(config.get('safety'))
+        self.safety = SafetyMonitor(self.safety_cfg, Arena(
+            origin=self.arena_origin, half_xy=self.metadata.arena_half_xy,
+            z_min=self.metadata.arena_z_min, z_max=self.metadata.arena_z_max))
+        self._fault = None                       # latched safety Verdict that ended the run
+        self._inject = dict(self.safety_cfg.inject or {})
+        self._inject_kind = str(self._inject.get('kind', 'none')).lower()
+        self._frozen_opponent = None
+        self.land_duration = float(controller_config.get('land_duration', 3.0))
 
         self.drone_pose_pub = DronePosePublisher(world_frame=self.mocap_world_frame)
         self.own = CrazyflieDrone(self.self_config, pose_publisher=self.drone_pose_pub)
@@ -394,12 +411,10 @@ class PursuitEvasionController:
             self.mocap_tf_publisher = MocapTfPublisher(
                 world_frame=self.mocap_world_frame)
         self.mocap_receiver = MocapReceiver(
-            self.mocap_config, tf_publisher=self.mocap_tf_publisher)
+            self.mocap_config, tf_publisher=self.mocap_tf_publisher,
+            gate=MocapGate(self.safety_cfg))
 
-        rigid_ids = {
-            'pursuer': self.mocap_config.pursuer_rigid_body_id,
-            'evader': self.mocap_config.evader_rigid_body_id,
-        }
+        rigid_ids = self._rigid_ids
         self.mocap_receiver.register(
             rigid_ids[self.role], self.own, frame_id=self.role)
         if self.opponent_mode != 'scripted':
@@ -435,9 +450,39 @@ class PursuitEvasionController:
         command.body_rate_deg = filt
         return command
 
+    def _monitored_states(self, own_state=None, opponent_state=None) -> dict:
+        """States the safety layer checks: the agent, plus the opponent when it is a real drone."""
+        states = {self.role: own_state if own_state is not None else self.own.get_state()}
+        if self.opponent_mode != 'scripted':
+            states[self.opponent_role] = (opponent_state if opponent_state is not None
+                                          else self.opponent.get_state())
+        return states
+
+    def _mocap_health(self) -> Optional[dict]:
+        if self.mocap_receiver is None:
+            return None
+        roles = [self.role] + ([self.opponent_role] if self.opponent_mode != 'scripted' else [])
+        return {r: self.mocap_receiver.health(self._rigid_ids[r]) for r in roles}
+
     def _arm_and_takeoff(self) -> None:
-        self.own.arm()
-        self.opponent.arm()
+        status = {'own': self.own.arm() or {}, 'opp': self.opponent.arm() or {}}
+        # SAFETY_PLAN B4: with strict_preflight a failed mocap alignment / estimator convergence or a bad start
+        # position blocks the take-off instead of only logging a warning.
+        problems = []
+        for key, drone, tracked in (('own', self.own, True),
+                                    ('opp', self.opponent, self.opponent_mode != 'scripted')):
+            if not tracked:
+                continue
+            if self.mocap_config.enabled and not status[key].get('mocap_aligned', False):
+                problems.append(f'{drone.name}: mocap orientation not aligned')
+            if not status[key].get('estimator_converged', False):
+                problems.append(f'{drone.name}: estimator not converged')
+        if self.safety_cfg.enabled:
+            problems += self.safety.preflight(self._monitored_states(), time.time())
+        if problems:
+            if self.safety_cfg.strict_preflight:
+                raise RuntimeError('[pe] Pre-flight checks failed, not taking off: ' + '; '.join(problems))
+            logger.warning('[pe] Pre-flight problems (strict_preflight off, continuing): %s', '; '.join(problems))
         self.own.takeoff(self.takeoff_height, duration=self.takeoff_duration)
         self.opponent.takeoff(self.takeoff_height, duration=self.takeoff_duration)
 
@@ -567,8 +612,14 @@ class PursuitEvasionController:
                     continue
 
                 now = time.time()
-                if now - own_state.stamp > self.state_timeout:
-                    logger.warning('[pe] %s state timed out; stopping.', self.role)
+                own_state, opponent_state = self._apply_injection(own_state, opponent_state, now)
+                # SAFETY_PLAN B2: the opponent's state can go stale too (policy / cf mode).
+                stale = [(r, s) for r, s in ((self.role, own_state), (self.opponent_role, opponent_state))
+                         if (r == self.role or self.opponent_mode != 'scripted')
+                         and now - s.stamp > self.state_timeout]
+                if stale:
+                    logger.warning('[pe] %s state timed out (%.2f s); stopping.',
+                                   stale[0][0], now - stale[0][1].stamp)
                     break
                 if own_state.pos[2] < self.min_altitude:
                     logger.warning(
@@ -612,6 +663,27 @@ class PursuitEvasionController:
                     self.arena_origin, self.previous_action, self.device,
                     esn=self.esn,
                 )
+                if self._inject_kind == 'nan_action' and self._inject_active(now):
+                    action = action * float('nan')
+                opp_action = opp_command = None
+                if self.opponent_mode == 'policy':
+                    assert self.opponent_policy is not None
+                    assert self.opponent_metadata is not None
+                    opp_action, opp_command, _ = _build_command(
+                        self.opponent_policy, self.opponent_metadata,
+                        opponent_state, own_state, self.arena_origin,
+                        self.opponent_previous_action, self.device,
+                        esn=self.opponent_esn,
+                    )
+                action_finite = bool(torch.isfinite(action).all() and torch.isfinite(obs_vec).all()
+                                     and (opp_action is None or torch.isfinite(opp_action).all()))
+                verdict = self.safety.check(
+                    self._monitored_states(own_state, opponent_state), now,
+                    action_finite=action_finite, mocap=self._mocap_health())
+                if verdict.level >= Level.HOLD:
+                    self._fault = verdict
+                    logger.error('[pe] SAFETY %s: %s', verdict.level.name, ' | '.join(verdict.reasons))
+                    break
                 # previous_action feeds the observation, so store the raw
                 # (unfiltered) policy action; the low-pass only shapes the
                 # body-rate setpoint actually sent to the firmware.
@@ -627,14 +699,6 @@ class PursuitEvasionController:
                     self._last_debug_time = now
 
                 if self.opponent_mode == 'policy':
-                    assert self.opponent_policy is not None
-                    assert self.opponent_metadata is not None
-                    opp_action, opp_command, _ = _build_command(
-                        self.opponent_policy, self.opponent_metadata,
-                        opponent_state, own_state, self.arena_origin,
-                        self.opponent_previous_action, self.device,
-                        esn=self.opponent_esn,
-                    )
                     self.opponent_previous_action = opp_action.detach()
                     opp_command = self._smooth_command('opp', opp_command)
                     self.opponent.send_ctbr(opp_command)
@@ -674,9 +738,70 @@ class PursuitEvasionController:
         finally:
             self.shutdown()
 
+    def _apply_injection(self, own_state, opponent_state, now):
+        """Simulator fault injection (safety.inject): corrupt the states after inject.at_s seconds."""
+        kind = self._inject_kind
+        if kind in ('none', 'nan_action') or not self._inject_active(now):
+            return own_state, opponent_state
+        if kind == 'stale_opponent':
+            if self._frozen_opponent is None:
+                self._frozen_opponent = opponent_state
+                logger.warning('[pe] INJECT: freezing the %s state', self.opponent_role)
+            return own_state, self._frozen_opponent
+        if kind == 'position_jump':
+            return dataclasses.replace(own_state, pos=own_state.pos + np.array([3.0, 0.0, 0.0])), opponent_state
+        if kind == 'tilt':
+            return dataclasses.replace(own_state, quat_wxyz=np.array([0.7071068, 0.7071068, 0.0, 0.0])), \
+                opponent_state
+        raise ValueError(f'Unknown safety.inject.kind {kind!r}')
+
+    def _inject_active(self, now: float) -> bool:
+        return self._inject_kind != 'none' and now - self._motion_start_time >= float(self._inject.get('at_s', 5.0))
+
+    def _hold(self, drones, duration: float) -> None:
+        """Hold each real drone at its current position (and yaw) for ``duration`` seconds."""
+        targets = []
+        for d in drones:
+            s = d.get_state() if isinstance(d, CrazyflieDrone) else None
+            if s is not None and np.all(np.isfinite(s.pos)):
+                targets.append((d, s.pos.copy(), _quat_to_rpy_deg(s.quat_wxyz)[2]))
+        if targets:
+            logger.warning('[pe] HOLD for %.1f s at the current positions.', duration)
+        end = time.time() + duration
+        while targets and time.time() < end:
+            for d, p, yaw in targets:
+                try:
+                    d.send_position_setpoint(p[0], p[1], p[2], yaw_deg=yaw)
+                except Exception:
+                    pass
+            time.sleep(self.control_dt)
+
     def shutdown(self) -> None:
+        drones = [self.own, self.opponent]
+        fault = self._fault
+        if fault is not None and fault.level >= Level.EMERGENCY:
+            for role in fault.emergency_roles:
+                d = self.own if role == self.role else self.opponent
+                try:
+                    d.emergency_stop()
+                except Exception:
+                    logger.exception('[pe] emergency stop failed for %s', role)
+                drones = [x for x in drones if x is not d]
+        if fault is not None and fault.level == Level.HOLD:
+            self._hold(drones, self.safety_cfg.hold_s)
+        # SAFETY_PLAN B1: start every landing first, then wait once. Landing the drones one after the other left
+        # the second one without setpoints for the whole first landing (> 2 s: the firmware cuts its motors).
+        landing = []
+        for d in drones:
+            try:
+                if d.land_async(self.land_duration):
+                    landing.append(d)
+            except Exception:
+                logger.exception('[pe] landing failed for %s', getattr(d, 'name', d))
+        if landing:
+            time.sleep(self.land_duration + 1.0)
         for drone in (self.own, self.opponent):
-            for action in ('land', 'disarm', 'disconnect'):
+            for action in ('disarm', 'disconnect'):
                 try:
                     getattr(drone, action)()
                 except Exception:

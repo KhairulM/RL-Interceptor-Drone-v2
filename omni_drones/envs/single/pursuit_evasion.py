@@ -48,7 +48,7 @@ from omni_drones.controllers import ControllerBase
 from omni_drones.controllers.apf_controller import APFController
 from omni_drones.controllers.intercept_baseline_common import GeometricCTBR
 from omni_drones.envs.isaac_env import AgentSpec, IsaacEnv
-from omni_drones.envs.single import roncero_reward
+from omni_drones.envs.single import roncero_reward, shaping
 from omni_drones.robots.drone import MultirotorBase
 from omni_drones.utils.selfplay.opponents import FrozenPolicyBank
 from omni_drones.utils.torch import (
@@ -111,6 +111,9 @@ class PursuitEvasion(IsaacEnv):
         self.reward_approach_weight = float(task_cfg.get("reward_approach_weight", 10.0))
         self.reward_precision_weight = float(task_cfg.get("reward_precision_weight", 10.0))
         self.reward_precision_scale = float(task_cfg.get("reward_precision_scale", 5.0))
+        # Thesis v2 (2026-11-11): gamma for potential-based shaping (shaping.py); None = plain differences.
+        _g = task_cfg.get("shaping_gamma", None)
+        self.shaping_gamma = None if _g is None else float(_g)
         self.reward_body_rate_weight = float(task_cfg.get("reward_body_rate_weight", 0.0005))
         # Penalty on the step-to-step action jerk (norm of the CTBR action delta).
         # Directly discourages the bang-bang command oscillation that tumbles the
@@ -146,6 +149,7 @@ class PursuitEvasion(IsaacEnv):
         # Thesis F9: single Roncero components on top of the thesis rules (roncero_reward.ablate); all off by default.
         abl = dict(task_cfg.get("ablation", {}) or {})
         self.abl_no_timeout = bool(abl.get("no_timeout", False))
+        self.abl_no_timeout_evader = bool(abl.get("no_timeout_evader", False))   # thesis v2d: evader bonus only
         self.abl_closing_discount = bool(abl.get("closing_discount", False))
         self.abl_truncate_failures = bool(abl.get("truncate_failures", False))
         # Dense per-step distance penalty (pursuer only; matches Intercept's
@@ -660,6 +664,9 @@ class PursuitEvasion(IsaacEnv):
 
         self.stats_spec = Composite({
             "return": UnboundedContinuous(torch.Size([1]), device=self.device),
+            # exact per-episode sums (thesis F11 pilot): pursuer approach + precision, and the regularisation penalties
+            "sum_shaping": UnboundedContinuous(torch.Size([1]), device=self.device),
+            "sum_regularisation": UnboundedContinuous(torch.Size([1]), device=self.device),
             "episode_len": UnboundedContinuous(torch.Size([1]), device=self.device),
             "distance": UnboundedContinuous(torch.Size([1]), device=self.device),
             "min_distance": UnboundedContinuous(torch.Size([1]), device=self.device),
@@ -1324,7 +1331,8 @@ class PursuitEvasion(IsaacEnv):
         # The opponent crashing or (evader) leaving the arena is neutral for the agent.
         self._terminal_reward = self.reward_terminal_weight * (
             self._win.float() - self._loss.float())
-        if self.abl_no_timeout or self.abl_closing_discount or self.abl_truncate_failures:
+        if (self.abl_no_timeout or self.abl_closing_discount or self.abl_truncate_failures
+                or self.abl_no_timeout_evader):
             pursuer = self.role == PURSUER
             pd, ed = (self.agent_drone, self.opp_drone) if pursuer else (self.opp_drone, self.agent_drone)
             v_close = roncero_reward.closing_speed(pd.pos[:, 0], pd.vel_w[:, 0, :3], ed.pos[:, 0], ed.vel_w[:, 0, :3])
@@ -1332,7 +1340,8 @@ class PursuitEvasion(IsaacEnv):
             self._terminal_reward, self._terminated, self._truncated = roncero_reward.ablate(
                 self._terminal_reward, self._terminated, self._truncated, self._timeout, self._captured, beta,
                 self.reward_terminal_weight, pursuer, self.abl_no_timeout, self.abl_closing_discount,
-                self.abl_truncate_failures)
+                self.abl_truncate_failures,
+                self.abl_no_timeout_evader)
         self.stats["reward_terminal"][:] = self._terminal_reward
         self.stats["timeout"][:] = torch.maximum(
             self.stats["timeout"], self._timeout.float())
@@ -1363,11 +1372,10 @@ class PursuitEvasion(IsaacEnv):
         # distance and capture were computed in _compute_state_and_obs.
         distance = self._distance
         delta = self.prev_distance - distance
-        # Precision potential (telescopes to <= weight; strong pull near contact).
-        precision = self.reward_precision_weight * (
-            torch.exp(-self.reward_precision_scale * distance)
-            - torch.exp(-self.reward_precision_scale * self.prev_distance)
-        )
+        # Approach + precision potential (shaping.py; gamma None = the original plain differences).
+        approach_shaping, precision = shaping.shaping(
+            self.prev_distance, distance, self.reward_approach_weight, self.reward_precision_weight,
+            self.reward_precision_scale, self.shaping_gamma, self._terminated)
         first_step = (self.progress_buf == 0).reshape(self.num_envs, 1).float()
         precision = precision * (1.0 - first_step)
         self.prev_distance = distance.detach().clone()
@@ -1432,7 +1440,7 @@ class PursuitEvasion(IsaacEnv):
             reward_distance = torch.zeros(self.num_envs, 1, device=self.device)
 
         if self.role == PURSUER:
-            approach = self.reward_approach_weight * delta
+            approach = approach_shaping
             reward = (approach + precision + reward_distance - body_rate_pen
                       - smoothness_pen - cmd_rate_pen - bounds_pen + terminal)
             self.stats["reward_approach"].lerp_(approach, 1 - self.alpha)
@@ -1451,6 +1459,9 @@ class PursuitEvasion(IsaacEnv):
         self.stats["reward_action_smoothness"].lerp_(-smoothness_pen, 1 - self.alpha)
         self.stats["reward_cmd_rate"].lerp_(-cmd_rate_pen, 1 - self.alpha)
         self.stats["return"] += reward
+        if self.role == PURSUER:
+            self.stats["sum_shaping"] += approach + precision
+        self.stats["sum_regularisation"] -= body_rate_pen + smoothness_pen + cmd_rate_pen
         self.stats["episode_len"][:] = self.progress_buf.unsqueeze(1)
         self.stats["capture_radius"][:] = self.active_capture_radius
 

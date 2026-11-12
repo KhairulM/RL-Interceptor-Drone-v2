@@ -7,7 +7,7 @@
 # The artifact's `role` (pursuer | evader) decides which drone the policy flies;
 # the drone sections below are keyed by role, so the same file serves both.
 
-artifact_dir: artifacts/selfplay_ppo_v6_fix_reward_and_bounds/pursuer   # Folder with policy_ts.pt + metadata.json (required).
+artifact_dir: artifacts/thesis_F8b_roncero_s0/pursuer   # Folder with policy_ts.pt + metadata.json (required).
 # ^ v3: retrained from scratch with anti-tumble smoothness reward (body-rate +
 #   action-jerk penalties, lower approach weight). On-trajectory commanded body
 #   rates dropped ~61% (mean 96->37 deg/s, 0% saturation) vs the aggressive
@@ -26,11 +26,11 @@ controller:
   # toward the (unchanged) 50 Hz training response. Time constant in seconds;
   # 0 = disabled (raw passthrough). Try 0.02-0.05 and increase until the roll
   # oscillation stops; decrease if the chase becomes sluggish.
-  command_rate_lpf_tau: 0.0
+  command_rate_lpf_tau: 0.00
   takeoff_height: 1.0          # Takeoff height for both drones (m).
   takeoff_duration: 3.0        # Takeoff duration for both drones (s).
   state_timeout: 0.5           # Stop if the agent's state is stale this long (s).
-  min_altitude: 0.15           # Safety cutoff altitude (m).
+  min_altitude: 0.10           # Safety cutoff altitude (m).
   log_commands: true           # Print decoded CTBR commands.
   debug_obs: false             # Dump raw states + named observation components
                                # each step (throttled) to compare deploy vs sim.
@@ -53,7 +53,7 @@ controller:
   opponent:
     mode: policy             # policy | cf | scripted.
     # Required when mode == policy: artifact of the OPPOSING role.
-    artifact_dir: artifacts/selfplay_ppo_v6_fix_reward_and_bounds/evader
+    artifact_dir: artifacts/thesis_F8b_roncero_s0/evader
     motion:                    # Used only when mode == scripted.
       type: hover           # hover | linear | circular | pure_pursuit | flee.
       yaw_deg: 0.0             # Yaw command for opponent position setpoints (deg).
@@ -110,3 +110,30 @@ mocap:
   mocap_send_rate_hz: 60.0
   world_frame: world
   orientation_align_time: 2.0
+
+# -- Safety layer (safety.py; SAFETY_PLAN.md) ---------------------------------
+# Checked every control tick for both drones. Responses: HOLD (hover in place for hold_s, then land),
+# LAND (both drones land at the same time), EMERGENCY (motors off on the affected drone, the other lands).
+safety:
+  enabled: true
+  strict_preflight: true        # refuse to take off if mocap is not aligned / the estimator has not converged /
+                                # a drone starts outside the arena, not level or with a stale / non-finite state
+  geofence_margin: 0.3          # hard fence = arena + margin, for BOTH drones (incl. ceiling) -> LAND
+  stop_lookahead_s: 0.3         # predicted position (p + v * t) outside the fence -> HOLD
+  min_altitude: 0.10            # -> LAND
+  max_descent_speed: 2.5        # m/s below descent_check_alt -> HOLD (brake; motors-off would hit harder)
+  descent_check_alt: 0.6
+  max_tilt_deg: 60.0            # -> EMERGENCY
+  max_body_rate_deg: 720.0      # -> EMERGENCY
+  max_speed: 6.0                # m/s -> LAND
+  min_separation: 0.0           # m, 0 = off (rely on the capture stop); e.g. 0.20 on hardware -> HOLD
+  telemetry_timeout: 0.1        # s without state packets from a drone -> HOLD
+  telemetry_land_after: 0.3     # -> LAND
+  mocap_timeout: 0.2            # s without an accepted mocap frame for a drone -> HOLD
+  mocap_land_after: 0.5         # -> LAND
+  mocap_max_rejects: 5          # consecutive implausible mocap frames (jumps) -> HOLD
+  mocap_max_speed: 5.0          # m/s, jump gate: |dp| > v * dt + mocap_jump_tol is rejected
+  mocap_jump_tol: 0.05
+  mocap_swap_tol: 0.05          # a body reading where the other body was -> swap suspected -> LAND
+  hold_s: 1.0
+  inject: {kind: none, at_s: 5.0}   # simulator only: stale_opponent | nan_action | position_jump | tilt

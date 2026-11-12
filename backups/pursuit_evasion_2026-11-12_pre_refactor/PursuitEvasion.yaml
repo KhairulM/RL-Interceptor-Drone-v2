@@ -1,0 +1,203 @@
+name: PursuitEvasion
+
+defaults:
+  - /base/env_base@_here_
+  - /base/sim_base@_here_
+
+env:
+  num_envs: 4096
+  max_episode_length: 1500
+  env_spacing: 12
+
+# Which side is trained with RL. The opponent is a frozen policy from the pool.
+# The generational driver overrides this per stage (task.role=pursuer|evader).
+role: pursuer
+
+# Confined 3D arena (env-local coordinates).
+arena:
+  half_xy: 2.0
+  z_min: 0.1
+  z_max: 3.0
+  visualize: true
+
+# Capture-radius curriculum (shrinks the capture threshold during training,
+# like Intercept). Fixed at success_radius_eval outside training.
+success_radius_init: 0.1 # 0.3
+success_radius_end: 0.1
+# success_radius_lr: 2e-6
+success_radius_lr: 0.0
+success_radius_eval: 0.1
+minimum_altitude: 0.1
+min_spawn_separation: 1.0
+
+# Reward weights. Terminal outcomes (magnitude reward_terminal_weight = W):
+#   * FULL WIN  (+W):  pursuer -> capture;  evader -> survived to the timeout.
+#   * FULL LOSS (-W):  own crash to the ground (z < minimum_altitude) / NaN,
+#     (evader only) departure through a wall or the ceiling, and (pursuer only)
+#     the timeout.
+#   * The OPPONENT crashing is neutral (0): it ends the episode with no terminal reward.
+#   Only the evader is confined to the arena: leaving ends the episode as its
+#   loss (neutral for the pursuer). The pursuer may leave freely, unpenalized.
+#   pursuer: +approach +precision -body_rate          +W(capture)   -W(own crash | timeout)
+#   evader:  +step                -body_rate -bounds  +W(survived)  -W(captured | own crash | own leave)
+reward_approach_weight: 7.0        # dense distance-closing (delta distance)
+# reward_approach_weight: 0.0
+reward_precision_weight: 10.0      # potential exp(-scale*d); pulls through the last meter
+reward_precision_scale: 5.0
+shaping_gamma: null                # thesis v2: gamma for potential-based shaping gamma*Phi(s')-Phi(s) (shaping.py); null = plain differences
+reward_body_rate_weight: 0.0       # penalty on actual body angular velocity
+reward_action_smoothness_weight: 0.5   # penalty on step-to-step CTBR jerk
+reward_cmd_rate_weight: 0.2         # penalty on commanded body-rate MAGNITUDE (anti-tumble; see envs/single/pursuit_evasion.py). The other two miss sustained saturated commands that tumble the real firmware rate loop.
+reward_terminal_weight: 100.0      # magnitude of every full win/loss outcome
+reward_bounds_weight: 1.0          # evader-only dense penalty ramping up within bounds_margin of a wall
+bounds_margin: 0.5
+reward_floor_weight: 0.0           # pursuer-only floor penalty (the evader's floor ramp, no walls / ceiling); 0 = off
+reward_step: 0.1                   # evader per-step survival reward; must exceed the per-step penalties
+# Thesis F8: reward_mode roncero = Sanchez Roncero et al. 2026 Eqs. (8)-(11) and endings (capture terminal; crash /
+# out-of-arena of either agent and the timeout are truncations); the thesis reward terms above are then unused.
+# Pair with algo.gae_cut_at_truncation=true. Coefficients from the paper (Sec. III-A c); see roncero_reward.py.
+reward_mode: thesis
+roncero: {k_br: 0.001, k_sm: 0.002, k_b: 10.0, k_c: 10.0, k_app: 0.25, k_s: 0.0025, v_safe: 2.0, alpha_close: 3.0}
+# Thesis F9: one Roncero component at a time on top of the thesis rules (roncero_reward.ablate); all off = thesis.
+ablation: {no_timeout: false, closing_discount: false, truncate_failures: false, no_timeout_evader: false}
+# Optional dense distance penalty (pursuer only), matching Intercept's
+# reward_distance = reward_distance_weight * distance. Negative weight penalizes
+# being far from the evader. Toggle with use_distance.
+use_distance: false
+reward_distance_weight: -0.1
+
+observation:
+  include_noise: false
+  use_previous_action: true
+  use_time_encoding: true
+  time_encoding_dim: 4
+  use_rel_dist: true
+  agent_rel_vel: true   # false: drop the opponent's relative velocity from the agent's obs (thesis A3, positions-only)
+  opp_drop_rel_vel: false  # true: same for the frozen opponent's obs (frozen pursuers trained positions-only, thesis F4)
+  rel_vel_source: truth   # pursuer agent: truth | nf | fd_ema = estimated evader velocity from (noisy) positions
+                          # replaces the true relative velocity (thesis A3d / F4)
+  opp_rel_vel_source: truth  # same for frozen pursuer opponents (evader role, clean inputs)
+  rel_vel_model: null     # nf: velocity basis (exps/a3d_velest.py)
+  rel_vel_history: 10
+  rel_vel_ema: 0.1        # fd_ema: EMA alpha on the first difference of the evader position estimate
+  rot_repr: matrix   # attitude obs: matrix (vec(R), 9-D), quat (w>=0, 4-D) or log (log(R) rotation vector, 3-D)
+  # Per-component Gaussian noise stds applied to the agent's observation when
+  # include_noise is true (sensor-matched defaults, from Intercept).
+  noise:
+    pos_std: 0.02
+    rot_std: 0.01
+    lin_vel_std: 0.05
+    rot_vel_std: 0.02
+    rel_dist_std: 0.02
+    rel_lin_vel_std: 0.08
+
+# ESN-OA (arXiv:2602.06326): reservoir + per-env online RLS readout predicting the
+# opponent's next rel distance + rel lin vel; the 6-D prediction is appended to obs.
+# One ESN per side listed in `roles`; per-env RLS modes add num_envs x reservoir_size^2 floats.
+# Changes obs_dim: policies trained with/without ESN cannot share a pool.
+esn:
+  enabled: false
+  roles: [pursuer]   # roles whose policies get the ESN input; obs_dim differs per role
+  reservoir_size: 700
+  spectral_radius: 0.9
+  leak_rate: 0.3
+  input_scale: 0.1
+  forgetting_factor: 0.99
+  delta: 100.0
+  p_trace_max: 1.0e6
+  use_bias: true
+  seed: 0
+  # per_env: fresh RLS readout per episode | shared: one readout fitted centrally on all
+  # envs (frozen at deploy) | shared_adapt: shared readout as init, then per-env RLS.
+  readout: shared
+  fit_interval: 50        # central ridge re-solve period (training steps)
+  fit_forgetting: 0.999   # per-step decay of pooled statistics
+  ridge: 1.0e-4           # relative to mean diag of the pooled feature covariance
+  readout_path: null      # warm-start shared readout (<ckpt>_esn.pt saved next to checkpoints)
+
+# Privileged inputs appended to the agent obs (thesis diagnostic X4; all off by default; change obs_dim).
+oracle:
+  opp_accel: false        # opponent acceleration (finite difference), agent body frame, scaled x0.1
+  opp_command: false      # opponent's latest CTBR command (tanh, 4-D)
+  accel_source: vel      # vel: finite difference of velocities | pos: second difference of the evader position estimate
+  accel_ema: 0.0          # >0: EMA filter (this alpha) on the acceleration estimate; with observation.include_noise the
+                          # finite difference uses noisy velocities (rel_lin_vel_std), as a real estimator would
+  descriptor_path: null   # JSON {opponent_id: [floats]}: fixed behaviour descriptor of the assigned opponent
+  opp_side_accel: false   # frozen RL opponents also get opp_accel (vel source, noise-free); for opponents trained with it (F2)
+
+# Online opponent adaptation for the pursuer (thesis A1; omni_drones/utils/opponent_adapt.py). Changes obs_dim.
+adapt:
+  enabled: false
+  kind: nf                # nf (learned basis) | esn (random reservoir) | raw (linear on history) | stack (frame stack)
+  model_path: null        # nf: trained basis (+ input normalisation for all kinds)
+  history: 10             # steps of [rel_pos, rel_vel, own_vel] in the input window
+  horizon: 15             # prediction horizon (steps)
+  z_mode: vel             # vel: input window [rel_pos, rel_vel, own_vel] | pos: [rel_pos, own_pos, own_vel] (needs freeze, target dvel)
+  target: disp            # disp: evader relative displacement over the horizon | dvel: evader velocity change
+                          # (fed to the policy as the predicted mean acceleration, scaled like oracle.opp_accel)
+  forgetting: 0.98        # RLS forgetting factor
+  delta: 10.0             # RLS initial covariance scale
+  p_max_ratio: 1.0        # cap on the RLS covariance trace, relative to its initial value (anti wind-up)
+  freeze: false           # true: no online update (readout stays at its initial value)
+  reset_on_episode: true  # false: keep the adapted readout across episodes (across-episode adaptation)
+  reservoir_size: 128
+  seed: 0
+  opp_side: false         # evader role only: frozen pursuer opponents get the same (clean-input) adapter output (F4)
+
+# Scripted opponent motion (used for heuristic seeds: hover/circular/pure_pursuit/apf/flee).
+# `flee` runs horizontally away from the pursuer at a held altitude; it never
+# commands a descent, its target is clamped inside the arena shrunk by
+# safe_margin, and its outward speed fades to zero within brake_zone of the
+# keep-in edge so the drone coasts to a stop before the wall rather than
+# overshooting it (a pure position push could not brake the built-up momentum:
+# the drone punched through the wall AND dived as the hard braking tilt dumped
+# its lift). Interior flee speed ~1.3 m/s: slow enough for the Crazyflie
+# pursuer to run it down.
+heuristic:
+  circular_radius: 1.5
+  circular_omega: 1.0
+  speed: 2.0
+  lookahead: 0.5
+  wall_margin: 1.5       # flee starts turning away this far from a wall
+  safe_margin: 0.75      # every heuristic target is clamped this far inside the arena
+  brake_zone: 1.5        # flee speed fades to zero over this distance before the keep-in edge, so outward momentum cannot overshoot the wall
+  wall_gain: 0.75        # strength of the gentle, always-on inward push (fraction of full step)
+  max_tilt_deg: 22.0     # opponent CTBR tilt cap; low enough that reactive maneuvers cannot dump the lift the T/W~1.4 Crazyflie needs to hold altitude
+
+action_transform: pidrate
+
+pursuer:
+  model: Crazyflie
+  controller: PIDRateController
+
+evader:
+  model: Crazyflie
+  controller: PIDRateController
+
+# Frozen opponent pool. Populated by the self-play driver at runtime; the
+# default here lets the task run standalone (single hover opponent). When the
+# driver injects RL opponents it also sets opponent.algo_cfg for loading them.
+opponent:
+  policies:
+    - id: "evader:heuristic0"
+      kind: heuristic
+      checkpoint_path: null
+      metadata:
+        heuristic: hover
+  probs: null
+  algo_cfg: null
+
+# Domain randomization for the RL-controlled agent (optional).
+randomization:
+  train:
+    mass_scale: [0.95, 1.05]
+    t2w_scale: [0.85, 1.15]
+    inertia_scale: [0.90, 1.10]
+    tau_up: [0.08, 0.17]
+    tau_down: [0.08, 0.17]
+  eval:
+    mass_scale: [0.95, 1.05]
+    t2w_scale: [0.85, 1.15]
+    inertia_scale: [0.90, 1.10]
+    tau_up: [0.08, 0.17]
+    tau_down: [0.08, 0.17]

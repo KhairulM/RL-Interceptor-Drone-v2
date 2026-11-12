@@ -57,7 +57,17 @@ EXPERIMENTS = {
     "F8d": "f8d_heldout:run_f8d",
     "F10": "f10_gae_sp:run_f10",
     "F10c": "f10_gae_sp:run_f10c",
+    "F11": "f11_v2_sp:run_f11",
+    "F11c": "f11_v2_sp:run_f11c",
+    "F12": "f12_acc_sp:run_f12",
+    "F12c": "f12_acc_sp:run_f12c",
 }
+
+# Registered before the GAE truncation fix became the PPO default (2026-11-11): these keep the old setting
+# (common.gae_pin) unless their own overrides set it.
+LEGACY_GAE = {"X0", "X1", "X2", "X3", "X4", "D1", "D1b", "D1c", "D2", "A1a", "A1b", "F1", "A2a", "A2b", "A3a", "A3b",
+              "A3c", "A3d", "A3e", "A3f", "F2a", "F2b", "F2c", "F3", "F3c", "F4", "F4c", "F5", "F5c", "F6", "F6c",
+              "F6b", "F6bc", "F7", "F7c", "F8", "F8c", "F9", "F9c", "F8d", "F10", "F10c"}
 
 
 def main():
@@ -66,6 +76,8 @@ def main():
     ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--smoke", action="store_true", help="tiny frame budgets / few opponents")
     args = ap.parse_args()
+    import common
+    common.LEGACY_GAE = args.exp in LEGACY_GAE
     from common import log_progress
     log_progress(f"=== start {args.exp} ({' '.join(sys.argv[1:])})")
     mod, _, fn = EXPERIMENTS[args.exp].partition(":")

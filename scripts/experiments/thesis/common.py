@@ -208,6 +208,19 @@ def _acquire_lock(lock: str) -> bool:
     return True
 
 
+# GAE truncation fix (PPOConfig.gae_cut_at_truncation): on by default since 2026-11-11. Experiments registered before
+# then run with it off unless their overrides set it (run.py sets LEGACY_GAE), so re-runs and resumes reproduce them.
+LEGACY_GAE = False
+_GAE_KEY = "algo.gae_cut_at_truncation"
+
+
+def gae_pin(overrides: List[str]) -> List[str]:
+    """`overrides` plus the pre-2026-11-11 GAE setting for legacy experiments, unless they set it themselves."""
+    if LEGACY_GAE and not any(o.startswith(_GAE_KEY + "=") for o in overrides):
+        return list(overrides) + [f"{_GAE_KEY}=false"]
+    return list(overrides)
+
+
 def train(ckpt: str, opponents: List[dict], frames: int, role: str = "pursuer", probs: Optional[Dict[str, float]] = None,
           init_policy: Optional[str] = None, num_envs: int = 4096, seed: int = 0,
           extra: Optional[List[str]] = None) -> Optional[str]:
@@ -238,7 +251,7 @@ def _train(ckpt, opponents, frames, role, probs, init_policy, num_envs, seed, ex
         f"stage_out={base}_out.json"]
     if init_policy:
         args.append(f"init_policy={init_policy}")
-    args += list(extra or [])
+    args = gae_pin(args + list(extra or []))
     rc = run_stage(args, base + "_log.txt")
     if rc != 0 or not os.path.isfile(ckpt):
         print(f"[train FAILED rc={rc}] {ckpt}", flush=True)

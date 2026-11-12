@@ -213,13 +213,27 @@ class CrazyflieDrone(Drone):
             logger.info('[%s] Cannot %s, drone is not armed', self.name, action)
         return self.armed
 
-    def connect(self):
+    def connect(self, timeout: float = 15.0):
         self.cf.connected.add_callback(self._on_connected)
         self.cf.connection_lost.add_callback(self._on_disconnected)
+        self.cf.connection_failed.add_callback(self._on_connection_failed)
+        self._connect_error = None
         self.cf.open_link(self.uri)
 
+        # SAFETY_PLAN B10: fail instead of waiting forever (wrong URI, sim / radio not running).
+        deadline = time.time() + timeout
         while not self.connected:
+            if self._connect_error is not None or time.time() > deadline:
+                try:
+                    self.cf.close_link()
+                except Exception:
+                    pass
+                raise ConnectionError(f'[{self.name}] could not connect to {self.uri}: '
+                                      f'{self._connect_error or f"timeout after {timeout:.0f} s"}')
             time.sleep(0.1)
+
+    def _on_connection_failed(self, link_uri, msg=None):
+        self._connect_error = msg or 'connection failed'
 
     def setup(self):
         self._setup_params()
@@ -243,13 +257,16 @@ class CrazyflieDrone(Drone):
 
         logger.info('[%s] Arming request sent. Waiting for Mocap to align orientation...', self.name)
 
-        if not self.mocap_orientation_aligned.wait(timeout=10.0):
+        aligned = self.mocap_orientation_aligned.wait(timeout=10.0)
+        if not aligned:
             logger.warning('[%s] Mocap orientation not aligned. '
                            'Position estimate may be inaccurate.', self.name)
 
-        if not self._is_estimator_converged(timeout=10.0):
+        converged = self._is_estimator_converged(timeout=10.0)
+        if not converged:
             logger.warning('[%s] Kalman filter not converged. '
                            'Position estimate may be inaccurate.', self.name)
+        self.arm_status = {'mocap_aligned': bool(aligned), 'estimator_converged': bool(converged)}
 
         # The first setpoint must be a zero-thrust one to unlock the commander.
         self.cf.commander.send_setpoint(0.0, 0.0, 0.0, 0)
@@ -258,6 +275,7 @@ class CrazyflieDrone(Drone):
 
         self.armed = True
         logger.info('[%s] Armed. Commander unlocked. Ready to take off.', self.name)
+        return self.arm_status
 
     def disarm(self):
         if not self._require_connected('disarm'):
@@ -287,6 +305,24 @@ class CrazyflieDrone(Drone):
         self._relax_setpoint_priority()
         self.cf.high_level_commander.land(0.1, duration)
         time.sleep(duration + 1.0)  # wait for landing to complete
+
+    def land_async(self, duration: float = 3.0) -> bool:
+        """Start a high-level landing and return immediately (SAFETY_PLAN B1: land several drones at once)."""
+        if not self._require_connected('land') or not self._require_armed('land'):
+            return False
+        logger.info('[%s] Landing over %.1f s...', self.name, duration)
+        self._relax_setpoint_priority(wait_s=0.02)
+        self.cf.high_level_commander.land(0.1, duration)
+        return True
+
+    def emergency_stop(self) -> None:
+        """Motors off immediately (supervisor emergency stop)."""
+        logger.warning('[%s] EMERGENCY STOP', self.name)
+        try:
+            self.cf.supervisor.send_emergency_stop()
+        except Exception:
+            self.cf.loc.send_emergency_stop()
+        self.armed = False
 
     def get_state(self) -> Optional[ic.DroneState]:
         return self.state.snapshot()
@@ -485,9 +521,10 @@ class ScriptedDrone(Drone):
 
     # -- arming --------------------------------------------------------------
 
-    def arm(self) -> None:
+    def arm(self) -> dict:
         self.armed = True
         logger.info('[%s] Armed (scripted)', self.name)
+        return {'mocap_aligned': True, 'estimator_converged': True}
 
     def disarm(self) -> None:
         self.armed = False
@@ -506,6 +543,13 @@ class ScriptedDrone(Drone):
 
     def land(self, duration: float = 3.0) -> None:
         logger.info('[%s] Scripted landing (no-op)', self.name)
+
+    def land_async(self, duration: float = 3.0) -> bool:
+        logger.info('[%s] Scripted landing (no-op)', self.name)
+        return False
+
+    def emergency_stop(self) -> None:
+        logger.info('[%s] Scripted emergency stop (no-op)', self.name)
 
     # -- state ---------------------------------------------------------------
 

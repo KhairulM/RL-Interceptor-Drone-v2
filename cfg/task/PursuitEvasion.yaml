@@ -44,6 +44,7 @@ reward_approach_weight: 7.0        # dense distance-closing (delta distance)
 # reward_approach_weight: 0.0
 reward_precision_weight: 10.0      # potential exp(-scale*d); pulls through the last meter
 reward_precision_scale: 5.0
+shaping_gamma: null                # thesis v2: gamma for potential-based shaping gamma*Phi(s')-Phi(s) (shaping.py); null = plain differences
 reward_body_rate_weight: 0.0       # penalty on actual body angular velocity
 reward_action_smoothness_weight: 0.5   # penalty on step-to-step CTBR jerk
 reward_cmd_rate_weight: 0.2         # penalty on commanded body-rate MAGNITUDE (anti-tumble; see envs/single/pursuit_evasion.py). The other two miss sustained saturated commands that tumble the real firmware rate loop.
@@ -58,7 +59,7 @@ reward_step: 0.1                   # evader per-step survival reward; must excee
 reward_mode: thesis
 roncero: {k_br: 0.001, k_sm: 0.002, k_b: 10.0, k_c: 10.0, k_app: 0.25, k_s: 0.0025, v_safe: 2.0, alpha_close: 3.0}
 # Thesis F9: one Roncero component at a time on top of the thesis rules (roncero_reward.ablate); all off = thesis.
-ablation: {no_timeout: false, closing_discount: false, truncate_failures: false}
+ablation: {no_timeout: false, closing_discount: false, truncate_failures: false, no_timeout_evader: false}
 # Optional dense distance penalty (pursuer only), matching Intercept's
 # reward_distance = reward_distance_weight * distance. Negative weight penalizes
 # being far from the evader. Toggle with use_distance.
