@@ -61,6 +61,8 @@ EXPERIMENTS = {
     "F11c": "f11_v2_sp:run_f11c",
     "F12": "f12_acc_sp:run_f12",
     "F12c": "f12_acc_sp:run_f12c",
+    "F13": "f13_thesis_short_sp:run_f13",
+    "F13c": "f13_thesis_short_sp:run_f13c",
 }
 
 # Registered before the GAE truncation fix became the PPO default (2026-11-11): these keep the old setting

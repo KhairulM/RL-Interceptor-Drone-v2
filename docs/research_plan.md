@@ -331,13 +331,20 @@ Conventions: "plain" = plain observation; "Hedge" = Roncero eq. (12) exactly, ga
   5. 11-12 00:43, amendment 3 (user, before any v2c run): **v2c** = v2b with the original shaping (7 / 10); everything else unchanged.
   6. 11-12 00:58, v2c gate failed (0.781 < 0.80); diagnosis 01:48: one-stage reruns reproduce earlier stage-0 results exactly (no code or simulator regression); endings + no timeout terms together remove the pursuer's urgency (capture 0.18, timeouts 0.42).
   7. 11-12 09:16, amendment 4 (user, before any v2d run): **v2d** = v2c but only the evader's timeout bonus is removed; the pursuer keeps -100 at timeout (`task.ablation.no_timeout_evader`); everything else unchanged. Campaigns `thesis-F11v2d-*`.
-- **Status.** Running (v2d campaigns, then F11c; PROGRESS.md). No RESULTS section yet.
+- **Status.** Done (campaigns 11-12 20:06, F11c 21:33; RESULTS.md [F11](../experiments/thesis/RESULTS.md#f11), 11-13 00:10): predictions (1)-(4) did not hold, (5) held on s0 only.
 
 #### F12_acc_v2_sp (added 11-12, user request; pre-registered 2026-11-12 13:43 before any F12 run; queued after F11; 2 seeds, descriptive)
 - **Question.** Does the learned acceleration estimator still help the pursuer under the thesis v2d rules?
 - **Design.** `thesis-F12-acc-s{0,100}` = F11 v2d (rules, pilot settings, Hedge, 26 x 50M, seeds) with F5's pursuer input (learned acceleration + online RLS); gate as F11. F12c: final pursuers vs train pool, test set, the default held-out set (v10 + F8d's 16 strong finals), F3 / F11 / F12 campaign evaders, two 100M-frame exploiters (v2d rules, seeds 880 / 881; old rules without the GAE fix, 890 / 891); RLS-frozen ablation. Paired by seed with `thesis-F11v2d-s{0,100}`. **Outputs.** `F12_acc_v2_sp/summary.md`, `results.json`.
 - **Predictions.** (1) acc - plain on the default held-out set >= +0.03 on both seeds (low confidence; F5: +0.091 on v10 under the old rules, F11 near the v10 ceiling). (2) Exploitability difference vs the old-rules exploiter within +/- 0.10. (3) RLS frozen vs on within +/- 0.02 (F5). Descriptive (2 seeds)
-- **Status.** Queued after F11.
+- **Status.** Stopped 11-13 01:14 (user) after 10 of 26 stages per campaign, to run F13 first (resumable). Resume if v2d beats F13's setup (F13 decision rule); otherwise F12 is re-run on F13's setup (new entry).
+
+#### F13_thesis_short_sp (added 11-13, user decision after F11; pre-registered 2026-11-13 01:16 before any F13 run; 3 seeds, descriptive)
+- **Question.** Is the original thesis rule set with short stages (thesis rules, GAE fix, Hedge both roles, 13 x 50M) a robust protocol on more seeds, and does thesis v2d (F11) beat it?
+- **Design.** Campaigns `thesis-F13-short-s{100,200}` = F9 control exactly (thesis rules from the task YAML, `algo.gae_cut_at_truncation=true`, Hedge both roles, 13 stages x 50M, warm start, the same seed heuristics); seed 0 is `thesis-F9-control-s0` (same configuration, not re-run). No smoke or gate (same code path as F9 control and F11). **F13c**: final pursuers (stage 12) of the three campaigns, clean under the thesis rules, vs train pool, test set (v10 held-out RL, held-out scripted, X3 exploiters), F3 campaigns' evaders, F8d's 16 strong finals and the F3 hedge / F8 finals, the F13 campaigns' evaders (own and other), the F11 campaigns' evaders, and two 100M-frame exploiters each: thesis rules without the GAE fix (F3c / F9c / F11c recipe; seeds 900 / 901; seed 0 reuses F9c's exploiter) and v2d rules (F11c recipe; seeds 910 / 911 / 912). Cross-play and stage control, eval only: the F11 final pursuers (stage 24) vs the F13 campaigns' evaders; the F11 stage-12 pursuers (same number of stages as F13) vs the test set, the strong finals and the F13 evaders. J at 0.10 m (primary) and 0.15 m. **Outputs.** `F13_thesis_short_sp/summary.md`, `results.json`.
+- **Decision rule (user, 11-13 01:14).** Four measures at 0.10 m, mean over seeds (F13: 0 / 100 / 200; F11: 0 / 100): M1 held-out RL (v10); M2 strong-finals mean (16); M3 exploitability vs the thesis-rules exploiter (lower is better); M4 J vs the other rule set's campaign evaders (F11 pursuers vs F13 evaders; F13 pursuers vs F11 evaders). **v2d beats F13's setup if its mean is better on at least 3 of the 4.** Then F12 is resumed; otherwise F12 is re-run on F13's setup (new pre-registration). The F11 stage-12 control is reported, not used in the rule.
+- **Predictions.** (1) Pursuer crash vs the thesis-rules exploiter < 0.10 on both new seeds (F9 control 0.056, F10 0.031). (2) Held-out RL >= 0.90 on both new seeds (F9 control 0.893, F10 0.933; low confidence). (3) v2d does not beat F13's setup (rule above). (4) In-campaign lure rate (a) (mean over evader stages 3-11) between 0.10 and 0.60 on both new seeds (F9 control 0.36; low confidence). Descriptive (3 seeds; the decision uses means, no CIs)
+- **Status.** Running (lanes Y / Z from 01:17; campaigns to ~05:30, F13c to ~08:30).
 
 ## 5. Protocol details
 
@@ -414,3 +421,4 @@ Chronological. Amendment details are in the §4 entries.
 | 11-12 | F11 amendment 3 (00:43); v2c gate failed (00:58); amendment 4 (09:16) | Gate results |
 | 11-12 | Default held-out test and F12 added (13:43) | User |
 | 11-12 | File reformatted; predictions verbatim | Readability |
+| 11-13 | F12 stopped after 10 stages (01:14); F13 added (01:16) | User: test the thesis rules with 13 x 50M before F12 |
