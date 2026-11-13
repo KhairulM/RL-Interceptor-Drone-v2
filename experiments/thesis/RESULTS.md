@@ -6,7 +6,7 @@ Measured results only. Each section is filled when the experiment finishes, with
 - J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over seeds (with 2 seeds, the range of the two values); "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position + velocity, no acceleration).
 - Training radius and primary results: 0.10 m. **0.15 m values are eval-only exact re-scores** of the same episodes ([R15_rescore/](R15_rescore/), `rescore.py`). Every policy and exploiter was trained for 0.10 m, so **J at 0.15 m is an upper bound and exploitability a lower bound for a 0.15 m game**. Sections below write "(0.15 m convention)" for this. Exception: F7 trained its pursuers and exploiters at 0.15 m.
 
-## Summary (updated 2026-11-13 00:10; details in the sections below)
+## Summary (updated 2026-11-13 09:24; details in the sections below)
 
 One finding per bullet, 0.10 m unless marked; numbers are copied from the linked sections.
 
@@ -31,14 +31,15 @@ One finding per bullet, 0.10 m unless marked; numbers are copied from the linked
 - Self-play with noise and no true velocity (3 seeds per arm): learned estimators beat the EMA filter on other campaigns' evaders (+0.196 [+0.132, +0.291]) and X3 exploiters (+0.441 [+0.254, +0.541]) but are **more** exploitable (0.872 vs 0.675) ([F4](#f4)).
 - Self-play, learned estimate + RLS (3 seed pairs): clean, held-out RL +0.091 [+0.055, +0.116] and worst cluster +0.128 [+0.042, +0.174] on all 3 pairs, not other campaigns' evaders (-0.027); under noise below plain (other campaigns -0.140 [-0.232, -0.065]), mainly from running RLS (-0.103). **The A3c RLS gain is not reproduced in self-play** ([F5](#f5)).
 
-**Self-play robustness and the floor-lure exploit (F2-F10, F8d)**
+**Self-play robustness and the floor-lure exploit (F2-F13, F8d)**
 - Under the reference papers' protocol (9 x 300M) every self-play pursuer is ~fully exploitable (0.94-0.98; F2c, F3, F5, F6, F6b) and the exploiters win almost only by making it crash (97 % in F2c), a near-miss dive at a low evader. Inside the campaigns each evader stage lures the current pursuers (0.79-0.99 crash) and the next pursuer stage patches it; pool-trained pursuers are not lured (crash <= 0.03) ([F5 post-hoc](#f5-posthoc)).
 - A 0.15 m training radius, with or without a pursuer floor penalty, does not remove the weakness (exploitability 0.963 / 0.968 vs exploiters trained under the 0.15 m rules, 1 seed per arm). **Decision rule: the rules stay** (0.10 m, no floor penalty) ([F7](#f7)).
 - Under Roncero et al.'s reward and episode endings (26 stages x 50M, 2 seeds) the exploit disappears: no evader stage lures, and a thesis-rules exploiter crashes the final pursuer in only 0.010 / 0.030 of episodes (F3 hedge 0.975 / 0.988). Vs F3 hedge: held-out RL +0.157 / +0.060, exploitability 0.631 / 0.513 by near-miss timeouts. The game stays as transitive as F3's ([F8](#f8), [post-hoc](#f8-posthoc)).
 - Against the final evaders of 16 other campaigns the final F8 pursuer beats Hedge's by +0.189 / +0.126, and F8 already beats Hedge's final pursuer at stage 8 (250M pursuer frames vs Hedge's 1.5B) ([F8d](#f8d)).
 - One Roncero component at a time (1 seed): **the control arm (thesis rules, GAE truncation fix, 13 x 50M) is already hardly lurable** (lure 0.36, exploiter crash 0.056, exploitability 0.440); removing the timeout terms restores luring (0.75; exploiter crash 0.955); truncation endings stop evaders from learning to lure (0.03) but leave the pursuer lurable (0.834) ([F9](#f9)).
-- **The schedule, not the GAE fix, makes the pursuer lure-resistant**: without the fix the evaders lure (0.81), yet the final pursuer is not lurable (crash 0.031) and is the least exploitable thesis-rules self-play pursuer so far (0.172). F3-F7's ~0.97 exploitability is mainly a 9 x 300M schedule effect ([F10](#f10)).
+- **The schedule, not the GAE fix, makes the pursuer lure-resistant**: without the fix the evaders lure (0.81), yet the final pursuer is not lurable (crash 0.031) and is the least exploitable thesis-rules self-play pursuer so far (0.172). F3-F7's ~0.97 exploitability is mainly a 9 x 300M schedule effect ([F10](#f10)). Eval-only addendum (11-13): F10's final pursuer reaches strong-finals mean 0.828 / worst 0.658, close to F8 (0.858 / 0.875) and above every F13 seed (0.563-0.656). This is one seed, and F13 showed large seed variance. Against F8's own evaders it matches F8 under the thesis rules (0.926), but under Roncero's rules it drops to 0.707 (F8 0.82-0.84), mainly by leaving the arena (0.27).
 - Thesis v2d rules (truncation endings, no evader timeout bonus, 26 x 50M, 2 seeds): the pursuer is not lured by a v2d-rules exploiter (crash 0.016 / 0.028) but **is lured by a thesis-rules exploiter (crash 0.309 / 0.636; F8 0.010 / 0.030, F10 0.031)** and generalises less well (held-out RL 0.875 / 0.869 vs F8 0.948 / 0.941; strong finals 0.845 / 0.751 vs 0.858 / 0.875). 4 of 5 predictions did not hold, (5) held on one seed; v2d improves on neither F8 nor F10 ([F11](#f11)).
+- **F13 (original thesis rules, 13 x 50M, GAE fix; 3 seeds including reused F9 control):** F11 v2d beats F13 on all four registered mean measures, so the decision rule calls for resuming F12. This is descriptive (3 vs 2 seeds): held-out RL means are nearly tied (0.872 vs 0.871), and F13's two new seeds missed the registered held-out-RL and exploiter-crash thresholds ([F13](#f13)).
 
 **Capture radius 0.15 m** (0.15 m convention; F6b added 2026-11-10; F8 reports both radii itself)
 - Most directions hold; many 0.10 m gaps were partly final-approach precision.
@@ -46,7 +47,7 @@ One finding per bullet, 0.10 m unless marked; numbers are copied from the linked
 - RQ2: the acceleration input still dominates but less (train +0.153, exploiters +0.180; F1). Under noise RLS - frozen gains less (train +0.072, CI includes 0; exploiters +0.073; A3c). F5's clean held-out RL gain shrinks to +0.021; F4 nf - ema held-out RL becomes significant (+0.170 [+0.028, +0.404]) and the exploitability difference disappears.
 - Diagnostics and F2c: the adaptation gap rests on 2 exploiters (X3); gate G1 still passes (X4); the game is more transitive (X1). F2c acc exploitability 0.327 vs plain 0.746 (one exploiter each).
 
-**Running / pending (updated 2026-11-13 01:20)**: F13 (original thesis rules, GAE fix, Hedge, 13 x 50M; seeds 100 / 200 + F9 control as seed 0) running, results ~08:30; decides whether F12 (stopped after 10 of 26 stages) is resumed on v2d or re-run on F13's setup. Default held-out test for new experiments: v10 + F8d's 16 strong finals. No freeze date (user, 11-09). Open (user): opponent sensor noise in the noisy runs (A3b-d, F4, F5; audit), the seed-CI method, F5 Exp 2 (paused), the exploiter-augmented pool, a sampler / diversity comparison under v2d.
+**Running / pending (updated 2026-11-13 11:46)**: **F10 amendment 1 running** (user, pre-registered 11:45): seeds 100 / 200 of the F10 campaign (no GAE fix), paired by seed with F13, launched 11:44; campaigns to ~15:00-16:00, F10sc to ~18:00. F10's s0 results below remain one seed until then. F13 / F13c completed (07:43); its decision rule favored F11 v2d on 4/4 measures, so **F12 resumes** on its v2d setup after F10sc (user order). F12 was stopped after 10/26 stages per seed. Default held-out test for new experiments: v10 + F8d's 16 strong finals. No freeze date (user, 11-09). Open (user): opponent sensor noise in the noisy runs (A3b-d, F4, F5; audit), the seed-CI method, F5 Exp 2 (paused), the exploiter-augmented pool, a sampler / diversity comparison under v2d.
 
 ## Contents
 
@@ -55,7 +56,7 @@ One finding per bullet, 0.10 m unless marked; numbers are copied from the linked
 - RQ1 on a fixed pool: [D1 sampler](#d1) · [D1b duplicates](#d1b) · [D1c no floor](#d1c) · [D2 exploitability](#d2)
 - RQ2 opponent model: [A1a](#a1a) · [A1b](#a1b) · [A2a](#a2a) · [A2b](#a2b) · [A3a](#a3a) · [A3b](#a3b) · [A3c](#a3c) · [A3d](#a3d) · [A3e](#a3e) · [A3f](#a3f)
 - Final runs on a fixed pool: [F1](#f1) · [F2a](#f2a)
-- Self-play: [F2b / F2c](#f2) · [F3](#f3) ([transitivity](#f3-posthoc)) · [F4](#f4) · [F5](#f5) ([post-hoc](#f5-posthoc)) · [F6](#f6) · [F7](#f7) · [F6b](#f6b) · [F8](#f8) ([post-hoc](#f8-posthoc), [F8d](#f8d)) · [F9](#f9) · [F10](#f10) · [F11](#f11)
+- Self-play: [F2b / F2c](#f2) · [F3](#f3) ([transitivity](#f3-posthoc)) · [F4](#f4) · [F5](#f5) ([post-hoc](#f5-posthoc)) · [F6](#f6) · [F7](#f7) · [F6b](#f6b) · [F8](#f8) ([post-hoc](#f8-posthoc), [F8d](#f8d)) · [F9](#f9) · [F10](#f10) · [F11](#f11) · [F13](#f13)
 
 <a id="synthesis"></a>
 
@@ -1244,12 +1245,12 @@ Findings:
 
 X1's measures on the F3 campaigns: additive-logit R² (one strength per player) and rank-reversal fraction (delta 0.1; a pursuer pair ordered one way on one evader and the other way on another). [F3_sampler_sp/transitivity.md](F3_sampler_sp/transitivity.md) (matrices included), `transitivity.json`, `exps/f3_transitivity.py`. Within each campaign: pursuer stages 2-8 x RL evader stages 1-7, from the in-campaign stage evals, 0.10 m only (pursuer stage 0 is left out because evader stage 1 never played it):
 
-| sampler | R² (J), seed 0 / 1 | reversals (J), seed 0 / 1 | final pursuer (P8) vs older evaders, min J, seed 0 / 1 |
+| sampler | R² (J, mean of 2 seeds) | reversals (J, mean of 2 seeds) | final pursuer (P8) vs older evaders, min J (mean of 2 seeds) |
 |---|---|---|---|
-| uniform | 0.731 / 0.725 | 0.000 / 0.000 | 0.79 / 0.92 (vs E7) |
-| hedge | 0.651 / 0.690 | 0.000 / 0.000 | 0.91 / 0.90 (vs E7) |
-| qd_dpp | 0.671 / 0.673 | 0.000 / 0.000 | 0.92 / 0.95 (vs E7) |
-| pfsp | 0.388 / 0.382 | **0.278 / 0.194** | **0.65 / 0.35** (vs E5) |
+| uniform | 0.728 | 0.000 | 0.855 (vs E7) |
+| hedge | 0.671 | 0.000 | 0.905 (vs E7) |
+| qd_dpp | 0.672 | 0.000 | 0.935 (vs E7) |
+| pfsp | 0.385 | 0.236 | 0.500 (vs E5) |
 
 Across campaigns (the 8 F3 final pursuers x each sampler's RL evaders, stage 1 excluded; F3c evals):
 
@@ -1287,10 +1288,10 @@ Self-play campaigns (reference papers' protocol: uniform sampling, 9 stages x 30
 
 How the fresh exploiters win (fractions of episodes):
 
-| campaign | J vs exploiter | capture | pursuer crash | timeout | evader crash / OOB |
+| arm (mean of 3 seeds) | J vs exploiter | capture | pursuer crash | timeout | evader crash / OOB |
 |---|---|---|---|---|---|
-| ema-s0 / s1 / s2 | 0.448 / 0.214 / 0.313 | 0.13 / 0.12 / 0.14 | 0.00 / 0.00 / 0.00 | 0.55 / 0.78 / 0.68 | 0.32 / 0.09 / 0.17 |
-| nf-s0 / s1 / s2 | 0.171 / 0.089 / 0.123 | 0.13 / 0.05 / 0.09 | 0.01 / **0.92 / 0.88** | 0.82 / 0.00 / 0.00 | 0.04 / 0.04 / 0.03 |
+| ema | 0.325 | 0.130 | 0.000 | 0.670 | 0.193 |
+| nf | 0.128 | 0.090 | 0.603 | 0.273 | 0.037 |
 
 **At 0.15 m** ([R15_rescore/F4_estimator_sp/summary.md](R15_rescore/F4_estimator_sp/summary.md); 0.15 m convention):
 
@@ -1308,10 +1309,10 @@ How the fresh exploiters win (fractions of episodes):
 
 How the fresh exploiters win at 0.15 m (fractions of episodes; computed with `rescore.rescore` on the F4 exploiter eval files, which reproduces the 0.10 m table above):
 
-| campaign | J vs exploiter | capture | pursuer crash | timeout | evader crash / OOB |
+| arm (mean of 3 seeds) | J vs exploiter | capture | pursuer crash | timeout | evader crash / OOB |
 |---|---|---|---|---|---|
-| ema-s0 / s1 / s2 | 0.696 / 0.507 / 0.506 | 0.39 / 0.46 / 0.41 | 0.00 / 0.00 / 0.00 | 0.30 / 0.49 / 0.49 | 0.30 / 0.04 / 0.10 |
-| nf-s0 / s1 / s2 | 0.484 / 0.505 / 0.602 | 0.45 / 0.49 / 0.60 | 0.00 / **0.50 / 0.40** | 0.51 / 0.00 / 0.00 | 0.03 / 0.01 / 0.00 |
+| ema | 0.570 | 0.420 | 0.000 | 0.427 | 0.147 |
+| nf | 0.530 | 0.513 | 0.300 | 0.170 | 0.013 |
 
 Post-hoc, stage-1 evaders excluded, at 0.15 m: other campaigns' evaders ema 0.628 [0.488, 0.712], nf 0.835 [0.645, 0.971], nf - ema **+0.207 [+0.156, +0.287]**; own campaign ema 0.880 [0.785, 0.928], nf 0.938 [0.903, 0.984], nf - ema +0.058 [-0.024, +0.143].
 
@@ -1568,28 +1569,28 @@ Findings:
 - F8c: both final pursuers (stage 24) evaluated under the thesis rules vs train pool, test set, the F3 campaigns' evaders and all F8 campaigns' evaders (13 stages each), plus two fresh 100M-frame exploiters each: one under the **thesis rules** (a pursuer crash ends the game at 0 for the evader, so luring pays) and one under **Roncero's rules**. The F3 hedge-both s0 / s1 final pursuers get a Roncero-rules exploiter too (their thesis-rules exploiters are F3c's). [F8_roncero_sp/summary.md](F8_roncero_sp/summary.md), `results.json`.
 - Comparison: roncero/k vs F3 hedge/k (same seed; thesis rules, 9 x 300M, no GAE truncation fix). Rules, capture-bonus scaling, schedule and the GAE fix all differ together; F9 (below) shows that the schedule and GAE fix alone already change the result a lot.
 
-| final pursuer, J at 0.10 m (0.15 m) | roncero s0 | roncero s1 | hedge s0 | hedge s1 |
-|---|---|---|---|---|
-| held-out RL (v10) | 0.948 (0.995) | 0.941 (0.996) | 0.791 (0.960) | 0.882 (0.989) |
-| held-out worst cluster | 0.917 (0.993) | 0.893 (0.992) | 0.692 (0.874) | 0.816 (0.921) |
-| F3 campaigns' evaders (stage 1 excl.) | 0.887 (0.975) | 0.877 (0.967) | 0.871 (0.957) | 0.906 (0.973) |
-| F8 campaigns' evaders (roncero: the other campaign's; stage 1 excl.) | 0.877 (0.950) | 0.935 (0.987) | 0.826 (0.959) | 0.874 (0.979) |
-| own campaign's evaders (roncero: 12, hedge: 3) | 0.916 (0.939) | 0.940 (0.971) | 0.957 (0.993) | 0.961 (0.995) |
-| thesis train pool | 0.877 (0.963) | 0.902 (0.974) | 0.594 (0.759) | 0.640 (0.810) |
-| held-out scripted | 0.983 (0.997) | 0.990 (0.999) | 0.808 (0.905) | 0.853 (0.936) |
-| pursuer crash vs held-out scripted | 0.018 (0.003) | 0.011 (0.002) | 0.197 (0.096) | 0.149 (0.065) |
-| X3 exploiters | 0.999 (1.000) | 0.999 (1.000) | 0.955 (0.987) | 0.973 (0.992) |
-| exploitability vs thesis-rules exploiter | 0.631 (0.000) | 0.513 (0.026) | 0.974 (0.773) | 0.985 (0.855) |
-| exploitability vs Roncero-rules exploiter | 0.512 (0.064) | 0.755 (0.331) | 0.816 (0.683) | 0.939 (0.825) |
+| final pursuer, J at 0.10 m (0.15 m) | roncero (mean, n=2) | hedge (mean, n=2) |
+|---|---|---|
+| held-out RL (v10) | 0.945 (0.996) | 0.837 (0.975) |
+| held-out worst cluster | 0.905 (0.985) | 0.754 (0.898) |
+| F3 campaigns' evaders (stage 1 excl.) | 0.882 (0.971) | 0.889 (0.965) |
+| F8 campaigns' evaders (roncero: the other campaign's; stage 1 excl.) | 0.906 (0.969) | 0.850 (0.969) |
+| own campaign's evaders (roncero: 12, hedge: 3) | 0.928 (0.955) | 0.959 (0.994) |
+| thesis train pool | 0.890 (0.969) | 0.617 (0.785) |
+| held-out scripted | 0.987 (0.998) | 0.831 (0.921) |
+| pursuer crash vs held-out scripted | 0.015 (0.003) | 0.173 (0.081) |
+| X3 exploiters | 0.999 (1.000) | 0.964 (0.990) |
+| exploitability vs thesis-rules exploiter | 0.572 (0.013) | 0.980 (0.814) |
+| exploitability vs Roncero-rules exploiter | 0.634 (0.198) | 0.878 (0.754) |
 
 How the exploiters win (fractions of episodes at 0.10 m; the thesis-rules exploiter of hedge s0 / s1 is F3c's; leaving the arena is non-terminal under the thesis rules and ends the episode under Roncero's):
 
 | pursuer | exploiter | capture | pursuer crash | pursuer leaves arena | timeout | evader crash / leaves |
-|---|---|---|---|---|---|---|
-| roncero s0 / s1 | thesis rules | 0.304 / 0.441 | **0.010 / 0.030** | 0.054 / 0.012 | 0.622 / 0.484 | 0.066 / 0.046 |
-| roncero s0 / s1 | Roncero rules | 0.032 / 0.077 | 0.001 / 0.006 | 0.289 / 0.094 | 0.241 / 0.658 | 0.456 / 0.169 |
-| hedge s0 / s1 | thesis rules (F3c) | | **0.975 / 0.988** | | | |
-| hedge s0 / s1 | Roncero rules | 0.040 / 0.028 | 0.106 / 0.023 | **0.718 / 0.915** | 0.001 / 0.004 | 0.144 / 0.032 |
+|---|---|---:|---:|---:|---:|---:|
+| roncero (mean, n=2) | thesis rules | 0.373 | **0.020** | 0.033 | 0.553 | 0.056 |
+| roncero (mean, n=2) | Roncero rules | 0.055 | 0.004 | 0.192 | 0.450 | 0.313 |
+| hedge (mean, n=2) | thesis rules (F3c) | - | **0.982** | - | - | - |
+| hedge (mean, n=2) | Roncero rules | 0.034 | 0.065 | **0.817** | 0.003 | 0.088 |
 
 In-campaign pursuer crash caused by each evader stage in the stage >= 2 pursuers (its own training opponents, under Roncero's rules, 0.10 m): evader stages 3 / 5 / 7: **0.00 / 0.00 / 0.00** on both seeds (F3 hedge under the thesis rules: 0.97 / 0.98 / 0.98 and 0.95 / 0.98 / 0.97). Later evader stages 9-25: per-stage means 0.00-0.05 on both seeds (at most 0.18 against one pursuer in s0, 0.26 in s1).
 
@@ -1612,18 +1613,18 @@ Findings:
 
 Question (user): under Roncero's rules, is there room for diversity-aware training (QD-DPP / PSD-PSRO style), which targets non-transitive games with several distinct strategies to cover? Same measures as the F3 post-hoc transitivity; in-campaign evals under each campaign's own rules at 0.10 m. [F8_roncero_sp/transitivity.md](F8_roncero_sp/transitivity.md) (matrices included), `transitivity.json`, `exps/f8_transitivity.py`. (The 11-10 version used the k_sm = 0 campaigns and stage-8 probes; archived with the stage-8 outputs.)
 
-| | F8 s0 | F8 s1 | F3 hedge s0 | F3 hedge s1 |
-|---|---|---|---|---|
-| within campaign, P2-24 x E1-25: R² (J) / reversals | 0.731 / 0.008 | 0.673 / 0.003 | - | - |
-| within campaign, P2-8 x E1-7: R² (J) / reversals | 0.670 / 0.000 | 0.606 / 0.000 | 0.651 / 0.000 | 0.690 / 0.000 |
-| new pursuer stage beats every older evader (J >= 0.5) | 11 / 12 | 11 / 12 | 4 / 4 | 4 / 4 |
-| newest pursuer, min J vs older evaders | 0.92 | 0.91 | 0.91 | 0.90 |
-| new evader stage beats every older pursuer (J < 0.5) | 11 / 12 | 12 / 12 | 3 / 3 | 3 / 3 |
-| evader Vendi, shared 4-probe space, E1-7 (max 4) | 1.659 | 1.567 | 2.011 | 2.217 |
-| evader Vendi, shared 4-probe space, E19-25 (max 4) | 1.991 | 2.771 | - | - |
-| evader Vendi, own-campaign space, E1-7 vs P2-8 (max 4) | 2.462 | 2.356 | 2.401 | 2.384 |
-| evader Vendi, own-campaign space, all 13 evaders vs P2-24 | 3.514 | 3.514 | - | - |
-| - in that space, first 4 (E1-7) / last 4 (E19-25) | 1.912 / 1.707 | 1.809 / 1.729 | - | - |
+| | F8 (mean, n=2) | F3 hedge (mean, n=2) |
+|---|---|---|
+| within campaign, P2-24 x E1-25: R² (J) / reversals | 0.702 / 0.006 | - |
+| within campaign, P2-8 x E1-7: R² (J) / reversals | 0.638 / 0.000 | 0.671 / 0.000 |
+| new pursuer stage beats every older evader (J >= 0.5) | 11 / 12 | 4 / 4 |
+| newest pursuer, min J vs older evaders | 0.915 | 0.905 |
+| new evader stage beats every older pursuer (J < 0.5) | 11.5 / 12 | 3 / 3 |
+| evader Vendi, shared 4-probe space, E1-7 (max 4) | 1.613 | 2.114 |
+| evader Vendi, shared 4-probe space, E19-25 (max 4) | 2.381 | - |
+| evader Vendi, own-campaign space, E1-7 vs P2-8 (max 4) | 2.409 | 2.393 |
+| evader Vendi, own-campaign space, all 13 evaders vs P2-24 | 3.514 | - |
+| - in that space, first 4 (E1-7) / last 4 (E19-25) | 1.861 / 1.718 | - |
 
 Shared space = F3's Vendi construction (J and censored time vs each probe, behaviour mean / std; one RBF kernel over all 32 F3 + 26 F8 RL evaders) with the 4 probes that played both F3 and F8 evaders (F3 hedge s0 / s1 and F8 s0 / s1 final pursuers); not F3's frozen 8-probe space. Vendi grows with the number of evaders, so F8 is reported for 4-evader subsets as F3. In this space the other F3 samplers give uniform 1.97-2.16, QD-DPP 2.00-2.02, PFSP 2.62-2.80. Across campaigns, same 4 probes (thesis rules): F8 evaders stages 3-25 R² 0.619, reversals 0.050; F3 evaders 0.560 / 0.048; all 48 RL evaders 0.362 / 0.064 (0.15 m: reversals 0.000-0.002).
 
@@ -1643,15 +1644,15 @@ Findings:
 
 **Setup:** pursuers = F8 stages 8 / 16 / 24 (250M / 450M / 650M pursuer frames) and the F3 hedge-both final pursuers (stage 8, 1.5B pursuer frames; not matched by stage count, since F8's final pursuer already has fewer frames). Clean evals under the thesis rules vs the test set (F8c / F3c evals reused for F8 stage 24 / hedge) and vs the **final evader of 20 campaigns**: a common "strong" set of 16 none of these pursuers trained with (F2-plain, F3 uniform-s1, qd_dpp x2, pfsp x2, F6 x2, F6b x2, F7 r15 / floor_r15, F9 x4) plus the F3 hedge and F8 finals (own campaign excluded). [F8d_heldout/summary.md](F8d_heldout/summary.md) (per-evader tables), `results.json`, `exps/f8d_heldout.py`.
 
-| J at 0.10 m (0.15 m) | F8 s0 P8 | F8 s0 P16 | F8 s0 P24 | F8 s1 P8 | F8 s1 P16 | F8 s1 P24 | hedge s0 | hedge s1 |
-|---|---|---|---|---|---|---|---|---|
-| held-out RL (v10) | 0.889 (0.977) | 0.960 (0.998) | 0.948 (0.995) | 0.925 (0.992) | 0.968 (0.995) | 0.941 (0.996) | 0.791 (0.960) | 0.882 (0.989) |
-| held-out worst cluster | 0.828 (0.949) | 0.938 (0.997) | 0.917 (0.993) | 0.871 (0.982) | 0.961 (0.994) | 0.893 (0.992) | 0.692 (0.874) | 0.816 (0.921) |
-| **strong finals, mean (16)** | 0.753 (0.898) | 0.864 (0.966) | **0.858** (0.959) | 0.849 (0.937) | 0.861 (0.955) | **0.875** (0.955) | **0.669** (0.879) | **0.749** (0.927) |
-| strong finals, worst | 0.179 (0.471) | 0.662 (0.915) | 0.653 (0.898) | 0.482 (0.604) | 0.620 (0.833) | 0.603 (0.820) | 0.326 (0.671) | 0.446 (0.795) |
-| strong finals, pursuer crash | 0.100 (0.028) | 0.139 (0.037) | 0.152 (0.042) | 0.078 (0.026) | 0.147 (0.047) | 0.142 (0.050) | 0.357 (0.123) | 0.275 (0.076) |
-| F3 hedge finals | 0.899 (0.979) | 0.845 (0.945) | 0.867 (0.952) | 0.947 (0.991) | 0.866 (0.953) | 0.870 (0.935) | 0.740 (0.929) | 0.846 (0.958) |
-| F8 finals (other seed for F8) | 0.553 (0.582) | 0.222 (0.231) | 0.863 (0.953) | 0.190 (0.469) | 0.780 (0.981) | 0.864 (0.976) | 0.783 (0.945) | 0.817 (0.959) |
+| J at 0.10 m (0.15 m) | F8 P8 (mean, n=2) | F8 P16 (mean, n=2) | F8 P24 (mean, n=2) | hedge (mean, n=2) |
+|---|---|---|---|---|
+| held-out RL (v10) | 0.907 (0.985) | 0.964 (0.997) | 0.945 (0.996) | 0.837 (0.975) |
+| held-out worst cluster | 0.850 (0.966) | 0.950 (0.996) | 0.905 (0.993) | 0.754 (0.898) |
+| **strong finals, mean (16)** | 0.801 (0.918) | 0.863 (0.961) | **0.867 (0.957)** | **0.709 (0.903)** |
+| strong finals, worst | 0.331 (0.538) | 0.641 (0.874) | 0.628 (0.859) | 0.386 (0.733) |
+| strong finals, pursuer crash | 0.089 (0.027) | 0.143 (0.042) | 0.147 (0.046) | 0.316 (0.100) |
+| F3 hedge finals | 0.923 (0.985) | 0.856 (0.949) | 0.869 (0.944) | 0.793 (0.944) |
+| F8 finals (other seed for F8) | 0.372 (0.526) | 0.501 (0.606) | 0.864 (0.965) | 0.800 (0.952) |
 
 Findings:
 - **The strong set separates the pursuers where v10 does not**: mean J on it is 0.07-0.13 below v10 for every final pursuer, and the worst final evader (F7 floor_r15's, on both seeds) holds Hedge to 0.326 / 0.446.
@@ -1742,6 +1743,9 @@ Findings:
 | held-out scripted | 0.968 (0.998) | 0.918 (0.978) | +0.049 (+0.020) | 0.808 (0.905) |
 | pursuer crash vs held-out scripted | 0.033 (0.002) | 0.085 (0.023) | -0.052 | 0.197 (0.096) |
 | X3 exploiters | 0.993 (1.000) | 0.983 (0.998) | +0.010 | 0.955 (0.987) |
+| strong finals, mean (16; added 11-13) | **0.828** (0.947) | 0.656 (0.891) | +0.172 (+0.056) | 0.669 / 0.749 (F8d, s0 / s1) |
+| strong finals, worst (16; added 11-13) | **0.658** (0.898) | 0.404 (0.710) | +0.254 (+0.188) | |
+| F8 finals / F3 hedge finals (added 11-13) | 0.884 / 0.824 (0.982 / 0.925) | 0.792 / 0.521 (0.943 / 0.840) | | |
 | exploitability (thesis-rules exploiter) | **0.172** (0.004) | 0.440 (0.095) | -0.268 | 0.974 (0.773) |
 | (b) pursuer crash vs that exploiter | **0.031** (0.004) | 0.056 (0.008) | -0.025 | 0.975 (0.774) |
 | exploiter wins by timeout | 0.143 (0.000) | 0.385 (0.086) | -0.243 | - |
@@ -1755,7 +1759,32 @@ Findings:
 - F10's pursuer is the least exploitable self-play pursuer under the thesis rules so far (next: F2c's acceleration-input pursuer, 0.327), but weaker against its own campaign's lurers.
 - **Predictions (pre-registered 11:45):** (b) **H-schedule held** (0.031 < 0.50; predicted, low confidence). "(a) within +/- 0.15 of control's 0.36" **did not hold** (0.81).
 - **Consequence:** F3-F7's ~0.97 exploitability is mainly a schedule effect (9 x 300M), not the GAE leak; the GAE leak raises in-campaign luring but not final-pursuer lurability. The thesis rules + a 13 x 50M schedule already give a pursuer about as robust as F8's (exploitability 0.172 vs F8 0.631 / 0.513 at 0.10 m; held-out RL 0.933 vs 0.948 / 0.941; 1 seed vs 2).
-- Limitations: 1 seed; one exploiter; the schedule effect is inferred from F10 vs F3 hedge, which also differ in stage count (13 vs 9) and total frames (650M vs 1.5B pursuer frames), so "schedule" covers stage length, stage count and total budget together; F10 was not in F8d's strong set.
+- Limitations: 1 seed; one exploiter; the schedule effect is inferred from F10 vs F3 hedge, which also differ in stage count (13 vs 9) and total frames (650M vs 1.5B pursuer frames), so "schedule" covers stage length, stage count and total budget together.
+
+**Addendum 2026-11-13 (eval only): F10's final pursuer vs F8d's strong finals.** F10 was not in F8d's strong set. Its stage-12 pursuer was evaluated afterwards, clean under the thesis rules, against the same 20 final evaders as F11c / F13c (16 strong + F3 hedge + F8). The F13c metric definitions apply: strong = the 16 F8d `COMMON` campaigns, none of which is F10's own. Output: [F10_gae_sp/evals/thesis-F10-nofix-s0_final_finals.json](F10_gae_sp/evals/thesis-F10-nofix-s0_final_finals.json) (`evaluate(..., f8d._finals(), policy_ckpt=pursuer_stage12.pt)`). This eval is not part of `run_f10c`; F10's `results.json` / `summary.md` are unchanged.
+- **Strong-finals mean 0.828 (0.947), worst 0.658 (0.898).** This is close to F8 (0.858 / 0.875) and F11 v2d s0 (0.845), and above v2d s100 (0.751), F3 hedge (0.669 / 0.749) and every F13 seed (0.656 / 0.583 / 0.563). F10's worst strong final is the highest worst case measured so far (F8 0.653 / 0.603, v2d 0.501 / 0.346, F13 0.404 / 0.376 / 0.275).
+- Per evader at 0.10 m, the lowest J is against `thesis-F9-no_timeout-s0` s11 (0.658), `thesis-F2-plain` s7 (0.758) and `thesis-F3-uniform-s1` s7 (0.781). The highest is against `thesis-F9-endings-s0` s11 (0.944).
+- Against its same-seed GAE-fix twin (F9 control = F13 s0), F10 is higher by +0.172 (mean) and +0.254 (worst). This is consistent with F10's lower exploitability (0.172 vs 0.440), but it is one seed per arm. F13 showed that seed 0 of the GAE-fix arm was its most robust seed (exploitability 0.440 vs 0.915 / 0.741), so F10's seed 0 may also be favourable. **More seeds are needed to show whether "no GAE fix + 13 x 50M" is robust in general.**
+
+**Addendum 2026-11-13 11:37 (eval only): F10's final pursuer vs the F8 campaigns' evaders under the thesis and Roncero rules.** The stage-12 pursuer played all 26 F8 evaders (both seeds, every stage) twice:
+- clean under the thesis rules, as F8c's `f8_evaders`;
+- under Roncero's rules (`task.reward_mode=roncero`; leaving the arena ends the episode, applied by `rates_at(..., pursuer_oob_terminal=True)` as in F8c's Roncero exploiter).
+
+The F8 pursuers' thesis-rules values are F8c's. Their Roncero-rules values are new eval-only references, one per pursuer, against the other campaign's evaders: [F8_roncero_sp/evals/](F8_roncero_sp/evals/)`thesis-F8b-roncero-s{0,100}_final_f8_evaders_roncero.json`. F10 files: [F10_gae_sp/evals/](F10_gae_sp/evals/)`thesis-F10-nofix-s0_final_f8_evaders{,_roncero}.json`. Stage-1 evaders are excluded, as in F8c.
+
+| J at 0.10 m (0.15 m) | vs F8 s0's evaders (12) | vs F8 s100's evaders (12) | all 24, mean / worst |
+|---|---|---|---|
+| F10, thesis rules | 0.933 (0.992) | 0.920 (0.983) | 0.926 / 0.849 (0.987 / 0.941) |
+| F8 (the other seed's pursuer), thesis rules (F8c) | 0.935 (0.987) | 0.877 (0.950) | |
+| F3 hedge s0 / s1, thesis rules (F8c) | | | 0.826 / 0.874 (0.959 / 0.979) |
+| **F10, Roncero's rules** | **0.724** (0.901) | **0.690** (0.857) | **0.707 / 0.389** (0.879 / 0.634) |
+| F8 (the other seed's pursuer), Roncero's rules | 0.843 (0.958) | 0.824 (0.923) | |
+
+- **Under the thesis rules, F10's pursuer is at least as good as F8's on F8's own evaders**: level with F8 s100 (0.933 vs 0.935) and above F8 s0 (0.920 vs 0.877). It is clearly above the F3 hedge pursuers (0.826 / 0.874).
+- **Under Roncero's rules it is clearly worse than F8 (-0.12 / -0.13), because it leaves the arena.** F10's pursuer leaves the arena in 0.27 of episodes at 0.10 m (F8 pursuers 0.07 / 0.12; F3 hedge 0.25 / 0.21). The thesis rules never penalise leaving, and Roncero's end the episode, so these episodes become losses. Its crash rate stays low (0.03 under Roncero's rules; 0.08 under the thesis rules).
+- Leaving grows against later F8 evaders: pursuer-oob is <= 0.18 against evader stages 3-11 and 0.24-0.61 against stages 13-25. Under Roncero's rules F10's J against the two stage-25 finals is 0.616 / 0.389 (thesis rules 0.875 / 0.872). Late F8 evaders seem to have learned to draw the pursuer out of the arena, which Roncero's rules reward and the thesis rules ignore (interpretation, not tested).
+- At 0.15 m the Roncero-rules gap shrinks (F10 0.901 / 0.857 vs F8 0.958 / 0.923; oob 0.12), because captures come before the pursuer leaves.
+- Limitations: F10 was not trained under Roncero's rules, so this is an out-of-rules test for it, and in-rules for F8 (F8d / F8c's F3-hedge Roncero exploiter has the same caveat). The F8 references are matched only per evader set (F8 cannot be scored on its own campaign's evaders here). Single F10 seed.
 
 <a id="f11"></a>
 
@@ -1769,25 +1798,25 @@ Findings:
 - F11c: final pursuers (stage 24) evaluated clean under the thesis rules vs train pool, test set, F3 campaigns' evaders, F8d's 16 strong finals, the F3 hedge / F8 finals, both F11 campaigns' evaders, and two fresh 100M-frame exploiters each: one under the **v2d rules** (seeds 860 / 861) and one under the **thesis rules** without the GAE fix (870 / 871; same recipe as F3c / F9c / F10c, luring pays). [F11_v2_sp/summary.md](F11_v2_sp/summary.md), `results.json`, `exps/f11_v2_sp.py`.
 - References (not paired): F8 (Roncero's rules, 26 x 50M, 2 seeds) and F10 (thesis rules, 13 x 50M, no GAE fix, 1 seed); their exploiters use the same thesis-rules recipe.
 
-| final pursuer, J at 0.10 m (0.15 m) | v2d s0 | v2d s100 | F8 s0 / s1 | F10 |
-|---|---|---|---|---|
-| held-out RL (v10) | 0.875 (0.980) | 0.869 (0.987) | 0.948 / 0.941 | 0.933 |
-| held-out worst cluster | 0.838 (0.976) | 0.832 (0.982) | 0.917 / 0.893 | 0.890 |
-| **strong finals, mean (16)** | 0.845 (0.947) | 0.751 (0.922) | 0.858 / 0.875 | - |
-| strong finals, worst | 0.501 (0.789) | 0.346 (0.773) | 0.653 / 0.603 | - |
-| F8 finals | 0.868 (0.973) | 0.956 (0.993) | | |
-| F3 hedge finals | 0.858 (0.930) | 0.765 (0.908) | 0.867 / 0.870 | |
-| F3 campaigns' evaders | 0.892 (0.972) | 0.846 (0.964) | 0.887 / 0.877 | 0.826 |
-| other F11 campaign's evaders | 0.906 (0.993) | 0.942 (0.993) | | |
-| own campaign's evaders | 0.952 (0.996) | 0.957 (0.988) | 0.916 / 0.940 | 0.813 |
-| thesis train pool | 0.833 (0.927) | 0.678 (0.814) | 0.877 / 0.902 | 0.838 |
-| held-out scripted | 0.976 (0.996) | 0.971 (0.995) | 0.983 / 0.990 | 0.968 |
-| pursuer crash vs held-out scripted | 0.025 (0.004) | 0.030 (0.005) | 0.018 / 0.011 | 0.033 |
-| X3 exploiters | 0.998 (1.000) | 0.999 (1.000) | 0.999 / 0.999 | 0.993 |
-| exploitability, v2d-rules exploiter | 0.501 (0.156) | 0.140 (0.113) | - | - |
-| ... pursuer crash / timeout | 0.016 / 0.486 | 0.028 / 0.113 | | |
-| **exploitability, thesis-rules exploiter** | 0.293 (0.031) | 0.624 (0.208) | 0.631 / 0.513 | 0.172 |
-| ... **pursuer crash** / timeout | **0.309** / 0.002 | **0.636** / 0.030 | 0.010 / 0.030 (crash) | 0.031 (crash) |
+| final pursuer, J at 0.10 m (0.15 m) | v2d (mean, n=2) | F8 (mean, n=2) | F10 |
+|---|---|---|---|
+| held-out RL (v10) | 0.872 (0.984) | 0.945 | 0.933 |
+| held-out worst cluster | 0.835 (0.979) | 0.905 | 0.890 |
+| **strong finals, mean (16)** | 0.798 (0.935) | 0.867 | 0.828 (0.947; added 11-13) |
+| strong finals, worst | 0.424 (0.781) | 0.628 | 0.658 (0.898; added 11-13) |
+| F8 finals | 0.912 (0.985) | - | 0.884 (0.982) |
+| F3 hedge finals | 0.812 (0.919) | 0.869 | 0.824 (0.925) |
+| F3 campaigns' evaders | 0.869 (0.968) | 0.882 | 0.826 |
+| other F11 campaign's evaders | 0.924 (0.993) | - | - |
+| own campaign's evaders | 0.955 (0.992) | 0.928 | 0.813 |
+| thesis train pool | 0.756 (0.871) | 0.890 | 0.838 |
+| held-out scripted | 0.974 (0.996) | 0.987 | 0.968 |
+| pursuer crash vs held-out scripted | 0.028 (0.005) | 0.015 | 0.033 |
+| X3 exploiters | 0.999 (1.000) | 0.999 | 0.993 |
+| exploitability, v2d-rules exploiter | 0.321 (0.135) | - | - |
+| ... pursuer crash / timeout | 0.022 / 0.300 | - | - |
+| **exploitability, thesis-rules exploiter** | 0.459 (0.120) | 0.572 | 0.172 |
+| ... **pursuer crash** / timeout | **0.473** / 0.016 | 0.020 (crash) | 0.031 (crash) |
 
 (Outcome fractions come from separate per-episode flags and can overlap, so a crash fraction can exceed 1 - J.)
 
@@ -1807,3 +1836,27 @@ Findings:
   - (5) strong-finals mean >= F8's - 0.05 (0.808 / 0.825): **held on s0** (0.845), **not on s100** (0.751).
 - **Consequence:** v2d does not improve on F10's thesis rules + 13 x 50M schedule or on F8's Roncero rules on any pre-registered measure. F12 (learned acceleration input) runs on v2d as pre-registered, so its comparison is with F11, not with F8 / F10.
 - Limitations: 2 seeds; one exploiter per rule set and pursuer; F8 and F10 differ from F11 in more than the rules (F10 1 seed).
+
+<a id="f13"></a>
+
+## F13_thesis_short_sp / F13c (original thesis rules, GAE fix; campaigns done 2026-11-13 05:24, F13c done 07:43; 3 seeds, descriptive)
+
+**Question:** does the original thesis rule set with the 13 x 50M schedule remain a reasonable control on additional seeds, and does F11 v2d beat it under the registered rule?
+
+**Setup:** F13 used the original thesis rules, GAE truncation fix, Hedge on both roles, and 13 stages x 50M frames. Seed 0 reuses `thesis-F9-control-s0`; new campaigns were seeds 100 and 200. F13c evaluated the final pursuers under the thesis rules at 0.10 m (primary) and exact-rescored at 0.15 m. Full per-seed and stage results: [F13_thesis_short_sp/summary.md](F13_thesis_short_sp/summary.md), `results.json`; experiment: `exps/f13_thesis_short_sp.py`.
+
+**Registered decision** (means; F13 3 seeds vs F11 v2d 2 seeds):
+
+| measure | F13 mean (n=3) | F11 v2d mean (n=2) | v2d better? |
+|---|---|---|---|
+| held-out RL (v10) | 0.871 | 0.872 | yes, narrowly |
+| strong finals mean (16) | 0.601 | 0.798 | yes |
+| exploitability vs thesis-rules exploiter (lower is better) | 0.699 | 0.459 | yes |
+| cross-play vs the other rule set's campaign evaders | 0.723 | 0.913 | yes |
+
+**Decision-rule outcome: v2d wins 4/4, so resume F12** on its pre-registered v2d setup. The held-out-RL means are effectively tied at the reported precision; the other three margins favor v2d. This is a decision under the pre-registered threshold, not inferential evidence: the comparison is descriptive, with three F13 seeds (one reused) and two F11 seeds.
+
+F13's new seeds were variable: held-out RL was 0.894 / 0.826, and exploitability vs the thesis-rules exploiter was 0.915 / 0.741. Registered predictions: exploiter pursuer crash < 0.10 **did not hold** (0.925 / 0.751); held-out RL >= 0.90 **did not hold** (0.894 / 0.826); prediction that v2d would not beat F13 **did not hold** (4/4); in-campaign lure rate (a) within 0.10-0.60 **held** (0.14 / 0.15). F12 remains paused and had not been restarted at the 09:23 status check.
+
+- Reference outside the registered decision: F10 (same schedule, no GAE fix, 1 seed) reaches strong-finals mean 0.828, worst 0.658, and exploitability 0.172 ([F10 addendum](#f10)).
+- Limitations: descriptive 3-vs-2-seed comparison; seed 0 is reused rather than rerun; the first decision measure is nearly tied and the equal-weight count rule does not account for uncertainty. The F11 stage-12 control is reported in the linked summary but excluded from the registered decision.
