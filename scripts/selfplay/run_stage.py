@@ -80,6 +80,8 @@ def _load_opponent_spec(cfg):
         spec = json.load(f)
     cfg.task.opponent.policies = spec["policies"]
     cfg.task.opponent.probs = spec.get("probs", None)
+    if spec.get("switch") is not None:
+        OmegaConf.update(cfg.task.opponent, "switch", spec["switch"], force_add=True)
     # Frozen RL opponents are PPO policies; hand them this run's algo config.
     if cfg.algo.name == "ppo":
         cfg.task.opponent.algo_cfg = cfg.algo
@@ -453,16 +455,20 @@ def _run_eval_multi(cfg, env, base_env, policy):
 
     episodes = acc.episodes()
     assignment = base_env.opponent_bank.assignment
+    switch = base_env.opponent_bank.switch
+    if switch is not None and episodes:
+        episodes["switch_step"] = base_env.opponent_bank.switch_steps[episodes["env"].long()].cpu()
     matchups = summarize_matchups(episodes, assignment, str(cfg.task.role), step_dt, max_len)
     ep_out = cfg.get("eval_episodes_out", None)
     if ep_out:
         os.makedirs(os.path.dirname(os.path.abspath(ep_out)), exist_ok=True)
         torch.save({"episodes": episodes,
-                    "assignment": {k: v.cpu() for k, v in assignment.items()}}, ep_out)
+                    "assignment": {k: v.cpu() for k, v in assignment.items()},
+                    "switch": switch}, ep_out)
     _write_stage_out(cfg, {
         "matchups": matchups,
         "eval": {"cutoff_steps": cutoff, "steps_run": steps, "step_dt": step_dt,
-                 "num_envs": int(base_env.num_envs),
+                 "num_envs": int(base_env.num_envs), "switch": switch,
                  "episodes": int(episodes["env"].numel()) if episodes else 0},
     })
 

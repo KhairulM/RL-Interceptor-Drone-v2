@@ -51,8 +51,10 @@ class FrozenPolicyBank:
         reward_spec,
         algo_cfg,
         device,
+        switch: Optional[dict] = None,
     ):
         self.device = device
+        self.switch = switch
         self.policies = list(policies)
         self.ids: List[str] = [p["id"] for p in self.policies]
         self.kind: Dict[str, str] = {p["id"]: p["kind"] for p in self.policies}
@@ -95,6 +97,26 @@ class FrozenPolicyBank:
     def assign(self, probs: Dict[str, float], num_envs: int):
         """Fix each env to an opponent by sampling the id distribution once."""
         self.num_envs = num_envs
+        if self.switch is not None:
+            first, second = self.switch["first_id"], self.switch["second_id"]
+            if first == second or first not in self.ids or second not in self.ids:
+                raise ValueError("switch policies must be two distinct policies in the opponent bank")
+            if self.kind[first] != "rl" or self.kind[second] != "rl":
+                raise ValueError("within-episode policy switching requires two RL opponents")
+            switch_times = self.switch.get("times_s", [])
+            if not switch_times or any(float(t) <= 0 for t in switch_times):
+                raise ValueError("switch times must be positive seconds")
+            self._switch_first = self.ids.index(first)
+            self._switch_second = self.ids.index(second)
+            self._switch_times = torch.as_tensor(switch_times, dtype=torch.float32, device=self.device)
+            generator = torch.Generator(device="cpu").manual_seed(int(self.switch.get("seed", 0)))
+            order = torch.randperm(num_envs, generator=generator).to(self.device)
+            choices = order % self._switch_times.numel()
+            self.switch_steps_s = self._switch_times[choices]
+            self.env_policy = torch.full((num_envs,), self._switch_first, dtype=torch.long, device=self.device)
+            self.assignment = {self.switch["group_id"]: torch.arange(num_envs, device=self.device)}
+            self._heuristic_masks = {}
+            return self.assignment
         # Only sample over ids that this bank actually holds.
         probs = {k: v for k, v in probs.items() if k in self.ids and v > 0}
         if not probs:
@@ -125,8 +147,20 @@ class FrozenPolicyBank:
         """Bool mask [num_envs] of envs assigned to each heuristic name."""
         return self._heuristic_masks
 
+    def update_switch(self, progress_buf: torch.Tensor, step_dt: float):
+        if self.switch is None:
+            return
+        elapsed = progress_buf.reshape(-1).float() * float(step_dt)
+        self.switch_steps = torch.ceil(self.switch_steps_s / float(step_dt)).long()
+        switched = elapsed >= self.switch_steps_s
+        first = torch.full_like(self.env_policy, self._switch_first)
+        second = torch.full_like(self.env_policy, self._switch_second)
+        self.env_policy = torch.where(switched, second, first)
+
     @property
     def rl_mask(self) -> torch.Tensor:
+        if self.switch is not None:
+            return self.env_policy >= 0
         mask = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
         for pid in self._rl:
             if pid in self.assignment:
@@ -149,7 +183,10 @@ class FrozenPolicyBank:
             return raw
         with set_exploration_type(ExplorationType.MODE):
             for pid, policy in self._rl.items():
-                idx = self.assignment.get(pid)
+                if self.switch is None:
+                    idx = self.assignment.get(pid)
+                else:
+                    idx = (self.env_policy == self.ids.index(pid)).nonzero().squeeze(-1)
                 if idx is None or idx.numel() == 0:
                     continue
                 policy_obs = opp_obs.index_select(0, idx)

@@ -66,12 +66,16 @@ def heuristic(name: str, role: str = "evader") -> dict:
             "metadata": {"heuristic": name}}
 
 
-def write_spec(path: str, policies: List[dict], probs: Optional[Dict[str, float]] = None) -> str:
+def write_spec(path: str, policies: List[dict], probs: Optional[Dict[str, float]] = None,
+               switch: Optional[dict] = None) -> str:
     if probs is None:
         probs = {p["id"]: 1.0 / len(policies) for p in policies}
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    spec = {"policies": policies, "probs": probs}
+    if switch is not None:
+        spec["switch"] = switch
     with open(path, "w") as f:
-        json.dump({"policies": policies, "probs": probs}, f, indent=2)
+        json.dump(spec, f, indent=2)
     return path
 
 
@@ -136,7 +140,8 @@ def common_overrides(role: str, num_envs: int, seed: int) -> List[str]:
 
 def evaluate(out_json: str, opponents: List[dict], role: str = "pursuer", policy_ckpt: Optional[str] = None,
              heuristic_agent: Optional[str] = None, num_envs: int = 4096, seed: int = 0,
-             cutoff: int = EVAL_CUTOFF, extra: Optional[List[str]] = None, save_episodes: bool = True) -> Optional[dict]:
+             cutoff: int = EVAL_CUTOFF, extra: Optional[List[str]] = None, save_episodes: bool = True,
+             switch: Optional[dict] = None) -> Optional[dict]:
     """Evaluate one agent (checkpoint or heuristic) against ``opponents`` (envs split uniformly).
 
     Returns None if the eval failed or another lane is running it (lock).
@@ -150,18 +155,19 @@ def evaluate(out_json: str, opponents: List[dict], role: str = "pursuer", policy
         return None
     try:
         return _evaluate(out_json, opponents, role, policy_ckpt, heuristic_agent, num_envs, seed, cutoff, extra,
-                         save_episodes)
+                         save_episodes, switch)
     finally:
         if os.path.isfile(lock):
             os.remove(lock)
 
 
-def _evaluate(out_json, opponents, role, policy_ckpt, heuristic_agent, num_envs, seed, cutoff, extra, save_episodes):
+def _evaluate(out_json, opponents, role, policy_ckpt, heuristic_agent, num_envs, seed, cutoff, extra, save_episodes,
+              switch):
     if os.path.isfile(out_json):
         with open(out_json) as f:
             return json.load(f)
     base = os.path.splitext(out_json)[0]
-    spec = write_spec(base + "_opp.json", opponents)
+    spec = write_spec(base + "_opp.json", opponents, switch=switch)
     args = common_overrides(role, num_envs, seed) + [
         "mode=eval", f"opponent_spec_path={spec}", f"stage_out={out_json}", f"eval_cutoff_steps={cutoff}"]
     if save_episodes:

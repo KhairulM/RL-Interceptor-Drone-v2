@@ -509,6 +509,8 @@ class PursuitEvasion(IsaacEnv):
             self.reward_spec,
             algo_cfg,
             self.device,
+            switch=OmegaConf.to_container(opp_cfg.get("switch"), resolve=True)
+            if opp_cfg.get("switch", None) is not None else None,
         )
         self.opponent_bank.assign(probs, self.num_envs)
 
@@ -803,6 +805,7 @@ class PursuitEvasion(IsaacEnv):
         raw = torch.zeros(
             self.num_envs, 1, self.agent_drone.action_spec.shape[-1], device=self.device)
 
+        self.opponent_bank.update_switch(self.progress_buf, self.dt * self.substeps)
         rl_mask = self.opponent_bank.rl_mask
         if bool(rl_mask.any()):
             rl_raw = self.opponent_bank.rl_raw_actions(self._opp_obs)
