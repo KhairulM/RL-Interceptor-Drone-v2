@@ -1,7 +1,10 @@
 """F14: generalization, exploitability, and within-episode RLS adaptation study."""
 
 import json
+import hashlib
 import os
+import shutil
+import sys
 import time
 
 import torch
@@ -17,6 +20,7 @@ import f8_roncero_sp as f8
 import f8d_heldout as f8d
 import f10_gae_sp as f10
 import f11_v2_sp as f11
+import f12_acc_sp as f12
 import f13_thesis_short_sp as f13
 from rescore import rates_at
 
@@ -82,10 +86,11 @@ def run_f14a(args):
     log_progress("F14 Stage A campaigns complete: F8 s200 and F11 v2d short s200")
 
 
-def _exploiter(path, pid, c, checkpoint, rules, seed):
+def _exploiter(path, pid, c, checkpoint, rules, seed, opponent_extra=None):
     target = [{"id": pid, "kind": "rl", "checkpoint_path": checkpoint, "metadata": {}}]
     if not os.path.isfile(path):
-        train(path, target, EXPLOIT_FRAMES, role="evader", seed=seed, extra=list(rules))
+        train(path, target, EXPLOIT_FRAMES, role="evader", seed=seed,
+              extra=list(rules) + list(opponent_extra or []))
     while not os.path.isfile(path):
         if not os.path.isfile(path + ".lock"):
             raise RuntimeError(f"F14 exploiter training failed: {path}")
@@ -258,6 +263,142 @@ def _campaign_rules(choice):
     return list(f10.NOFIX)
 
 
+def _stagee_campaigns(choice):
+    return {
+        "rls": tuple(_f14_name(choice, "acc-rls-26", seed) for seed in SEEDS),
+        "no_rls": tuple(_f14_name(choice, "acc-frozen-26", seed) for seed in SEEDS),
+    }
+
+
+def _db_hashes(path):
+    hashes = {}
+    for root, _, files in os.walk(path):
+        for name in sorted(files):
+            full = os.path.join(root, name)
+            rel = os.path.relpath(full, path)
+            digest = hashlib.sha256(open(full, "rb").read()).hexdigest()
+            hashes[rel] = digest
+    return hashes
+
+
+def _resume_point(db_path):
+    selfplay = os.path.join(common.REPO, "scripts", "selfplay")
+    if selfplay not in sys.path:
+        sys.path.insert(0, selfplay)
+    import train_selfplay
+
+    return train_selfplay._resume_point(train_selfplay.PolicyDatabase(db_path))
+
+
+def _prepare_stagee_campaign(source, destination, arm, seed):
+    source_db = os.path.join(common.SELFPLAY_OUT, source, "db")
+    destination_root = os.path.join(common.SELFPLAY_OUT, destination)
+    destination_db = os.path.join(destination_root, "db")
+    manifest_path = os.path.join(destination_root, "stageE_resume.json")
+    if not os.path.isdir(source_db):
+        raise RuntimeError(f"F14 Stage E source database missing: {source_db}")
+
+    source_pursuers = f8.all_stages(source, "pursuer")
+    source_evaders = f8.all_stages(source, "evader")
+    source_p12 = next((p for p in source_pursuers if int(p["metadata"]["stage"]) == 12), None)
+    source_e11 = next((p for p in source_evaders if int(p["metadata"]["stage"]) == 11), None)
+    if source_p12 is None or source_e11 is None:
+        raise RuntimeError(f"F14 Stage E source {source} is not complete through stage 12")
+    source_ckpt = source_p12["checkpoint_path"]
+    if not os.path.isfile(source_ckpt):
+        raise RuntimeError(f"F14 Stage E stage-12 checkpoint missing: {source_ckpt}")
+    source_hashes = _db_hashes(source_db)
+    if not source_hashes:
+        raise RuntimeError(f"F14 Stage E source database is empty: {source_db}")
+
+    os.makedirs(destination_root, exist_ok=True)
+    clone_lock = destination_db + ".clone.lock"
+    acquired = common._acquire_lock(clone_lock)
+    while not acquired:
+        if not os.path.isfile(clone_lock):
+            acquired = common._acquire_lock(clone_lock)
+        else:
+            time.sleep(10)
+    try:
+        if not os.path.isdir(destination_db):
+            temp_db = f"{destination_db}.tmp-{os.getpid()}"
+            shutil.copytree(source_db, temp_db)
+            if _db_hashes(temp_db) != source_hashes:
+                shutil.rmtree(temp_db)
+                raise RuntimeError(f"F14 Stage E database clone verification failed: {destination}")
+            os.rename(temp_db, destination_db)
+
+        if os.path.isfile(manifest_path):
+            manifest = json.load(open(manifest_path))
+            if manifest["source_campaign"] != source or manifest["source_db_sha256"] != source_hashes:
+                raise RuntimeError(f"F14 Stage E source differs from existing clone manifest: {destination}")
+        else:
+            if _db_hashes(destination_db) != source_hashes:
+                raise RuntimeError(f"F14 Stage E destination exists without a matching source snapshot: {destination}")
+            checkpoint_hash = hashlib.sha256(open(source_ckpt, "rb").read()).hexdigest()
+            manifest = {
+                "source_campaign": source,
+                "destination_campaign": destination,
+                "arm": arm,
+                "seed": seed,
+                "source_db_sha256": source_hashes,
+                "stage12_checkpoint": source_ckpt,
+                "stage12_checkpoint_sha256": checkpoint_hash,
+                "source_pursuer_stage": 12,
+                "source_evader_stage": 11,
+                "expected_resume": {"stage": 13, "role": "evader"},
+                "continuation": {"n_stages": 26, "max_total_stages": 26, "frames_per_stage": 50_000_000},
+            }
+            with open(manifest_path, "w") as f:
+                json.dump(manifest, f, indent=2)
+    finally:
+        if os.path.isfile(clone_lock):
+            os.remove(clone_lock)
+
+    common.CAMPAIGNS[destination] = destination
+    destination_pursuers = f8.all_stages(destination, "pursuer")
+    destination_p12 = next((p for p in destination_pursuers if int(p["metadata"]["stage"]) == 12), None)
+    if destination_p12 is None or destination_p12["checkpoint_path"] != source_ckpt:
+        raise RuntimeError(f"F14 Stage E clone does not preserve the stage-12 pursuer: {destination}")
+    if hashlib.sha256(open(source_ckpt, "rb").read()).hexdigest() != manifest["stage12_checkpoint_sha256"]:
+        raise RuntimeError(f"F14 Stage E stage-12 checkpoint changed: {source_ckpt}")
+    start, role, incomplete = _resume_point(destination_db)
+    if start < 13 or start > 26:
+        raise RuntimeError(f"F14 Stage E clone has invalid resume stage {start}: {destination}")
+    if start == 13 and (role != "evader" or incomplete is not None):
+        raise RuntimeError(f"F14 Stage E clone does not resume cleanly at evader stage 13: {destination}")
+    log_progress(f"F14 Stage E verified clone {source} -> {destination}; resume stage={start} role={role}")
+
+
+def _run_stagee_arm(args, arm):
+    if args.smoke:
+        raise SystemExit("F14 Stage E uses the registered 26-stage continuation budget")
+    stagec = json.load(open(os.path.join(F14, "stageC_results.json")))
+    if not stagec["extend_to_26"]:
+        raise RuntimeError("F14 Stage E was not triggered by the registered Stage C rule")
+    choice = stagec["rules"]
+    sources = _arm_campaigns(choice)[arm]
+    campaigns = _stagee_campaigns(choice)[arm]
+    for seed, source, destination in zip(SEEDS, sources, campaigns):
+        _prepare_stagee_campaign(source, destination, arm, seed)
+        cfg = _campaign_cfg(choice, seed)
+        cfg.update(n_stages=26, max_total_stages=26, frames_per_stage=50_000_000)
+        if cfg["seed"] != seed or cfg["n_stages"] != 26 or cfg["max_total_stages"] != 26:
+            raise RuntimeError(f"F14 Stage E config verification failed: {destination}")
+        run_campaign(destination, _campaign_rules(choice), cfg, role_overrides=_roles(arm))
+        _wait_campaign(destination)
+    common.save_json(os.path.join(F14, f"stageE_campaigns_{arm}.json"), {"rules": choice, "campaigns": campaigns})
+    log_progress(f"F14 Stage E {arm} campaigns complete: {campaigns}")
+
+
+def run_f14e(args):
+    _run_stagee_arm(args, "rls")
+
+
+def run_f14en(args):
+    _run_stagee_arm(args, "no_rls")
+
+
 def _roles(arm):
     pov = f5.rls_overrides()
     if arm == "rls":
@@ -297,36 +438,60 @@ def _arm_specs():
     return choice, camps, output
 
 
-def _stagec_eval_jobs():
-    choice, camps, specs = _arm_specs()
+def _estimator_eval_jobs(choice, camps, specs, final_stage, phase, all_camps):
     strong = [p for p in f8d._finals() if p["id"].split("/")[0] in f8d.COMMON]
-    all_camps = tuple(c for arm in ("plain", "rls", "no_rls") for c in camps[arm])
     cross_by_camp = {c: [p for p in _evaders(all_camps) if p["id"].split("/")[0] != c] for _, _, c in specs}
     rules = _campaign_rules(choice)
     jobs = []
     for arm, seed, c in specs:
-        ck = _ck(c, 12)
+        ck = _ck(c, final_stage)
         extra = None if arm == "plain" else f5.rls_overrides() + ([f5.FREEZE] if arm == "no_rls" else [])
         if arm == "plain":
             # Reuse the Stage A strong-set and exploiter evaluations; cross-play is expanded to include the estimator campaigns.
-            jobs.append((c, "stageC_cross", cross_by_camp[c], ck, extra, None))
+            jobs.append((c, f"{phase}_cross", cross_by_camp[c], ck, extra, None))
             continue
         own_rules = rules
+        opponent_extra = f5._mirror(f5.rls_overrides())
+        if arm == "no_rls":
+            opponent_extra.append(f5.FREEZE)
         own_path = os.path.join(F14, "ckpt", f"exploiter_own_{c}.pt")
-        own = _exploiter(own_path, f"f14/pursuer:{c}", c, ck, own_rules, 1100 + seed)
+        own = _exploiter(own_path, f"f14/pursuer:{c}", c, ck, own_rules, 1100 + seed,
+                         opponent_extra=opponent_extra)
         thesis = own if choice == "thesis" else _exploiter(
             os.path.join(F14, "ckpt", f"exploiter_thesis_{c}.pt"), f"f14/pursuer:{c}", c, ck,
-            f11.OLD_RULES_EXPLOITER, 1200 + seed)
-        jobs += [(c, "stageC_strong", strong, ck, extra, None),
-                 (c, "stageC_cross", cross_by_camp[c], ck, extra, None),
-                 (c, "stageC_own", own, ck, extra, None)]
+            f11.OLD_RULES_EXPLOITER, 1200 + seed, opponent_extra=opponent_extra)
+        jobs += [(c, f"{phase}_strong", strong, ck, extra, None),
+                 (c, f"{phase}_cross", cross_by_camp[c], ck, extra, None),
+                 (c, f"{phase}_own", own, ck, extra, None)]
         if choice == "v2d":
-            jobs.append((c, "stageC_thesis", thesis, ck, extra, None))
+            jobs.append((c, f"{phase}_thesis", thesis, ck, extra, None))
         if arm == "rls":
             frozen_extra = f5.rls_overrides() + [f5.FREEZE]
-            jobs += [(c, "stageC_frozen_strong", strong, ck, frozen_extra, None),
-                     (c, "stageC_frozen_cross", cross_by_camp[c], ck, frozen_extra, None)]
+            jobs += [(c, f"{phase}_frozen_strong", strong, ck, frozen_extra, None),
+                     (c, f"{phase}_frozen_cross", cross_by_camp[c], ck, frozen_extra, None),
+                     (c, f"{phase}_frozen_own", own, ck, frozen_extra, None)]
     return choice, camps, specs, jobs
+
+
+def _stagec_eval_jobs():
+    choice, camps, specs = _arm_specs()
+    all_camps = tuple(c for arm in ("plain", "rls", "no_rls") for c in camps[arm])
+    return _estimator_eval_jobs(choice, camps, specs, 12, "stageC", all_camps)
+
+
+def _stagee_eval_jobs():
+    choice = _selected_rules()
+    stagec_camps = _arm_campaigns(choice)
+    stagee_camps = _stagee_campaigns(choice)
+    camps = {
+        "plain": stagec_camps["plain"],
+        "rls": stagec_camps["rls"] + stagee_camps["rls"],
+        "no_rls": stagec_camps["no_rls"] + stagee_camps["no_rls"],
+    }
+    specs = [(arm, seed, campaign) for arm in ("rls", "no_rls")
+             for seed, campaign in zip(SEEDS, stagee_camps[arm])]
+    all_camps = tuple(campaign for arm in ("plain", "rls", "no_rls") for campaign in camps[arm])
+    return _estimator_eval_jobs(choice, camps, specs, 24, "stageE", all_camps)
 
 
 def run_f14cc(args):
@@ -347,59 +512,96 @@ def run_f14cc(args):
     analyse_stage_c(choice, camps, specs)
 
 
-def _score_stagec(c, arm, radius, frozen=False):
+def _score_stagec(c, arm, radius, frozen=False, phase="stageC"):
     if arm == "plain":
         base = _score(c, radius)
         base["cross_j"] = _group_cross(rates_at(_out(c, "stageC_cross"), "neutralization_rate", radius), c)
         base["g1"] = 0.5 * (base["strong_j"] + base["cross_j"])
         return base
-    prefix = "stageC_frozen_" if frozen else "stageC_"
+    prefix = f"{phase}_frozen_" if frozen else f"{phase}_"
     rate = lambda g, key="neutralization_rate": rates_at(_out(c, prefix + g), key, radius)
     strong = rate("strong")
     strong_vals = [v for k, v in strong.items() if k.split("/")[0] in f8d.COMMON]
     cross = rate("cross")
     r = {"strong_j": _mean(strong_vals), "cross_j": _group_cross(cross, c),
          "g1": 0.5 * (_mean(strong_vals) + _group_cross(cross, c))}
-    if not frozen:
-        own = rate("own")
-        r.update(own_j=float(next(iter(own.values()))),
-                 own_exploitability=1 - float(next(iter(own.values()))))
+    own = rate("own")
+    r.update(own_j=float(next(iter(own.values()))),
+             own_exploitability=1 - float(next(iter(own.values()))))
     return r
 
 
-def analyse_stage_c(choice, camps, specs):
+def analyse_stage_c(choice, camps, specs, phase="stageC"):
     baseline = json.load(open(os.path.join(F14, "baseline_results.json")))
-    f8_scores = baseline["metrics"]["r0.10"]["f8"]
-    f8_g1 = _mean([v["g1"] for v in f8_scores.values()])
-    f8_own = _mean([v["own_j"] for v in f8_scores.values()])
-    result = {}
-    for arm, seed, c in specs:
-        score = _score_stagec(c, arm, 0.10)
-        score.update(g1_gap=score["g1"] - f8_g1, g2_gap=score["own_j"] - f8_own)
-        if arm == "rls":
-            frozen = _score_stagec(c, arm, 0.10, frozen=True)
-            score["frozen_at_eval"] = frozen
-        result.setdefault(arm, {})[str(seed)] = score
+    results = {}
+    f8_by_radius = {}
+    for radius in RADII:
+        radius_key = f"r{radius:.2f}"
+        f8_scores = baseline["metrics"][radius_key]["f8"]
+        f8_g1 = _mean([v["g1"] for v in f8_scores.values()])
+        f8_own = _mean([v["own_j"] for v in f8_scores.values()])
+        result = {}
+        for arm, seed, c in specs:
+            score = _score_stagec(c, arm, radius, phase=phase)
+            score.update(g1_gap=score["g1"] - f8_g1, g2_gap=score["own_j"] - f8_own)
+            if arm == "rls":
+                score["frozen_at_eval"] = _score_stagec(c, arm, radius, frozen=True, phase=phase)
+            result.setdefault(arm, {})[str(seed)] = score
+        results[f"metrics_{radius_key}"] = result
+        f8_by_radius[radius_key] = {"g1": f8_g1, "own_j": f8_own}
+
+    result = results["metrics_r0.10"]
+    f8_g1 = f8_by_radius["r0.10"]["g1"]
+    f8_own = f8_by_radius["r0.10"]["own_j"]
     g1_mean = _mean([v["g1_gap"] for v in result["rls"].values()])
     g2_mean = _mean([v["g2_gap"] for v in result["rls"].values()])
     rls_mean = _mean([v["g1"] for v in result["rls"].values()])
     no_rls_mean = _mean([v["g1"] for v in result["no_rls"].values()])
     extend = g1_mean <= 0 or g2_mean <= 0
-    out = {"rules": choice, "metrics_r0.10": result, "f8_g1": f8_g1, "f8_own_j": f8_own,
+    out = {"rules": choice, **results, "f8_by_radius": f8_by_radius,
            "rls_g1_gap_mean": g1_mean, "rls_g2_gap_mean": g2_mean,
-           "rls_minus_no_rls_g1": rls_mean - no_rls_mean, "extend_to_26": extend}
-    common.save_json(os.path.join(F14, "stageC_results.json"), out)
-    lines = ["# F14 Stage C: selected-rule 13-stage estimator comparison", "",
+           "rls_minus_no_rls_g1": rls_mean - no_rls_mean,
+           "extend_to_26": extend if phase == "stageC" else None}
+    common.save_json(os.path.join(F14, f"{phase}_results.json"), out)
+    lines = [f"# F14 {phase}: selected-rule estimator comparison", "",
              f"Selected rules: {choice}. At 0.10 m; G1 = 0.5 x strong-set J + 0.5 x campaign-balanced cross-seed J; G2 = own-rules exploiter J minus F8 own-rules exploiter J.",
              "| Arm | Seed | Strong J | Cross J | G1 gap vs F8 | G2 gap vs F8 | Own exploitability |", "|---|---:|---:|---:|---:|---:|---:|"]
     for arm in ("plain", "rls", "no_rls"):
-        for seed, v in result[arm].items():
+        for seed, v in result.get(arm, {}).items():
             lines.append(f"| {arm} | {seed} | {v['strong_j']:.3f} | {v['cross_j']:.3f} | {v['g1_gap']:+.3f} | {v['g2_gap']:+.3f} | {v['own_exploitability']:.3f} |")
+    g1_15 = _mean([v["g1_gap"] for v in results["metrics_r0.15"]["rls"].values()])
+    g2_15 = _mean([v["g2_gap"] for v in results["metrics_r0.15"]["rls"].values()])
     lines += ["", f"Mean RLS G1 gap: {g1_mean:+.3f}; mean RLS G2 gap: {g2_mean:+.3f}; RLS - no-RLS G1: {rls_mean - no_rls_mean:+.3f}.",
-              f"26-stage continuation required: {extend} (trigger: either mean gap is non-positive).", ""]
-    with open(os.path.join(F14, "stageC_summary.md"), "w") as f:
+              f"At 0.15 m, mean RLS G1 gap: {g1_15:+.3f}; mean RLS G2 gap: {g2_15:+.3f}."]
+    if phase == "stageC":
+        lines.append(f"26-stage continuation required: {extend} (trigger: either mean gap is non-positive).")
+    lines.append("")
+    with open(os.path.join(F14, f"{phase}_summary.md"), "w") as f:
         f.write("\n".join(lines))
-    log_progress(f"F14 Stage C analysis done; extend_to_26={extend}")
+    log_progress(f"F14 {phase} analysis done; extend_to_26={extend if phase == 'stageC' else 'n/a'}")
+
+
+def run_f14ec(args):
+    if args.smoke:
+        raise SystemExit("F14 Stage E evaluations use the registered full evaluation sets")
+    stagec = json.load(open(os.path.join(F14, "stageC_results.json")))
+    if not stagec["extend_to_26"]:
+        raise RuntimeError("F14 Stage E evaluations were not triggered by Stage C")
+    choice = stagec["rules"]
+    campaigns = _stagee_campaigns(choice)
+    for campaign in campaigns["rls"] + campaigns["no_rls"]:
+        _wait_campaign(campaign)
+    choice, campaigns, specs, jobs = _stagee_eval_jobs()
+    for campaign, group, opponents, ck, extra, switch in jobs:
+        path = _out(campaign, group)
+        if not os.path.isfile(path) and opponents:
+            evaluate(path, opponents, policy_ckpt=ck, extra=extra, switch=switch)
+    missing = [_out(campaign, group) for campaign, group, opponents, *_ in jobs
+               if opponents and not os.path.isfile(_out(campaign, group))]
+    if missing:
+        log_progress(f"F14 Stage E: {len(missing)} evaluation files missing; analysis deferred")
+        return
+    analyse_stage_c(choice, campaigns, specs, phase="stageE")
 
 
 def _switch_pair(seed, direction):
@@ -412,27 +614,27 @@ def _switch_pair(seed, direction):
     return (f8_ev, f10_ev) if direction == "f8_to_f10" else (f10_ev, f8_ev)
 
 
-def _adaptation_jobs():
+def _adaptation_jobs(camps=None, stage=12, group_prefix="adapt"):
     choice = _selected_rules()
-    camps = _arm_campaigns(choice)
+    if camps is None:
+        camps = _arm_campaigns(choice)
     jobs = []
     for model in ("rls", "no_rls", "rls_frozen"):
         arm = "rls" if model == "rls_frozen" else model
         for seed, c in zip(SEEDS, camps[arm]):
-            ck = _ck(c, 12)
+            ck = _ck(c, stage)
             extra = f5.rls_overrides() if arm == "rls" else f5.rls_overrides() + [f5.FREEZE]
             if model == "rls_frozen":
                 extra = f5.rls_overrides() + [f5.FREEZE]
             for direction in ("f8_to_f10", "f10_to_f8"):
                 first, second = _switch_pair(seed, direction)
-                for switch_s in (0.5, 1.0, 1.5):
-                    gid = f"switch:{direction}:{switch_s:.1f}s"
-                    path = _out(c, f"adapt_{model}_{direction}_{switch_s:.1f}s")
-                    switch = {"first_id": first["id"], "second_id": second["id"], "times_s": [switch_s],
-                              "group_id": gid, "seed": seed + 401}
-                    jobs.append((path, c, model, seed, direction, switch_s, [first, second], ck, extra, switch, gid))
+                gid = f"switch:{direction}:randomized"
+                path = _out(c, f"{group_prefix}_{model}_{direction}_randomized")
+                switch = {"first_id": first["id"], "second_id": second["id"], "times_s": [0.5, 1.0, 1.5],
+                          "group_id": gid, "seed": seed + 401}
+                jobs.append((path, c, model, seed, direction, [0.5, 1.0, 1.5], [first, second], ck, extra, switch, gid))
                 for policy in (first, second):
-                    path = _out(c, f"adapt_{model}_{direction}_fixed_{policy['id'].split('/')[0]}")
+                    path = _out(c, f"{group_prefix}_{model}_{direction}_fixed_{policy['id'].split('/')[0]}")
                     jobs.append((path, c, model, seed, direction, None, [policy], ck, extra, None, policy["id"]))
     return jobs
 
@@ -458,46 +660,79 @@ def _smoke_switch():
         raise RuntimeError("F14 switch smoke did not record switching metadata")
     if len(episodes.get("episode_len", [])) == 0:
         raise RuntimeError("F14 switch smoke produced no episodes")
+    expected_step = int(np.ceil(0.1 / data["eval"]["step_dt"]))
+    if not bool((episodes["switch_step"] == expected_step).all()):
+        raise RuntimeError("F14 switch smoke recorded an unexpected policy-switch step")
 
 
 def _episode_switch_metrics(path):
-    import torch
     data = json.load(open(path))
     episode_path = os.path.splitext(path)[0] + "_episodes.pt"
     episodes = torch.load(episode_path, map_location="cpu", weights_only=False)["episodes"]
-    alive = episodes["episode_len"] > episodes["switch_step"]
-    if not bool(alive.any()):
-        raise RuntimeError(f"no episodes survived to switch in {path}")
-    e = {k: v[alive].float() for k, v in episodes.items() if k not in ("env", "episode_index", "feat_mean", "feat_std", "switch_step")}
-    j = (e["capture"] > 0.5) | (e["opp_crash"] > 0.5) | (e["opp_out_of_bounds"] > 0.5)
-    captured = e["capture"] > 0.5
-    wait = (e["episode_len"] - episodes["switch_step"][alive].float()).clamp_min(0) * data["eval"]["step_dt"]
-    return {"episodes_alive_at_switch": int(alive.sum()), "post_switch_neutralization": float(j.float().mean()),
-            "post_switch_capture": float(captured.float().mean()),
-            "mean_seconds_after_switch_to_capture": float(wait[captured].mean()) if bool(captured.any()) else None,
-            "full_episode_j": float(next(iter(data["matchups"].values()))["neutralization_rate"])}
+    switch_steps = torch.unique(episodes["switch_step"]).tolist()
+    matchup = next(iter(data["matchups"].values()))
+    step_dt = data["eval"]["step_dt"]
+    records = []
+    for switch_step in sorted(int(s) for s in switch_steps):
+        alive = (episodes["switch_step"] == switch_step) & (episodes["episode_len"] > switch_step)
+        if not bool(alive.any()):
+            continue
+        e = {k: v[alive].float() for k, v in episodes.items()
+             if k not in ("env", "episode_index", "feat_mean", "feat_std", "switch_step")}
+        capture = e["capture"] > 0.5
+        j = capture | (e["opp_crash"] > 0.5) | (e["opp_out_of_bounds"] > 0.5)
+        wait = (e["episode_len"] - float(switch_step)).clamp_min(0) * step_dt
+        post = {
+            "episodes_alive_at_switch": int(alive.sum()),
+            "post_switch_neutralization": float(j.float().mean()),
+            "post_switch_capture": float(capture.float().mean()),
+            "mean_seconds_after_switch_to_capture": float(wait[capture].mean()) if bool(capture.any()) else None,
+        }
+        post_outcomes = {"pursuer_crash": "crash", "evader_crash": "opp_crash",
+                         "pursuer_oob": "out_of_bounds", "evader_oob": "opp_out_of_bounds",
+                         "timeout": "timeout"}
+        for name, key in post_outcomes.items():
+            if key in e:
+                post[f"post_switch_{name}"] = float((e[key] > 0.5).float().mean())
+        post.update({f"full_{key}": value for key, value in matchup.get("outcomes", {}).items()})
+        post["full_episode_j"] = float(matchup["neutralization_rate"])
+        post["switch_seconds"] = switch_step * step_dt
+        records.append(post)
+    if not records:
+        raise RuntimeError(f"no episodes survived to a policy switch in {path}")
+    return records
 
 
 def run_f14d(args):
     _wait_file(os.path.join(F14, "stageC_results.json"), "Stage C analyses")
     _smoke_switch()
-    jobs = _adaptation_jobs()
-    for path, c, model, seed, direction, switch_s, policies, ck, extra, switch, gid in jobs:
+    _run_adaptation_jobs(_adaptation_jobs(), os.path.join(F14, "adaptation_results.json"),
+                         os.path.join(F14, "adaptation_summary.md"), "Stage D")
+
+
+def _run_adaptation_jobs(jobs, results_path, summary_path, label):
+    for path, c, model, seed, direction, switch_times, policies, ck, extra, switch, gid in jobs:
         if not os.path.isfile(path):
             evaluate(path, policies, policy_ckpt=ck, extra=extra, seed=seed + 1400,
                      switch=switch)
     missing = [path for path, *_ in jobs if not os.path.isfile(path)]
     if missing:
-        log_progress(f"F14 Stage D: {len(missing)} switch/control evals missing; analysis deferred")
+        log_progress(f"F14 {label}: {len(missing)} switch/control evals missing; analysis deferred")
         return
     records = []
-    for path, c, model, seed, direction, switch_s, _, _, _, _, gid in jobs:
-        result = _episode_switch_metrics(path) if switch_s is not None else {
-            "fixed_policy_j": float(next(iter(json.load(open(path))["matchups"].values()))["neutralization_rate"])}
-        records.append({"campaign": c, "model": model, "seed": seed, "direction": direction,
-                        "switch_seconds": switch_s, "opponent": gid, **result})
-    common.save_json(os.path.join(F14, "adaptation_results.json"), {"records": records})
-    lines = ["# F14 Stage D: within-episode learned-evader switch", "",
+    for path, c, model, seed, direction, switch_times, _, _, _, _, gid in jobs:
+        if switch_times is not None:
+            metrics = _episode_switch_metrics(path)
+            records.extend({"campaign": c, "model": model, "seed": seed, "direction": direction,
+                            "opponent": gid, **result} for result in metrics)
+        else:
+            matchup = next(iter(json.load(open(path))["matchups"].values()))
+            records.append({"campaign": c, "model": model, "seed": seed, "direction": direction,
+                            "switch_seconds": None, "opponent": gid,
+                            "fixed_policy_j": float(matchup["neutralization_rate"]),
+                            **{f"fixed_{key}": value for key, value in matchup.get("outcomes", {}).items()}})
+    common.save_json(results_path, {"records": records})
+    lines = [f"# F14 {label}: within-episode learned-evader switch", "",
              "Post-switch outcomes are conditional on episodes whose duration exceeds their recorded switch step. Pursuer OOB is not an ending; report it as an outcome, not an evader win.",
              "| Model | Seed | Direction | Switch (s) | Alive at switch | Post-switch J | Post-switch capture | Post-switch capture time (s) |", "|---|---:|---|---:|---:|---:|---:|---:|"]
     for r in records:
@@ -505,6 +740,17 @@ def run_f14d(args):
             t = r["mean_seconds_after_switch_to_capture"]
             time_cell = f"{t:.3f}" if t is not None else "-"
             lines.append(f"| {r['model']} | {r['seed']} | {r['direction']} | {r['switch_seconds']:.1f} | {r['episodes_alive_at_switch']} | {r['post_switch_neutralization']:.3f} | {r['post_switch_capture']:.3f} | {time_cell} |")
-    with open(os.path.join(F14, "adaptation_summary.md"), "w") as f:
+    with open(summary_path, "w") as f:
         f.write("\n".join(lines))
-    log_progress("F14 Stage D adaptation analysis done")
+    log_progress(f"F14 {label} adaptation analysis done")
+
+
+def run_f14ed(args):
+    _wait_file(os.path.join(F14, "stageE_results.json"), "Stage E evaluations")
+    _wait_file(os.path.join(F14, "switch", "smoke.json"), "Stage D switch smoke")
+    campaigns = _stagee_campaigns(_selected_rules())
+    for campaign in campaigns["rls"] + campaigns["no_rls"]:
+        _wait_campaign(campaign)
+    _run_adaptation_jobs(_adaptation_jobs(campaigns, stage=24, group_prefix="stageE_adapt"),
+                         os.path.join(F14, "stageE_adaptation_results.json"),
+                         os.path.join(F14, "stageE_adaptation_summary.md"), "Stage E")

@@ -1,0 +1,114 @@
+{
+  "matchups": {
+    "switch:f8_to_f10:randomized": {
+      "episodes": 49639,
+      "eval_role": "pursuer",
+      "capture_rate": 0.5114728212356567,
+      "neutralization_rate": 0.6197344660758972,
+      "win_rate": 0.5627743050937625,
+      "decisive_episodes": 45114,
+      "avg_time_to_capture": 2.4433350563049316,
+      "time_to_neutralize_censored": 12.970625877380371,
+      "avg_episode_time": 2.61053204536438,
+      "avg_min_distance": 0.11803589016199112,
+      "avg_motor_effort": 877.3834838867188,
+      "pursuer_crash_rate": 0.39728841185569763,
+      "outcomes": {
+        "capture": 0.5114728212356567,
+        "pursuer_crash": 0.39728841185569763,
+        "evader_crash": 0.07878885418176651,
+        "pursuer_oob": 0.1917443871498108,
+        "evader_oob": 0.030218174681067467,
+        "timeout": 0.00010072725126519799
+      },
+      "behaviour": {
+        "features": [
+          "evader_speed",
+          "evader_altitude",
+          "evader_radius",
+          "evader_vz_abs",
+          "evader_accel",
+          "evader_lat_accel",
+          "evader_turn_rate",
+          "flee_cos",
+          "distance"
+        ],
+        "mean": [
+          1.1587928533554077,
+          1.3499246835708618,
+          1.1322836875915527,
+          0.5840234160423279,
+          2.8634824752807617,
+          1.9847441911697388,
+          1.418837070465088,
+          0.19688403606414795,
+          1.2781277894973755
+        ],
+        "std": [
+          0.6019961833953857,
+          0.31214866042137146,
+          0.25438231229782104,
+          0.4761204421520233,
+          1.9487028121948242,
+          1.4743002653121948,
+          1.668959379196167,
+          0.40471020340919495,
+          0.6017729043960571
+        ]
+      },
+      "behaviour_pursuer": {
+        "features": [
+          "evader_speed",
+          "evader_altitude",
+          "evader_radius",
+          "evader_vz_abs",
+          "evader_accel",
+          "evader_lat_accel",
+          "evader_turn_rate",
+          "flee_cos",
+          "distance"
+        ],
+        "mean": [
+          1.7225632667541504,
+          1.47869873046875,
+          1.063307285308838,
+          0.7979671955108643,
+          3.91951584815979,
+          2.719604969024658,
+          1.3516626358032227,
+          -0.5480068922042847,
+          1.2781277894973755
+        ],
+        "std": [
+          0.9864540696144104,
+          0.3849002718925476,
+          0.4011998772621155,
+          0.7453304529190063,
+          2.2179930210113525,
+          2.105126142501831,
+          1.48456871509552,
+          0.4513702094554901,
+          0.6017729043960571
+        ]
+      }
+    }
+  },
+  "eval": {
+    "cutoff_steps": 1500,
+    "steps_run": 2921,
+    "step_dt": 0.02,
+    "num_envs": 4096,
+    "switch": {
+      "first_id": "thesis-F8b-roncero-s0/evader:s25",
+      "second_id": "thesis-F10-nofix-s0/evader:s11",
+      "times_s": [
+        0.5,
+        1.0,
+        1.5
+      ],
+      "group_id": "switch:f8_to_f10:randomized",
+      "seed": 601
+    },
+    "episodes": 49639
+  }
+}

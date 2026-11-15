@@ -67,6 +67,13 @@ EXPERIMENTS = {
     "F10sc": "f10_gae_sp:run_f10sc",
     "F14a": "f14_generalization_sp:run_f14a",
     "F14ac": "f14_generalization_sp:run_f14ac",
+    "F14c": "f14_generalization_sp:run_f14c",
+    "F14cc": "f14_generalization_sp:run_f14cc",
+    "F14d": "f14_generalization_sp:run_f14d",
+    "F14e": "f14_generalization_sp:run_f14e",
+    "F14en": "f14_generalization_sp:run_f14en",
+    "F14ec": "f14_generalization_sp:run_f14ec",
+    "F14ed": "f14_generalization_sp:run_f14ed",
 }
 
 # Registered before the GAE truncation fix became the PPO default (2026-11-11): these keep the old setting
