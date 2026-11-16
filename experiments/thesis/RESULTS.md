@@ -6,15 +6,16 @@ Measured results only. Each section is filled when the experiment finishes, with
 - J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over seeds (with 2 seeds, the range of the two values); "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position + velocity, no acceleration).
 - Training radius and primary results: 0.10 m. **0.15 m values are eval-only exact re-scores** of the same episodes ([R15_rescore/](R15_rescore/), `rescore.py`). Every policy and exploiter was trained for 0.10 m, so **J at 0.15 m is an upper bound and exploitability a lower bound for a 0.15 m game**. Sections below write "(0.15 m convention)" for this. Exception: F7 trained its pursuers and exploiters at 0.15 m.
 
-## Summary (updated 2026-11-16 06:34 KST; details in the sections below)
+## Summary (updated 2026-11-16 12:03 KST; details in the sections below)
 
 One finding per bullet, 0.10 m unless marked; numbers are copied from the linked sections.
 
-**Latest thesis-level conclusions (F14 complete; exploratory, 3 training seeds)**
+**Latest thesis-level conclusions (F14 complete; F15 evaluation-only comparison complete, both exploratory with 3 seeds)**
 - **The joint goal is not met:** learned acceleration + RLS under v2d improves resistance to same-rules exploiters relative to the Roncero-rule F8 reference, but not the combined G1 generalization score. At 13 stages, G1/G2 gaps are -0.050/+0.364; at 26 stages, -0.035/+0.323. Neither schedule beats F8 on both measures ([F14](#f14)).
 - **The generalization components disagree:** at 26 stages the strong held-out RL gap is -0.103, while the campaign-balanced cross-campaign gap is +0.034. These are different tests, and G1's average must not hide the remaining strong-set deficit. Extending training improves G1 by only +0.015 ([F14](#f14)).
 - **Training with RLS and updating RLS at test time are different effects:** at 26 stages, RLS-trained pursuers exceed no-RLS-trained pursuers by +0.140 G1 and +0.156 post-switch J. Freezing the same RLS-trained pursuer only at evaluation reduces post-switch J by 0.009. This is a small live-update benefit, not evidence that online updating explains most of the training-arm difference ([F14](#f14)).
 - **The estimator is not uniformly better than plain observations:** in Stage C's 13-stage comparison, RLS G1 is 0.833 versus plain v2d's 0.880, although same-rules-exploiter exploitability falls from 0.124 to 0.009. Beating the no-RLS-trained estimator arm is not the same as beating the plain pursuer ([F14](#f14)).
+- **F15 adds the missing F8 pursuer switch baseline:** at 0.10 m, post-switch J/capture is 0.822/0.592 for F8 versus 0.874/0.710 for stage-24 RLS. The mean J gap (+0.052) is seed-variable (RLS-minus-F8: +0.001/-0.067/+0.220), so it fails the registered all-three-seed direction criterion; RLS capture is higher on all three seeds. Live RLS exceeds the same checkpoint frozen at evaluation by only +0.009 J/capture ([F15](#f15-switch-baseline)).
 
 **Diagnostics (X0-X4)**
 - The game is mostly transitive; self-play pools are redundant (22 RL evaders = 3.8 distinct behaviours) ([X1](#x1), [X2](#x2)).
@@ -36,7 +37,7 @@ One finding per bullet, 0.10 m unless marked; numbers are copied from the linked
 - Self-play, finite-difference acceleration (1 campaign per arm): better on held-out RL (0.89 vs 0.78), not on the other campaign's evaders (0.74 vs 0.86); prediction did not hold ([F2b / F2c](#f2)).
 - Self-play with noise and no true velocity (3 seeds per arm): learned estimators beat the EMA filter on other campaigns' evaders (+0.196 [+0.132, +0.291]) and X3 exploiters (+0.441 [+0.254, +0.541]) but are **more** exploitable (0.872 vs 0.675) ([F4](#f4)).
 - Self-play, learned estimate + RLS under the older schedule (3 seed pairs): clean, held-out RL +0.091 [+0.055, +0.116] and worst cluster +0.128 [+0.042, +0.174] on all 3 pairs, not other campaigns' evaders (-0.027); under noise below plain (other campaigns -0.140 [-0.232, -0.065]), mainly from running RLS (-0.103). **F5 does not reproduce the A3c noise-robustness gain**; this does not exclude F14's later, small clean policy-switch benefit ([F5](#f5), [F14](#f14)).
-- Policy switches, selected v2d rules (F14, 3 seeds): post-switch J/capture at 13 stages are 0.844/0.669 (RLS), 0.840/0.666 (frozen at evaluation), and 0.712/0.539 (no-RLS training); at 26 stages, 0.874/0.710, 0.864/0.700, and 0.717/0.569. These are survivor-conditioned, seed-balanced descriptive means, not paired counterfactual outcomes for identical episode states ([F14](#f14)).
+- Policy switches, selected v2d rules (F14, 3 seeds): post-switch J/capture at 13 stages are 0.844/0.669 (RLS), 0.840/0.666 (frozen at evaluation), and 0.712/0.539 (no-RLS training); at 26 stages, 0.874/0.710, 0.864/0.700, and 0.717/0.569. F15 adds F8 at the 26-stage switch budget (0.822/0.592). These are survivor-conditioned, seed-balanced descriptive means, not paired counterfactual outcomes for identical episode states ([F14](#f14), [F15](#f15-switch-baseline)).
 
 **Self-play robustness and the floor-lure exploit (F2-F14, F8d)**
 - F10 seeds 0/100/200 (13 x 50M, no GAE fix): mean held-out RL J 0.924, strong-finals J 0.711, and thesis-exploiter exploitability 0.525; seed-level exploitability ranges from 0.172 to 0.808. The short-run result is seed-variable, not uniformly robust ([F10 seeds](#f10-seeds)).
@@ -57,7 +58,9 @@ One finding per bullet, 0.10 m unless marked; numbers are copied from the linked
 - Diagnostics and F2c: the adaptation gap rests on 2 exploiters (X3); gate G1 still passes (X4); the game is more transitive (X1). F2c acc exploitability 0.327 vs plain 0.746 (one exploiter each).
 - F14's conclusion is unchanged: RLS G1/G2 gaps are -0.023/+0.120 at 13 stages and -0.019/+0.107 at 26 stages; longer training does not make both positive ([F14](#f14)).
 
-**Completed / open (updated 2026-11-16 06:34 KST)**: F14 training, G1/G2 evaluations, and Stage D/E adaptation evaluations and analyses are complete; no F14 run remains pending. The joint generalization/exploitability hypothesis was not met. Default held-out test for new experiments: v10 + F8d's 16 strong finals. No freeze date (user, 11-09). Other open items remain separate: opponent sensor noise in the noisy runs (A3b-d, F4, F5; audit), the seed-CI method, F5 Exp 2 (paused), the exploiter-augmented pool, and a sampler / diversity comparison under v2d. The new generalization citation chase is in [literature notes, section (E)](L0_literature/notes.md); its proposed interventions have not been run as part of F14.
+**Completed / open (updated 2026-11-16 12:03 KST)**: F14 and the F15 switch-baseline evaluation are complete. F15 reused 36 audited F14 cells and added 12 F8 evaluations; all four arm smoke checks passed. Results are descriptive over three training seeds and do not establish a causal or seed-robust F8-vs-RLS difference. [F17](../../docs/research_plan.md#f17) (F8 rules + learned acceleration estimator/RLS on the pursuer; tests whether summary row 10's rule confound hides an estimator effect on G1/G2) is registered and running; no F17 results yet. F16 is queued after F17; no F16 runs have started. Default held-out test for new experiments: v10 + F8d's 16 strong finals. Other open items remain separate: opponent sensor noise (A3b-d, F4, F5; audit), seed-CI method, F5 Exp 2 (paused), exploiter-augmented pool, and the F16 sampler/diversity comparison.
+
+**Next queued study:** [F16](../../docs/research_plan.md#f16) compares Hedge, QD-DPP, PSRO and a full-mechanism PSD-PSRO adaptation under unchanged Roncero rewards, with three paired seeds and audited reuse of F8 training. Roncero's rewards are general-sum, so the adaptation does not inherit PSD's zero-sum guarantees. F16 is not implemented or launched; earlier F3/F6/F6b results do not establish that full PSD-PSRO cannot beat Hedge.
 
 ## Contents
 
@@ -66,7 +69,7 @@ One finding per bullet, 0.10 m unless marked; numbers are copied from the linked
 - RQ1 on a fixed pool: [D1 sampler](#d1) · [D1b duplicates](#d1b) · [D1c no floor](#d1c) · [D2 exploitability](#d2)
 - RQ2 opponent model: [A1a](#a1a) · [A1b](#a1b) · [A2a](#a2a) · [A2b](#a2b) · [A3a](#a3a) · [A3b](#a3b) · [A3c](#a3c) · [A3d](#a3d) · [A3e](#a3e) · [A3f](#a3f)
 - Final runs on a fixed pool: [F1](#f1) · [F2a](#f2a)
-- Self-play: [F2b / F2c](#f2) · [F3](#f3) ([transitivity](#f3-posthoc)) · [F4](#f4) · [F5](#f5) ([post-hoc](#f5-posthoc)) · [F6](#f6) · [F7](#f7) · [F6b](#f6b) · [F8](#f8) ([post-hoc](#f8-posthoc), [F8d](#f8d)) · [F9](#f9) · [F10](#f10) ([three seeds](#f10-seeds)) · [F11](#f11) · [F13](#f13) · [F14: generalization, exploitability and policy switches](#f14)
+- Self-play: [F2b / F2c](#f2) · [F3](#f3) ([transitivity](#f3-posthoc)) · [F4](#f4) · [F5](#f5) ([post-hoc](#f5-posthoc)) · [F6](#f6) · [F7](#f7) · [F6b](#f6b) · [F8](#f8) ([post-hoc](#f8-posthoc), [F8d](#f8d)) · [F9](#f9) · [F10](#f10) ([three seeds](#f10-seeds)) · [F11](#f11) · [F13](#f13) · [F14: generalization, exploitability and policy switches](#f14) · [F15: switch baseline](#f15-switch-baseline)
 
 <a id="synthesis"></a>
 
@@ -1984,3 +1987,45 @@ At stage 24, RLS exceeds the frozen-at-evaluation control by +0.009 on both J an
 **F14 outcome:** all registered execution stages and their analyses are complete. The 26-stage fallback improved the negative G1 gap only slightly and did not make it positive; G2 remained positive. Within-episode policy switching was evaluated for both schedules. Results do not support claiming that 26 stages solve held-out generalization, or that online RLS updates account for most of the adaptation gain. See [stageE_adaptation_results.json](F14_generalization_sp/stageE_adaptation_results.json) for structured stage-24 outcomes.
 
 **Registered predictions:** (1) 13-stage RLS G1 > F8: **did not hold** (-0.050). (2) Same-rules G2 > 0: **held** (+0.364). (3) Live RLS improves post-switch J/capture over frozen-at-evaluation and no-RLS training: **directionally held in the means**, with a small live-update margin and no training-seed significance claim. (4) The triggered continuation improves the failed G1 gap: **held slightly** (+0.015), but did not make the joint G1/G2 goal hold.
+
+<a id="f15-switch-baseline"></a>
+
+## F15_switch_baseline (complete 2026-11-16; evaluation only, exploratory, 3 seeds)
+
+F15 adds the missing stage-24 F8 pursuer to F14's learned F8/F10 evader switches. It compares F8, stage-24 RLS, that same RLS checkpoint frozen at evaluation, and the no-RLS-trained estimator arm. No policies were retrained or selected using these switch results. F8 uses its native observation and no estimator/RLS overrides. F8 and the v2d estimator arms differ in training reward/observation, so their contrast is between complete systems, not a causal estimate of RLS alone.
+
+The evaluation used seeds 0/100/200, both switch directions, and randomized switch times 0.5/1.0/1.5 s. Of 48 unique arm/seed/condition cells, 36 Stage E estimator/control cells were reused after validating switch metadata and raw episode files; 12 new F8 cells were run. Each cell exceeded 2,048 episodes: F8 jobs had 17,289-36,061 episodes and reused F14 jobs 24,647-67,266. The F8 smoke produced 526 episodes and recorded the expected step-5 switch. The structured [results](F15_switch_baseline/results.json), [summary](F15_switch_baseline/summary.md), and [manifest](F15_switch_baseline/manifest.json) preserve per-cell counts and provenance.
+
+### Switch and fixed-control results
+
+Equal-seed-weighted means across six randomized-switch conditions per seed (two directions x three switch times). Post-switch metrics condition on episodes active at the scheduled switch. Full-episode J is the logical OR of capture, evader crash and evader OOB. Capture, crashes, OOB and timeout are reported separately; ending flags may overlap. Pursuer OOB is not an evader win.
+
+| Arm | Post-switch J | Post-switch capture | Full J (0.10 m) | Full J (0.15 m) | Alive at switch | Capture time among captured (s) | Failure-penalized time (s) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| F8 | 0.822 | 0.592 | 0.822 | 0.953 | 0.330 | 4.434 | 14.612 |
+| RLS | 0.874 | 0.710 | 0.876 | 0.980 | 0.309 | 2.210 | 10.031 |
+| RLS frozen at evaluation | 0.864 | 0.700 | 0.867 | 0.979 | 0.309 | 2.206 | 10.270 |
+| No-RLS training | 0.717 | 0.569 | 0.715 | 0.915 | 0.297 | 1.723 | 13.465 |
+
+The 0.15 m result is an exact full-episode re-score only. A larger capture radius can change which episodes would have remained alive at a switch, so post-switch survivor-conditioned metrics are not reinterpreted at 0.15 m.
+
+| Fixed-policy controls (mean, seed-balanced) | J (0.10 m) | J (0.15 m) | Capture (0.10 m) |
+|---|---:|---:|---:|
+| F8 | 0.809 | 0.950 | 0.573 |
+| RLS | 0.875 | 0.979 | 0.726 |
+| RLS frozen at evaluation | 0.863 | 0.976 | 0.714 |
+| No-RLS training | 0.700 | 0.909 | 0.569 |
+
+The fixed controls show that the RLS arm's advantage is not specific to a within-episode switch: against the same fixed-policy bank its mean J is +0.065 and capture +0.153 above F8. That remains a complete-system comparison, not an isolated adaptation effect.
+
+### Seed contrasts and interpretation
+
+RLS minus F8 on post-switch J is **+0.001 / -0.067 / +0.220** for seeds 0/100/200 (mean +0.052). On full-episode J the paired gaps are +0.001 / -0.063 / +0.223 (mean +0.054). Thus the mean J margin clears +0.05, but has mixed signs and fails the registered requirement of a positive contrast in all three pairs. RLS-minus-F8 capture is +0.087 / +0.035 / +0.231 (mean +0.118), positive for all three seeds. The large F8/RLS separation at seed 200 and reversal at seed 100 make the descriptive mean seed-sensitive.
+
+Live RLS exceeds frozen-at-evaluation RLS by +0.009 post-switch J and +0.009 capture; each contrast is positive but below +0.05 in all three seeds. Relative to no-RLS training, RLS gains +0.156 post-switch J and +0.141 capture, with positive contrasts in all three seeds. The much larger RLS/no-RLS difference is a training-arm contrast; it does not show that live updates caused that gain.
+
+Mean randomized-switch full-episode ending rates (capture / pursuer crash / evader crash / evader OOB / timeout / pursuer OOB) are: F8 0.591/0.164/0.067/0.165/0.022/0.166; RLS 0.724/0.131/0.047/0.107/0.001/0.161; frozen RLS 0.714/0.139/0.048/0.106/0.001/0.164; no-RLS training 0.582/0.296/0.047/0.086/<0.001/0.241. Pursuer OOB is kept separate and not counted as an evader win.
+
+Capture time among successful survivors is selection-conditioned. The failure-penalized time assigns each surviving non-capture the remaining 30 s episode horizon; it is 14.612 s for F8 and 10.031 s for RLS. Neither post-switch nor time contrasts are matched-state counterfactuals: the pursuers encounter different states and different survivor sets. With three training seeds, these are descriptive outcomes; episode counts do not supply training-seed uncertainty or support population-level significance.
+
+**F15 outcome:** the registered mean RLS-over-F8 post-switch J direction held, but the practical all-seed criterion did not; the RLS capture direction held on all three seeds. The live-versus-frozen direction held with a small margin. The experiment is complete; see the per-seed, per-direction and per-switch-time records in [F15 results](F15_switch_baseline/results.json).

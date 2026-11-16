@@ -1,0 +1,1437 @@
+{
+  "experiment": "F15_switch_baseline",
+  "seeds": [
+    0,
+    100,
+    200
+  ],
+  "rules_for_f8_pursuer": [
+    "task.reward_mode=roncero",
+    "algo.gae_cut_at_truncation=true"
+  ],
+  "evaluation": {
+    "num_envs": 4096,
+    "seed_rule": "target seed + 1400",
+    "switch_seed_rule": "target seed + 401",
+    "switch_times_s": [
+      0.5,
+      1.0,
+      1.5
+    ],
+    "radii_m": [
+      0.1,
+      0.15
+    ],
+    "primary_post_switch_radius_m": 0.1
+  },
+  "f14_reused_cells": [
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_f8_to_f10_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_f8_to_f10_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_f8_to_f10_randomized_opp.json",
+      "json_sha256": "1060c3cfe9e0792358749cc7b7d0ef1c252d14cf89e6158a4837d0b0e26cf752",
+      "opponent_spec_sha256": "ddf2d7dce562ec9c7d581f1bb0bf5ebee775fbf5110e4740f5c5928292ccbdf2",
+      "episodes_bytes": 13190666,
+      "episode_count": 64463,
+      "model": "rls",
+      "seed": 0,
+      "direction": "f8_to_f10",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s0/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "e3889256cdf143e4db14bc7ed14adfdd3cb12dcb383fa24e1e3a9445afde274f",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_f8_to_f10_fixed_thesis-F8b-roncero-s100.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_f8_to_f10_fixed_thesis-F8b-roncero-s100_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_f8_to_f10_fixed_thesis-F8b-roncero-s100_opp.json",
+      "json_sha256": "4dd842cd3b48f98e7b44e9d78a85db39a74fc1434693d44b24b283ff420ec7a0",
+      "opponent_spec_sha256": "6b60f866cafb78c247a50629e183b20c33feebb5c5fd160d5fbec4913a8312a2",
+      "episodes_bytes": 10685509,
+      "episode_count": 54310,
+      "model": "rls",
+      "seed": 0,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s0/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "e3889256cdf143e4db14bc7ed14adfdd3cb12dcb383fa24e1e3a9445afde274f",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_f8_to_f10_fixed_thesis-F10-nofix-s100.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_f8_to_f10_fixed_thesis-F10-nofix-s100_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_f8_to_f10_fixed_thesis-F10-nofix-s100_opp.json",
+      "json_sha256": "4ab65bf861aee01828bf18c631bc86abe0048d46b100f2ed785e979f26915d07",
+      "opponent_spec_sha256": "ef4669bc5a5153dd9052e8972913c8f68089de840841ab5d38c91fbc7257a158",
+      "episodes_bytes": 13224925,
+      "episode_count": 67266,
+      "model": "rls",
+      "seed": 0,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s0/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "e3889256cdf143e4db14bc7ed14adfdd3cb12dcb383fa24e1e3a9445afde274f",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_f10_to_f8_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_f10_to_f8_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_f10_to_f8_randomized_opp.json",
+      "json_sha256": "ace5742efa35ed458f3a7cfdfd0f162caa0beee11599e741579d08b987eb2326",
+      "opponent_spec_sha256": "0ba228c4bc455d4e8b94d2dfcc3c996d97c3a539aa99adfa309ffb9f35645086",
+      "episodes_bytes": 11371018,
+      "episode_count": 55541,
+      "model": "rls",
+      "seed": 0,
+      "direction": "f10_to_f8",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s0/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "e3889256cdf143e4db14bc7ed14adfdd3cb12dcb383fa24e1e3a9445afde274f",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_f8_to_f10_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_f8_to_f10_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_f8_to_f10_randomized_opp.json",
+      "json_sha256": "fad8033e4c0c715f3b6598496afdb9e739821ceefd9c72fe35f19b307f3b0d9f",
+      "opponent_spec_sha256": "1e6f9f4c09ed71b4f40ab314d11c689ae9ea1d51ed34639989d0f815dd80f015",
+      "episodes_bytes": 10433652,
+      "episode_count": 50944,
+      "model": "rls",
+      "seed": 100,
+      "direction": "f8_to_f10",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s100/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "673f8ab84d4b14ff3efec8680c4f2650713701eb8be1e775e2de982d29f49c31",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_f8_to_f10_fixed_thesis-F8b-roncero-s200.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_f8_to_f10_fixed_thesis-F8b-roncero-s200_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_f8_to_f10_fixed_thesis-F8b-roncero-s200_opp.json",
+      "json_sha256": "b95886e9599ae8e364d9f99ca8b126c3a523fb2e437be0cbddfc1c265758fe9d",
+      "opponent_spec_sha256": "aa79da15004066db4fe0e90e1a020a879d527e853c2336ae7cac190ba424f9b3",
+      "episodes_bytes": 10762157,
+      "episode_count": 54700,
+      "model": "rls",
+      "seed": 100,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s100/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "673f8ab84d4b14ff3efec8680c4f2650713701eb8be1e775e2de982d29f49c31",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_f8_to_f10_fixed_thesis-F10-nofix-s200.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_f8_to_f10_fixed_thesis-F10-nofix-s200_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_f8_to_f10_fixed_thesis-F10-nofix-s200_opp.json",
+      "json_sha256": "e2ae95781a020ed4455c8ee4dcaacb86d20a46e22c4acb08c5ce266fe67f7375",
+      "opponent_spec_sha256": "b96f34d621d43f3e55c1662edbcf1e6d998fbfe4571ddc38308f3878132b0b74",
+      "episodes_bytes": 10542469,
+      "episode_count": 53579,
+      "model": "rls",
+      "seed": 100,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s100/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "673f8ab84d4b14ff3efec8680c4f2650713701eb8be1e775e2de982d29f49c31",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_f10_to_f8_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_f10_to_f8_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_f10_to_f8_randomized_opp.json",
+      "json_sha256": "80973a8e03f49f96472c9a9395421db14ddb14b9ce4455d6778f8d024888ce1a",
+      "opponent_spec_sha256": "1bc853b28714370cd65b5689795aabe96a23476d18cb16eff0144c289dc1c9b9",
+      "episodes_bytes": 10884852,
+      "episode_count": 53158,
+      "model": "rls",
+      "seed": 100,
+      "direction": "f10_to_f8",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s100/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "673f8ab84d4b14ff3efec8680c4f2650713701eb8be1e775e2de982d29f49c31",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_f8_to_f10_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_f8_to_f10_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_f8_to_f10_randomized_opp.json",
+      "json_sha256": "9bd1c0debaaf855fcdaae66a0dde34e484a287aa4f2459c0744488d01fe0a216",
+      "opponent_spec_sha256": "1b4a260e79736f442cafcfab949bc381201bd9f8e2e53ddacaf631d9bd947ff9",
+      "episodes_bytes": 6169204,
+      "episode_count": 30042,
+      "model": "rls",
+      "seed": 200,
+      "direction": "f8_to_f10",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "c4852b7c620eedcc9b4c5c111ec2b1ae87920ece765f36c210cb094238b7127b",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_f8_to_f10_fixed_thesis-F8b-roncero-s0.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_f8_to_f10_fixed_thesis-F8b-roncero-s0_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_f8_to_f10_fixed_thesis-F8b-roncero-s0_opp.json",
+      "json_sha256": "07a61b9570831f88aec6048cc524e4361f8e81da3dbd084d790a30416fe847df",
+      "opponent_spec_sha256": "385989ac9db28366d350391d601cb4702e17cf5bbc6124c7c129d62a18de4a52",
+      "episodes_bytes": 4871493,
+      "episode_count": 24647,
+      "model": "rls",
+      "seed": 200,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "c4852b7c620eedcc9b4c5c111ec2b1ae87920ece765f36c210cb094238b7127b",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_f8_to_f10_fixed_thesis-F10-nofix-s0.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_f8_to_f10_fixed_thesis-F10-nofix-s0_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_f8_to_f10_fixed_thesis-F10-nofix-s0_opp.json",
+      "json_sha256": "5c7a7c464615685ace5de226990b5ed3fe0d93a7aa6265bc4d17e2d75803d49f",
+      "opponent_spec_sha256": "307ec20338df2f12bdb5514c327b851609249e84586c06887d9b24ba3a40a408",
+      "episodes_bytes": 5978461,
+      "episode_count": 30295,
+      "model": "rls",
+      "seed": 200,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "c4852b7c620eedcc9b4c5c111ec2b1ae87920ece765f36c210cb094238b7127b",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_f10_to_f8_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_f10_to_f8_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_f10_to_f8_randomized_opp.json",
+      "json_sha256": "f9f95070f6320d35a70be9bb136eaf0865fe6007ab31ab0811489735450c42b9",
+      "opponent_spec_sha256": "37bde27ad9fffbe1992a118d8bc6024d49dede7988eb573a82337f8d02fdcd5d",
+      "episodes_bytes": 5218036,
+      "episode_count": 25378,
+      "model": "rls",
+      "seed": 200,
+      "direction": "f10_to_f8",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "c4852b7c620eedcc9b4c5c111ec2b1ae87920ece765f36c210cb094238b7127b",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s0_stageE_adapt_no_rls_f8_to_f10_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s0_stageE_adapt_no_rls_f8_to_f10_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s0_stageE_adapt_no_rls_f8_to_f10_randomized_opp.json",
+      "json_sha256": "98cd9b77c69d66c7627ba116a9f35fdc84e00aec9d1eceb702ced61f00987f13",
+      "opponent_spec_sha256": "ddf2d7dce562ec9c7d581f1bb0bf5ebee775fbf5110e4740f5c5928292ccbdf2",
+      "episodes_bytes": 10346248,
+      "episode_count": 50517,
+      "model": "no_rls",
+      "seed": 0,
+      "direction": "f8_to_f10",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-26-s0/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "8698d327ae06558e3c2b4b0073077f9b047e876fb653aace32656bc0e3a13c8e",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s0_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F8b-roncero-s100.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s0_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F8b-roncero-s100_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s0_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F8b-roncero-s100_opp.json",
+      "json_sha256": "a5f7137a6c44d38a5f497ae2e3a2e71cf56cf54236255fe788e647a211f40a71",
+      "opponent_spec_sha256": "6b60f866cafb78c247a50629e183b20c33feebb5c5fd160d5fbec4913a8312a2",
+      "episodes_bytes": 9226365,
+      "episode_count": 46864,
+      "model": "no_rls",
+      "seed": 0,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-26-s0/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "8698d327ae06558e3c2b4b0073077f9b047e876fb653aace32656bc0e3a13c8e",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s0_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F10-nofix-s100.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s0_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F10-nofix-s100_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s0_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F10-nofix-s100_opp.json",
+      "json_sha256": "943fb8e46b1c2654ec5ef5c0bd2fb9832fd675529da52f9588c233d318c09521",
+      "opponent_spec_sha256": "ef4669bc5a5153dd9052e8972913c8f68089de840841ab5d38c91fbc7257a158",
+      "episodes_bytes": 9311381,
+      "episode_count": 47299,
+      "model": "no_rls",
+      "seed": 0,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-26-s0/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "8698d327ae06558e3c2b4b0073077f9b047e876fb653aace32656bc0e3a13c8e",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s0_stageE_adapt_no_rls_f10_to_f8_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s0_stageE_adapt_no_rls_f10_to_f8_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s0_stageE_adapt_no_rls_f10_to_f8_randomized_opp.json",
+      "json_sha256": "ed5be7af5e28704e4121ff19e9dd991c4b203a93a4b99bd949fac94c0d86a0f1",
+      "opponent_spec_sha256": "0ba228c4bc455d4e8b94d2dfcc3c996d97c3a539aa99adfa309ffb9f35645086",
+      "episodes_bytes": 10163336,
+      "episode_count": 49620,
+      "model": "no_rls",
+      "seed": 0,
+      "direction": "f10_to_f8",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-26-s0/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "8698d327ae06558e3c2b4b0073077f9b047e876fb653aace32656bc0e3a13c8e",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s100_stageE_adapt_no_rls_f8_to_f10_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s100_stageE_adapt_no_rls_f8_to_f10_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s100_stageE_adapt_no_rls_f8_to_f10_randomized_opp.json",
+      "json_sha256": "45ca264467904772d1f087677bc1965cbbcf06631415715daf81591acd4da0db",
+      "opponent_spec_sha256": "1e6f9f4c09ed71b4f40ab314d11c689ae9ea1d51ed34639989d0f815dd80f015",
+      "episodes_bytes": 10059058,
+      "episode_count": 49109,
+      "model": "no_rls",
+      "seed": 100,
+      "direction": "f8_to_f10",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-26-s100/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "00799286cefbb5e179f317335fe9671a583d40be094ebe9225029d5b63190a3e",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s100_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F8b-roncero-s200.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s100_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F8b-roncero-s200_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s100_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F8b-roncero-s200_opp.json",
+      "json_sha256": "4bad4064be9764ebf1ab5a975d95dcd73a2f4735daaeb5c4e7170d26735e4a8a",
+      "opponent_spec_sha256": "aa79da15004066db4fe0e90e1a020a879d527e853c2336ae7cac190ba424f9b3",
+      "episodes_bytes": 6927333,
+      "episode_count": 35133,
+      "model": "no_rls",
+      "seed": 100,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-26-s100/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "00799286cefbb5e179f317335fe9671a583d40be094ebe9225029d5b63190a3e",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s100_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F10-nofix-s200.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s100_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F10-nofix-s200_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s100_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F10-nofix-s200_opp.json",
+      "json_sha256": "4b9ab926ef1db199938364eb1c23bc04dc64f3f1ef82e01621c77e413b3fe05e",
+      "opponent_spec_sha256": "b96f34d621d43f3e55c1662edbcf1e6d998fbfe4571ddc38308f3878132b0b74",
+      "episodes_bytes": 10920061,
+      "episode_count": 55506,
+      "model": "no_rls",
+      "seed": 100,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-26-s100/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "00799286cefbb5e179f317335fe9671a583d40be094ebe9225029d5b63190a3e",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s100_stageE_adapt_no_rls_f10_to_f8_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s100_stageE_adapt_no_rls_f10_to_f8_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s100_stageE_adapt_no_rls_f10_to_f8_randomized_opp.json",
+      "json_sha256": "fae3ec91b93cd5dd13e3e4fb38cd912d7fac32d02a33a12e8588bfc8d0204eb2",
+      "opponent_spec_sha256": "1bc853b28714370cd65b5689795aabe96a23476d18cb16eff0144c289dc1c9b9",
+      "episodes_bytes": 8326706,
+      "episode_count": 40617,
+      "model": "no_rls",
+      "seed": 100,
+      "direction": "f10_to_f8",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-26-s100/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "00799286cefbb5e179f317335fe9671a583d40be094ebe9225029d5b63190a3e",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s200_stageE_adapt_no_rls_f8_to_f10_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s200_stageE_adapt_no_rls_f8_to_f10_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s200_stageE_adapt_no_rls_f8_to_f10_randomized_opp.json",
+      "json_sha256": "7b250191cf4cb17390b8421f5c5a4ae3b6504f64f654dd6ab3d4b18201caf3e9",
+      "opponent_spec_sha256": "1b4a260e79736f442cafcfab949bc381201bd9f8e2e53ddacaf631d9bd947ff9",
+      "episodes_bytes": 11929906,
+      "episode_count": 58279,
+      "model": "no_rls",
+      "seed": 200,
+      "direction": "f8_to_f10",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-26-s200/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "23f1c35d3b82fcf7c77c9dcd27f528f9398ec5f75e95b7c6221fb37182e83fc8",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s200_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F8b-roncero-s0.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s200_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F8b-roncero-s0_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s200_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F8b-roncero-s0_opp.json",
+      "json_sha256": "b335b97668dd692ba3dc7c522b41b0bd690c62813a0f31e1b14bcce0488ebcba",
+      "opponent_spec_sha256": "385989ac9db28366d350391d601cb4702e17cf5bbc6124c7c129d62a18de4a52",
+      "episodes_bytes": 11291837,
+      "episode_count": 57401,
+      "model": "no_rls",
+      "seed": 200,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-26-s200/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "23f1c35d3b82fcf7c77c9dcd27f528f9398ec5f75e95b7c6221fb37182e83fc8",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s200_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F10-nofix-s0.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s200_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F10-nofix-s0_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s200_stageE_adapt_no_rls_f8_to_f10_fixed_thesis-F10-nofix-s0_opp.json",
+      "json_sha256": "1281b4d8f8e049b096cd4801c5d48cbeaf3aa4be4847089569bc8362e1ccafbb",
+      "opponent_spec_sha256": "307ec20338df2f12bdb5514c327b851609249e84586c06887d9b24ba3a40a408",
+      "episodes_bytes": 11486997,
+      "episode_count": 58397,
+      "model": "no_rls",
+      "seed": 200,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-26-s200/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "23f1c35d3b82fcf7c77c9dcd27f528f9398ec5f75e95b7c6221fb37182e83fc8",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s200_stageE_adapt_no_rls_f10_to_f8_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s200_stageE_adapt_no_rls_f10_to_f8_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-frozen-26-s200_stageE_adapt_no_rls_f10_to_f8_randomized_opp.json",
+      "json_sha256": "6d628ee48d2c18c7692216810b15ad54678490538c9e2dff162987cc98778b88",
+      "opponent_spec_sha256": "37bde27ad9fffbe1992a118d8bc6024d49dede7988eb573a82337f8d02fdcd5d",
+      "episodes_bytes": 11783538,
+      "episode_count": 57563,
+      "model": "no_rls",
+      "seed": 200,
+      "direction": "f10_to_f8",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-26-s200/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "23f1c35d3b82fcf7c77c9dcd27f528f9398ec5f75e95b7c6221fb37182e83fc8",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_frozen_f8_to_f10_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_frozen_f8_to_f10_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_frozen_f8_to_f10_randomized_opp.json",
+      "json_sha256": "bca3c0025419aa8d634b45974996fbefe145f4fc43cb4fad1dde298cb6caa7a4",
+      "opponent_spec_sha256": "ddf2d7dce562ec9c7d581f1bb0bf5ebee775fbf5110e4740f5c5928292ccbdf2",
+      "episodes_bytes": 13120029,
+      "episode_count": 64112,
+      "model": "rls_frozen",
+      "seed": 0,
+      "direction": "f8_to_f10",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s0/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "e3889256cdf143e4db14bc7ed14adfdd3cb12dcb383fa24e1e3a9445afde274f",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F8b-roncero-s100.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F8b-roncero-s100_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F8b-roncero-s100_opp.json",
+      "json_sha256": "4ead53a2ddb9d5249b64d68e4658559aec344907721473e5581aafc9ae7c2385",
+      "opponent_spec_sha256": "6b60f866cafb78c247a50629e183b20c33feebb5c5fd160d5fbec4913a8312a2",
+      "episodes_bytes": 10319825,
+      "episode_count": 52442,
+      "model": "rls_frozen",
+      "seed": 0,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s0/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "e3889256cdf143e4db14bc7ed14adfdd3cb12dcb383fa24e1e3a9445afde274f",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F10-nofix-s100.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F10-nofix-s100_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F10-nofix-s100_opp.json",
+      "json_sha256": "5b59618f22bd294004eace0794403cc0e6264199bc43c30d22bf29af52f4b464",
+      "opponent_spec_sha256": "ef4669bc5a5153dd9052e8972913c8f68089de840841ab5d38c91fbc7257a158",
+      "episodes_bytes": 13066281,
+      "episode_count": 66457,
+      "model": "rls_frozen",
+      "seed": 0,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s0/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "e3889256cdf143e4db14bc7ed14adfdd3cb12dcb383fa24e1e3a9445afde274f",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_frozen_f10_to_f8_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_frozen_f10_to_f8_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s0_stageE_adapt_rls_frozen_f10_to_f8_randomized_opp.json",
+      "json_sha256": "bf53150915ba4c8258e0570368fd73af8c9a13ec10d2e3ce6b53089487a7bb23",
+      "opponent_spec_sha256": "0ba228c4bc455d4e8b94d2dfcc3c996d97c3a539aa99adfa309ffb9f35645086",
+      "episodes_bytes": 11258013,
+      "episode_count": 54987,
+      "model": "rls_frozen",
+      "seed": 0,
+      "direction": "f10_to_f8",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s0/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "e3889256cdf143e4db14bc7ed14adfdd3cb12dcb383fa24e1e3a9445afde274f",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_frozen_f8_to_f10_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_frozen_f8_to_f10_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_frozen_f8_to_f10_randomized_opp.json",
+      "json_sha256": "9b0edaf44823437e77509224caf0659435e7cb901ca1a125e94a22a857f23425",
+      "opponent_spec_sha256": "1e6f9f4c09ed71b4f40ab314d11c689ae9ea1d51ed34639989d0f815dd80f015",
+      "episodes_bytes": 10178631,
+      "episode_count": 49694,
+      "model": "rls_frozen",
+      "seed": 100,
+      "direction": "f8_to_f10",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s100/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "673f8ab84d4b14ff3efec8680c4f2650713701eb8be1e775e2de982d29f49c31",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F8b-roncero-s200.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F8b-roncero-s200_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F8b-roncero-s200_opp.json",
+      "json_sha256": "2605505e1675978d520d0a1ee541aae1197b16e2213407a876d383fc88cfa40e",
+      "opponent_spec_sha256": "aa79da15004066db4fe0e90e1a020a879d527e853c2336ae7cac190ba424f9b3",
+      "episodes_bytes": 10521721,
+      "episode_count": 53473,
+      "model": "rls_frozen",
+      "seed": 100,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s100/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "673f8ab84d4b14ff3efec8680c4f2650713701eb8be1e775e2de982d29f49c31",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F10-nofix-s200.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F10-nofix-s200_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F10-nofix-s200_opp.json",
+      "json_sha256": "67b6f10f6a217b2f7aaf0132567438305516d6f7250a70f1b717bba37ae02381",
+      "opponent_spec_sha256": "b96f34d621d43f3e55c1662edbcf1e6d998fbfe4571ddc38308f3878132b0b74",
+      "episodes_bytes": 10248337,
+      "episode_count": 52077,
+      "model": "rls_frozen",
+      "seed": 100,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s100/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "673f8ab84d4b14ff3efec8680c4f2650713701eb8be1e775e2de982d29f49c31",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_frozen_f10_to_f8_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_frozen_f10_to_f8_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s100_stageE_adapt_rls_frozen_f10_to_f8_randomized_opp.json",
+      "json_sha256": "0255a488aaba5758c56f1b08992bc6ea4909951b49af5c1296a2579b2739cc90",
+      "opponent_spec_sha256": "1bc853b28714370cd65b5689795aabe96a23476d18cb16eff0144c289dc1c9b9",
+      "episodes_bytes": 10693511,
+      "episode_count": 52220,
+      "model": "rls_frozen",
+      "seed": 100,
+      "direction": "f10_to_f8",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s100/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "673f8ab84d4b14ff3efec8680c4f2650713701eb8be1e775e2de982d29f49c31",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_frozen_f8_to_f10_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_frozen_f8_to_f10_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_frozen_f8_to_f10_randomized_opp.json",
+      "json_sha256": "8ba91d58aea6176cfab41f2f50736fa9d293d3a02b746949824880276987383d",
+      "opponent_spec_sha256": "1b4a260e79736f442cafcfab949bc381201bd9f8e2e53ddacaf631d9bd947ff9",
+      "episodes_bytes": 6080007,
+      "episode_count": 29603,
+      "model": "rls_frozen",
+      "seed": 200,
+      "direction": "f8_to_f10",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "c4852b7c620eedcc9b4c5c111ec2b1ae87920ece765f36c210cb094238b7127b",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F8b-roncero-s0.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F8b-roncero-s0_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F8b-roncero-s0_opp.json",
+      "json_sha256": "745815696012931cecf8bebaebab7826f6a763460768c822c5b428469989a927",
+      "opponent_spec_sha256": "385989ac9db28366d350391d601cb4702e17cf5bbc6124c7c129d62a18de4a52",
+      "episodes_bytes": 5051345,
+      "episode_count": 25562,
+      "model": "rls_frozen",
+      "seed": 200,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "c4852b7c620eedcc9b4c5c111ec2b1ae87920ece765f36c210cb094238b7127b",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F10-nofix-s0.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F10-nofix-s0_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_frozen_f8_to_f10_fixed_thesis-F10-nofix-s0_opp.json",
+      "json_sha256": "c56a09c0454e8a0ba4baf2e32862220192c25f5b6a3a8d6eb5fe29cf2efcd036",
+      "opponent_spec_sha256": "307ec20338df2f12bdb5514c327b851609249e84586c06887d9b24ba3a40a408",
+      "episodes_bytes": 5790697,
+      "episode_count": 29337,
+      "model": "rls_frozen",
+      "seed": 200,
+      "direction": "f8_to_f10",
+      "kind": "fixed",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "c4852b7c620eedcc9b4c5c111ec2b1ae87920ece765f36c210cb094238b7127b",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    },
+    {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_frozen_f10_to_f8_randomized.json",
+      "episodes": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_frozen_f10_to_f8_randomized_episodes.pt",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F14_generalization_sp/evals/thesis-F14-v2d-acc-rls-26-s200_stageE_adapt_rls_frozen_f10_to_f8_randomized_opp.json",
+      "json_sha256": "65fd84b6061c076cf6d27a16488aa79705c5c5a61e0f36e710f583ca7ff1025f",
+      "opponent_spec_sha256": "37bde27ad9fffbe1992a118d8bc6024d49dede7988eb573a82337f8d02fdcd5d",
+      "episodes_bytes": 5335687,
+      "episode_count": 25954,
+      "model": "rls_frozen",
+      "seed": 200,
+      "direction": "f10_to_f8",
+      "kind": "switch",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "c4852b7c620eedcc9b4c5c111ec2b1ae87920ece765f36c210cb094238b7127b",
+      "extra_overrides": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.delta=0.01",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.freeze=true"
+      ]
+    }
+  ],
+  "new_f8_evaluation_jobs": [
+    {
+      "group": "f8_s0_f8_to_f10_randomized",
+      "seed": 0,
+      "direction": "f8_to_f10",
+      "kind": "switch",
+      "policies": [
+        {
+          "id": "thesis-F8b-roncero-s100/evader:s25",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage25.pt",
+          "metadata": {
+            "campaign": "thesis-F8b-roncero-s100",
+            "stage": 25,
+            "db_id": "evader:s16"
+          }
+        },
+        {
+          "id": "thesis-F10-nofix-s100/evader:s11",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F10-nofix-s100/checkpoints/evader_stage11.pt",
+          "metadata": {
+            "campaign": "thesis-F10-nofix-s100",
+            "stage": 11,
+            "db_id": "evader:s9"
+          }
+        }
+      ],
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage24.pt",
+      "rng_seed": 1400,
+      "switch": {
+        "first_id": "thesis-F8b-roncero-s100/evader:s25",
+        "second_id": "thesis-F10-nofix-s100/evader:s11",
+        "times_s": [
+          0.5,
+          1.0,
+          1.5
+        ],
+        "group_id": "switch:f8_to_f10:randomized",
+        "seed": 401
+      }
+    },
+    {
+      "group": "f8_s0_f10_to_f8_randomized",
+      "seed": 0,
+      "direction": "f10_to_f8",
+      "kind": "switch",
+      "policies": [
+        {
+          "id": "thesis-F10-nofix-s100/evader:s11",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F10-nofix-s100/checkpoints/evader_stage11.pt",
+          "metadata": {
+            "campaign": "thesis-F10-nofix-s100",
+            "stage": 11,
+            "db_id": "evader:s9"
+          }
+        },
+        {
+          "id": "thesis-F8b-roncero-s100/evader:s25",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage25.pt",
+          "metadata": {
+            "campaign": "thesis-F8b-roncero-s100",
+            "stage": 25,
+            "db_id": "evader:s16"
+          }
+        }
+      ],
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage24.pt",
+      "rng_seed": 1400,
+      "switch": {
+        "first_id": "thesis-F10-nofix-s100/evader:s11",
+        "second_id": "thesis-F8b-roncero-s100/evader:s25",
+        "times_s": [
+          0.5,
+          1.0,
+          1.5
+        ],
+        "group_id": "switch:f10_to_f8:randomized",
+        "seed": 401
+      }
+    },
+    {
+      "group": "f8_s0_fixed_thesis-F8b-roncero-s100",
+      "seed": 0,
+      "direction": "both",
+      "kind": "fixed",
+      "policies": [
+        {
+          "id": "thesis-F8b-roncero-s100/evader:s25",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage25.pt",
+          "metadata": {
+            "campaign": "thesis-F8b-roncero-s100",
+            "stage": 25,
+            "db_id": "evader:s16"
+          }
+        }
+      ],
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage24.pt",
+      "rng_seed": 1400,
+      "switch": null
+    },
+    {
+      "group": "f8_s0_fixed_thesis-F10-nofix-s100",
+      "seed": 0,
+      "direction": "both",
+      "kind": "fixed",
+      "policies": [
+        {
+          "id": "thesis-F10-nofix-s100/evader:s11",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F10-nofix-s100/checkpoints/evader_stage11.pt",
+          "metadata": {
+            "campaign": "thesis-F10-nofix-s100",
+            "stage": 11,
+            "db_id": "evader:s9"
+          }
+        }
+      ],
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage24.pt",
+      "rng_seed": 1400,
+      "switch": null
+    },
+    {
+      "group": "f8_s100_f8_to_f10_randomized",
+      "seed": 100,
+      "direction": "f8_to_f10",
+      "kind": "switch",
+      "policies": [
+        {
+          "id": "thesis-F8b-roncero-s200/evader:s25",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/evader_stage25.pt",
+          "metadata": {
+            "campaign": "thesis-F8b-roncero-s200",
+            "stage": 25,
+            "db_id": "evader:s16"
+          }
+        },
+        {
+          "id": "thesis-F10-nofix-s200/evader:s11",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F10-nofix-s200/checkpoints/evader_stage11.pt",
+          "metadata": {
+            "campaign": "thesis-F10-nofix-s200",
+            "stage": 11,
+            "db_id": "evader:s9"
+          }
+        }
+      ],
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage24.pt",
+      "rng_seed": 1500,
+      "switch": {
+        "first_id": "thesis-F8b-roncero-s200/evader:s25",
+        "second_id": "thesis-F10-nofix-s200/evader:s11",
+        "times_s": [
+          0.5,
+          1.0,
+          1.5
+        ],
+        "group_id": "switch:f8_to_f10:randomized",
+        "seed": 501
+      }
+    },
+    {
+      "group": "f8_s100_f10_to_f8_randomized",
+      "seed": 100,
+      "direction": "f10_to_f8",
+      "kind": "switch",
+      "policies": [
+        {
+          "id": "thesis-F10-nofix-s200/evader:s11",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F10-nofix-s200/checkpoints/evader_stage11.pt",
+          "metadata": {
+            "campaign": "thesis-F10-nofix-s200",
+            "stage": 11,
+            "db_id": "evader:s9"
+          }
+        },
+        {
+          "id": "thesis-F8b-roncero-s200/evader:s25",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/evader_stage25.pt",
+          "metadata": {
+            "campaign": "thesis-F8b-roncero-s200",
+            "stage": 25,
+            "db_id": "evader:s16"
+          }
+        }
+      ],
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage24.pt",
+      "rng_seed": 1500,
+      "switch": {
+        "first_id": "thesis-F10-nofix-s200/evader:s11",
+        "second_id": "thesis-F8b-roncero-s200/evader:s25",
+        "times_s": [
+          0.5,
+          1.0,
+          1.5
+        ],
+        "group_id": "switch:f10_to_f8:randomized",
+        "seed": 501
+      }
+    },
+    {
+      "group": "f8_s100_fixed_thesis-F8b-roncero-s200",
+      "seed": 100,
+      "direction": "both",
+      "kind": "fixed",
+      "policies": [
+        {
+          "id": "thesis-F8b-roncero-s200/evader:s25",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/evader_stage25.pt",
+          "metadata": {
+            "campaign": "thesis-F8b-roncero-s200",
+            "stage": 25,
+            "db_id": "evader:s16"
+          }
+        }
+      ],
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage24.pt",
+      "rng_seed": 1500,
+      "switch": null
+    },
+    {
+      "group": "f8_s100_fixed_thesis-F10-nofix-s200",
+      "seed": 100,
+      "direction": "both",
+      "kind": "fixed",
+      "policies": [
+        {
+          "id": "thesis-F10-nofix-s200/evader:s11",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F10-nofix-s200/checkpoints/evader_stage11.pt",
+          "metadata": {
+            "campaign": "thesis-F10-nofix-s200",
+            "stage": 11,
+            "db_id": "evader:s9"
+          }
+        }
+      ],
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage24.pt",
+      "rng_seed": 1500,
+      "switch": null
+    },
+    {
+      "group": "f8_s200_f8_to_f10_randomized",
+      "seed": 200,
+      "direction": "f8_to_f10",
+      "kind": "switch",
+      "policies": [
+        {
+          "id": "thesis-F8b-roncero-s0/evader:s25",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage25.pt",
+          "metadata": {
+            "campaign": "thesis-F8b-roncero-s0",
+            "stage": 25,
+            "db_id": "evader:s16"
+          }
+        },
+        {
+          "id": "thesis-F10-nofix-s0/evader:s11",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F10-nofix-s0/checkpoints/evader_stage11.pt",
+          "metadata": {
+            "campaign": "thesis-F10-nofix-s0",
+            "stage": 11,
+            "db_id": "evader:s9"
+          }
+        }
+      ],
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage24.pt",
+      "rng_seed": 1600,
+      "switch": {
+        "first_id": "thesis-F8b-roncero-s0/evader:s25",
+        "second_id": "thesis-F10-nofix-s0/evader:s11",
+        "times_s": [
+          0.5,
+          1.0,
+          1.5
+        ],
+        "group_id": "switch:f8_to_f10:randomized",
+        "seed": 601
+      }
+    },
+    {
+      "group": "f8_s200_f10_to_f8_randomized",
+      "seed": 200,
+      "direction": "f10_to_f8",
+      "kind": "switch",
+      "policies": [
+        {
+          "id": "thesis-F10-nofix-s0/evader:s11",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F10-nofix-s0/checkpoints/evader_stage11.pt",
+          "metadata": {
+            "campaign": "thesis-F10-nofix-s0",
+            "stage": 11,
+            "db_id": "evader:s9"
+          }
+        },
+        {
+          "id": "thesis-F8b-roncero-s0/evader:s25",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage25.pt",
+          "metadata": {
+            "campaign": "thesis-F8b-roncero-s0",
+            "stage": 25,
+            "db_id": "evader:s16"
+          }
+        }
+      ],
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage24.pt",
+      "rng_seed": 1600,
+      "switch": {
+        "first_id": "thesis-F10-nofix-s0/evader:s11",
+        "second_id": "thesis-F8b-roncero-s0/evader:s25",
+        "times_s": [
+          0.5,
+          1.0,
+          1.5
+        ],
+        "group_id": "switch:f10_to_f8:randomized",
+        "seed": 601
+      }
+    },
+    {
+      "group": "f8_s200_fixed_thesis-F8b-roncero-s0",
+      "seed": 200,
+      "direction": "both",
+      "kind": "fixed",
+      "policies": [
+        {
+          "id": "thesis-F8b-roncero-s0/evader:s25",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage25.pt",
+          "metadata": {
+            "campaign": "thesis-F8b-roncero-s0",
+            "stage": 25,
+            "db_id": "evader:s16"
+          }
+        }
+      ],
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage24.pt",
+      "rng_seed": 1600,
+      "switch": null
+    },
+    {
+      "group": "f8_s200_fixed_thesis-F10-nofix-s0",
+      "seed": 200,
+      "direction": "both",
+      "kind": "fixed",
+      "policies": [
+        {
+          "id": "thesis-F10-nofix-s0/evader:s11",
+          "kind": "rl",
+          "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F10-nofix-s0/checkpoints/evader_stage11.pt",
+          "metadata": {
+            "campaign": "thesis-F10-nofix-s0",
+            "stage": 11,
+            "db_id": "evader:s9"
+          }
+        }
+      ],
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage24.pt",
+      "rng_seed": 1600,
+      "switch": null
+    }
+  ],
+  "new_f8_evaluation_sources": {
+    "f8_s0_f8_to_f10_randomized": {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s0_f8_to_f10_randomized.json",
+      "json_sha256": "b055c09e999ab86612042d89116ca0a2efad8f9e070d5e016c2a3425d6317a6f",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s0_f8_to_f10_randomized_opp.json",
+      "opponent_spec_sha256": "ddf2d7dce562ec9c7d581f1bb0bf5ebee775fbf5110e4740f5c5928292ccbdf2",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "6a434e1bd515b21550c428fb5192ad379643bc3e4d285ccd929ccd2c989874c1",
+      "episode_count": 29845
+    },
+    "f8_s0_f10_to_f8_randomized": {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s0_f10_to_f8_randomized.json",
+      "json_sha256": "92fb9f2816f01f28c821ed446d09ca924a4c139faf0645d230b5b4ecb544ebd3",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s0_f10_to_f8_randomized_opp.json",
+      "opponent_spec_sha256": "0ba228c4bc455d4e8b94d2dfcc3c996d97c3a539aa99adfa309ffb9f35645086",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "6a434e1bd515b21550c428fb5192ad379643bc3e4d285ccd929ccd2c989874c1",
+      "episode_count": 17342
+    },
+    "f8_s0_fixed_thesis-F8b-roncero-s100": {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s0_fixed_thesis-F8b-roncero-s100.json",
+      "json_sha256": "9acf4da83ea0d524157fc45f3b397b1cd261b50ba129fe96db572787c2aff7d2",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s0_fixed_thesis-F8b-roncero-s100_opp.json",
+      "opponent_spec_sha256": "6b60f866cafb78c247a50629e183b20c33feebb5c5fd160d5fbec4913a8312a2",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "6a434e1bd515b21550c428fb5192ad379643bc3e4d285ccd929ccd2c989874c1",
+      "episode_count": 17289
+    },
+    "f8_s0_fixed_thesis-F10-nofix-s100": {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s0_fixed_thesis-F10-nofix-s100.json",
+      "json_sha256": "6743fc886945470080784c15460b70c3fe504b3c13b6dd4e5e142983a9e95d2a",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s0_fixed_thesis-F10-nofix-s100_opp.json",
+      "opponent_spec_sha256": "ef4669bc5a5153dd9052e8972913c8f68089de840841ab5d38c91fbc7257a158",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "6a434e1bd515b21550c428fb5192ad379643bc3e4d285ccd929ccd2c989874c1",
+      "episode_count": 29678
+    },
+    "f8_s100_f8_to_f10_randomized": {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s100_f8_to_f10_randomized.json",
+      "json_sha256": "1b109ca42d64e293ae38ce2a982a45f4870db4eaa800947a4f4d336ff215ccec",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s100_f8_to_f10_randomized_opp.json",
+      "opponent_spec_sha256": "1e6f9f4c09ed71b4f40ab314d11c689ae9ea1d51ed34639989d0f815dd80f015",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "78f4ea6d6f38ea773a651f3cf890883be67ef10052c50eb4496cb28d7e60565e",
+      "episode_count": 28181
+    },
+    "f8_s100_f10_to_f8_randomized": {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s100_f10_to_f8_randomized.json",
+      "json_sha256": "760c94558ea4da9c3c1246bf78d7d49411ceacc6a08924e4d7efaedafec61211",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s100_f10_to_f8_randomized_opp.json",
+      "opponent_spec_sha256": "1bc853b28714370cd65b5689795aabe96a23476d18cb16eff0144c289dc1c9b9",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "78f4ea6d6f38ea773a651f3cf890883be67ef10052c50eb4496cb28d7e60565e",
+      "episode_count": 19945
+    },
+    "f8_s100_fixed_thesis-F8b-roncero-s200": {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s100_fixed_thesis-F8b-roncero-s200.json",
+      "json_sha256": "28fa9d897ddce14a26dfe22d99e43c4f94bd516e0eb4778f5d790a8b8e1b55c6",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s100_fixed_thesis-F8b-roncero-s200_opp.json",
+      "opponent_spec_sha256": "aa79da15004066db4fe0e90e1a020a879d527e853c2336ae7cac190ba424f9b3",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "78f4ea6d6f38ea773a651f3cf890883be67ef10052c50eb4496cb28d7e60565e",
+      "episode_count": 20368
+    },
+    "f8_s100_fixed_thesis-F10-nofix-s200": {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s100_fixed_thesis-F10-nofix-s200.json",
+      "json_sha256": "1329c485f392bad5920d7f1f9fb68ff3325cf8c8078c678519bf5074af6c30a0",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s100_fixed_thesis-F10-nofix-s200_opp.json",
+      "opponent_spec_sha256": "b96f34d621d43f3e55c1662edbcf1e6d998fbfe4571ddc38308f3878132b0b74",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "78f4ea6d6f38ea773a651f3cf890883be67ef10052c50eb4496cb28d7e60565e",
+      "episode_count": 23981
+    },
+    "f8_s200_f8_to_f10_randomized": {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s200_f8_to_f10_randomized.json",
+      "json_sha256": "646c04dee3ea46ad8249d3551b7eca47a7899a8f170d6bafbbe9b2e01f008053",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s200_f8_to_f10_randomized_opp.json",
+      "opponent_spec_sha256": "1b4a260e79736f442cafcfab949bc381201bd9f8e2e53ddacaf631d9bd947ff9",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "5c5ede9bd97014b31c75e7fcb7f9fb62fe12426a800b409c6584abfcc3211168",
+      "episode_count": 32229
+    },
+    "f8_s200_f10_to_f8_randomized": {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s200_f10_to_f8_randomized.json",
+      "json_sha256": "d686a0d2287d98133ac5789dc10228a34889cdd0247c9e89adda343e4e7107c1",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s200_f10_to_f8_randomized_opp.json",
+      "opponent_spec_sha256": "37bde27ad9fffbe1992a118d8bc6024d49dede7988eb573a82337f8d02fdcd5d",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "5c5ede9bd97014b31c75e7fcb7f9fb62fe12426a800b409c6584abfcc3211168",
+      "episode_count": 25003
+    },
+    "f8_s200_fixed_thesis-F8b-roncero-s0": {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s200_fixed_thesis-F8b-roncero-s0.json",
+      "json_sha256": "8e3f4ac8e6ae28adced99164ef2b5ffb93a869a762cfddbf5de5861d870425c4",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s200_fixed_thesis-F8b-roncero-s0_opp.json",
+      "opponent_spec_sha256": "385989ac9db28366d350391d601cb4702e17cf5bbc6124c7c129d62a18de4a52",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "5c5ede9bd97014b31c75e7fcb7f9fb62fe12426a800b409c6584abfcc3211168",
+      "episode_count": 23399
+    },
+    "f8_s200_fixed_thesis-F10-nofix-s0": {
+      "json": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s200_fixed_thesis-F10-nofix-s0.json",
+      "json_sha256": "421bd50c4aabc200d3ddc2ba1fac6667a5e8bf90b99972c44bc2fabd7a47a72e",
+      "opponent_spec": "/home/user/Projects/RLInterceptorDrone/experiments/thesis/F15_switch_baseline/evals/f8_s200_fixed_thesis-F10-nofix-s0_opp.json",
+      "opponent_spec_sha256": "307ec20338df2f12bdb5514c327b851609249e84586c06887d9b24ba3a40a408",
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage24.pt",
+      "checkpoint_sha256": "5c5ede9bd97014b31c75e7fcb7f9fb62fe12426a800b409c6584abfcc3211168",
+      "episode_count": 36061
+    }
+  }
+}

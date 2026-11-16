@@ -1,0 +1,37 @@
+{
+  "policies": [
+    {
+      "id": "thesis-F8b-roncero-s100/evader:s25",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage25.pt",
+      "metadata": {
+        "campaign": "thesis-F8b-roncero-s100",
+        "stage": 25,
+        "db_id": "evader:s16"
+      }
+    },
+    {
+      "id": "thesis-F10-nofix-s100/evader:s11",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F10-nofix-s100/checkpoints/evader_stage11.pt",
+      "metadata": {
+        "campaign": "thesis-F10-nofix-s100",
+        "stage": 11,
+        "db_id": "evader:s9"
+      }
+    }
+  ],
+  "probs": {
+    "thesis-F8b-roncero-s100/evader:s25": 0.5,
+    "thesis-F10-nofix-s100/evader:s11": 0.5
+  },
+  "switch": {
+    "first_id": "thesis-F8b-roncero-s100/evader:s25",
+    "second_id": "thesis-F10-nofix-s100/evader:s11",
+    "times_s": [
+      0.1
+    ],
+    "group_id": "f15:rls_frozen-switch-smoke",
+    "seed": 399
+  }
+}
