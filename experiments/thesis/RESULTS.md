@@ -6,11 +6,12 @@ Measured results only. Each section is filled when the experiment finishes, with
 - J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over seeds (with 2 seeds, the range of the two values); "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position + velocity, no acceleration).
 - Training radius and primary results: 0.10 m. **0.15 m values are eval-only exact re-scores** of the same episodes ([R15_rescore/](R15_rescore/), `rescore.py`). Every policy and exploiter was trained for 0.10 m, so **J at 0.15 m is an upper bound and exploitability a lower bound for a 0.15 m game**. Sections below write "(0.15 m convention)" for this. Exception: F7 trained its pursuers and exploiters at 0.15 m.
 
-## Summary (updated 2026-11-16 12:03 KST; details in the sections below)
+## Summary (updated 2026-11-17 13:10 KST; details in the sections below)
 
 One finding per bullet, 0.10 m unless marked; numbers are copied from the linked sections.
 
-**Latest thesis-level conclusions (F14 complete; F15 evaluation-only comparison complete, both exploratory with 3 seeds)**
+**Latest thesis-level conclusions (F14, F15 and F17 complete; exploratory, 3 seeds each)**
+- **F17 removes F14's rule confound but does not support a G1/G2 gain from the estimator:** at 0.10 m, paired F17-minus-F8 G1 is +0.010 (seed differences -0.013/-0.013/+0.055), while own-Roncero-exploiter J is -0.363 (-0.428/-0.132/-0.528; lower in all three pairs, meeting the registered descriptive degradation threshold). The RLS pursuer's switch post-switch J is +0.051 but seed-variable; capture is +0.098 in all three pairs. Live-minus-frozen post-switch J is only +0.004 ([F17](#f17-roncero-acc)).
 - **The joint goal is not met:** learned acceleration + RLS under v2d improves resistance to same-rules exploiters relative to the Roncero-rule F8 reference, but not the combined G1 generalization score. At 13 stages, G1/G2 gaps are -0.050/+0.364; at 26 stages, -0.035/+0.323. Neither schedule beats F8 on both measures ([F14](#f14)).
 - **The generalization components disagree:** at 26 stages the strong held-out RL gap is -0.103, while the campaign-balanced cross-campaign gap is +0.034. These are different tests, and G1's average must not hide the remaining strong-set deficit. Extending training improves G1 by only +0.015 ([F14](#f14)).
 - **Training with RLS and updating RLS at test time are different effects:** at 26 stages, RLS-trained pursuers exceed no-RLS-trained pursuers by +0.140 G1 and +0.156 post-switch J. Freezing the same RLS-trained pursuer only at evaluation reduces post-switch J by 0.009. This is a small live-update benefit, not evidence that online updating explains most of the training-arm difference ([F14](#f14)).
@@ -2029,3 +2030,43 @@ Mean randomized-switch full-episode ending rates (capture / pursuer crash / evad
 Capture time among successful survivors is selection-conditioned. The failure-penalized time assigns each surviving non-capture the remaining 30 s episode horizon; it is 14.612 s for F8 and 10.031 s for RLS. Neither post-switch nor time contrasts are matched-state counterfactuals: the pursuers encounter different states and different survivor sets. With three training seeds, these are descriptive outcomes; episode counts do not supply training-seed uncertainty or support population-level significance.
 
 **F15 outcome:** the registered mean RLS-over-F8 post-switch J direction held, but the practical all-seed criterion did not; the RLS capture direction held on all three seeds. The live-versus-frozen direction held with a small margin. The experiment is complete; see the per-seed, per-direction and per-switch-time records in [F15 results](F15_switch_baseline/results.json).
+
+<a id="f17-roncero-acc"></a>
+
+## F17_roncero_acc (complete 2026-11-17; exploratory, 3 paired seeds)
+
+F17 tests the learned acceleration estimator + RLS in the F8 Roncero-rule/Hedge training setup, changing the pursuer's estimator/RLS inputs while retaining F8's reward, schedule and sampler. Each new stage-24 pursuer is paired with the existing F8 checkpoint at the same seed. The estimator was reused from F5 thesis-rule data, so its training-data distribution differs from the Roncero-rule evaluation/training distribution.
+
+All three 26-stage campaigns and the 2-stage smoke completed. The smoke trained both roles and the estimator-on pursuer produced 586 episodes. The final analysis used 21 generalization/exploiter evaluation files (261 opponent matchups; 687,125 matchup-episodes in aggregate, 368-57,865 per matchup) and 24 switch/fixed-control files (986,893 episodes total, 17,519-52,256 per file). Results are paired seed means with no inferential confidence intervals; three training seeds do not establish population-level significance.
+
+### Generalization and own-rules exploitability
+
+The primary 0.10 m contrasts are F17 minus same-seed F8. G1 averages the shared strong-16 set with the arm-specific, other-seed cross-campaign bank. G2 is neutralization J against a new Roncero-rule exploiter; lower J means worse exploiter resistance.
+
+| Metric | Seed 0 | Seed 100 | Seed 200 | Mean | Registered descriptive decision |
+|---|---:|---:|---:|---:|---|
+| G1 (0.10 m) | -0.013 | -0.013 | +0.055 | +0.010 | Inconclusive |
+| Own-Roncero-exploiter J (0.10 m) | -0.428 | -0.132 | -0.528 | -0.363 | Notable degradation |
+| Strong-16 J (0.10 m) | -0.015 | +0.016 | +0.117 | +0.039 | Inconclusive |
+| Cross-campaign J (0.10 m) | -0.011 | -0.041 | -0.007 | -0.020 | Inconclusive |
+| Thesis-lure-exploiter J (0.10 m) | -0.319 | -0.105 | +0.568 | +0.048 | Inconclusive |
+| G1 (0.15 m exact re-score) | +0.002 | -0.019 | +0.018 | +0.000 | Inconclusive |
+| Own-Roncero-exploiter J (0.15 m exact re-score) | -0.475 | -0.539 | -0.452 | -0.489 | Notable degradation |
+
+The all-seed negative own-exploiter-J contrasts mean F17 is more exploitable by this measured Roncero-rule exploiter than F8, by the registered descriptive threshold; they do not prove a population effect. The mean G1 is essentially unchanged: strong-set J is slightly higher on average, while cross-bank J is lower. The strong set is common, but the cross-campaign comparison is not bank-matched: F17 and F8 each face their own other-seed evaders, so that component cannot isolate a pursuer-only effect.
+
+### Switch evaluation
+
+F15's switch schedule, opponent identities and episode semantics were reused. Values are paired F17-minus-F8 contrasts at 0.10 m; post-switch J/capture condition on episodes alive at the scheduled switch.
+
+| Metric | Seed 0 | Seed 100 | Seed 200 | Mean | Decision |
+|---|---:|---:|---:|---:|---|
+| Post-switch J | -0.056 | +0.037 | +0.173 | +0.051 | Inconclusive (mixed signs) |
+| Post-switch capture | +0.051 | +0.016 | +0.227 | +0.098 | Notable improvement by the registered rule |
+| Full-episode J | -0.053 | +0.036 | +0.178 | +0.053 | Inconclusive (mixed signs) |
+| Fixed-control J | -0.015 | +0.032 | +0.180 | +0.066 | Inconclusive (mixed signs) |
+| Live-minus-frozen post-switch J | -0.009 | +0.016 | +0.004 | +0.004 | Inconclusive |
+
+Thus, switched capture improved on all three observed seed pairs, but post-switch and full-episode J remain seed-variable. The same checkpoint's live-versus-frozen margin is negligible. These are not matched-state counterfactuals; policies may reach different switch states and survivor sets.
+
+**F17 outcome:** the low-confidence G1 prediction held (mean change +0.010); the predicted positive G2 did not hold and instead met the registered notable-degradation rule (-0.363). F17 provides no evidence that adding this estimator/RLS configuration to F8 improves generalization or own-rules exploitability; it descriptively worsened own-exploiter resistance, while switch capture improved. See the complete paired metrics in [F17 results](F17_roncero_acc/results.json) and [F17 summary](F17_roncero_acc/summary.md).
