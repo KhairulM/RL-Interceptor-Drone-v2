@@ -6,9 +6,15 @@ Measured results only. Each section is filled when the experiment finishes, with
 - J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over seeds (with 2 seeds, the range of the two values); "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position + velocity, no acceleration).
 - Training radius and primary results: 0.10 m. **0.15 m values are eval-only exact re-scores** of the same episodes ([R15_rescore/](R15_rescore/), `rescore.py`). Every policy and exploiter was trained for 0.10 m, so **J at 0.15 m is an upper bound and exploitability a lower bound for a 0.15 m game**. Sections below write "(0.15 m convention)" for this. Exception: F7 trained its pursuers and exploiters at 0.15 m.
 
-## Summary (updated 2026-11-17 13:10 KST; details in the sections below)
+## Summary (updated 2026-11-19 KST; details in the sections below)
 
 One finding per bullet, 0.10 m unless marked; numbers are copied from the linked sections.
+
+- **F20 (single-rules exploiters swapped between F8 and RLS-26, 3 seeds):** each attacker exploits only the pursuer it was trained against. RLS-26 captures F8's hovering attackers in 93-98 % of episodes; F8 is crashed by RLS's diving attackers in only 1-21 % of episodes (RLS: 94-97 % on seeds 0 / 100) ([F20](#f20)).
+
+- **F19 (plain pursuer at 26 stages, 3 seeds):** at matched budget the v2d rules alone give no exploitability gain over F8 (+0.002) and no switching gain (post-switch capture 0.546 vs F8 0.592); RLS-26 is notably less exploitable than plain-26 (+0.321) and captures switching evaders notably more often (+0.163). Plain-26 is notably less lurable (lure J +0.370). The 13-stage plain result (exploitability 0.124) does not persist to 26 stages (0.371) ([F19](#f19)).
+
+- **F18 (offline estimator replay on recorded trajectories, 3 seeds):** the stage-24 RLS pursuer's estimate errs by 0.18-0.34 m/s against every evaluation set (offline test 0.143); strong-16 is only 3-17 % worse than the v2d cross pool (P1 not held), the F8 switch evader is the hardest (+11-53 %). Live RLS lowers the error by only 2-9 % and moves the readout by a median 6-13 % of its norm within 2 s. Against the lure exploiter the seed-0 RLS pursuer crashes in 94 % of episodes, F8 times out in 62 % ([F18](#f18)).
 
 **Latest thesis-level conclusions (F14, F15 and F17 complete; exploratory, 3 seeds each)**
 - **F17 removes F14's rule confound but does not support a G1/G2 gain from the estimator:** at 0.10 m, paired F17-minus-F8 G1 is +0.010 (seed differences -0.013/-0.013/+0.055), while own-Roncero-exploiter J is -0.363 (-0.428/-0.132/-0.528; lower in all three pairs, meeting the registered descriptive degradation threshold). The RLS pursuer's switch post-switch J is +0.051 but seed-variable; capture is +0.098 in all three pairs. Live-minus-frozen post-switch J is only +0.004 ([F17](#f17-roncero-acc)).
@@ -2070,3 +2076,94 @@ F15's switch schedule, opponent identities and episode semantics were reused. Va
 Thus, switched capture improved on all three observed seed pairs, but post-switch and full-episode J remain seed-variable. The same checkpoint's live-versus-frozen margin is negligible. These are not matched-state counterfactuals; policies may reach different switch states and survivor sets.
 
 **F17 outcome:** the low-confidence G1 prediction held (mean change +0.010); the predicted positive G2 did not hold and instead met the registered notable-degradation rule (-0.363). F17 provides no evidence that adding this estimator/RLS configuration to F8 improves generalization or own-rules exploitability; it descriptively worsened own-exploiter resistance, while switch capture improved. See the complete paired metrics in [F17 results](F17_roncero_acc/results.json) and [F17 summary](F17_roncero_acc/summary.md).
+
+
+<a id="f18"></a>
+
+## F18_trajectories (complete 2026-11-18; eval only + offline replay; exploratory, descriptive)
+
+Recorded trajectories (512 of 4096 envs per job, F14 evaluation endings, 0.10 m, noise-free) of the stage-24 F14 Stage E RLS pursuers (live RLS) and the seed-0 F8 pursuer; existing checkpoints and exploiters only. Re-recording the two seed-0 lure jobs with per-episode outcomes reproduced the first recording exactly (episodes 75,487 / 8,813; J 0.0706 / 0.3687), and both equal F14's lure-exploiter J (0.071 / 0.369). Superseded first recordings: `F18_superseded/`. The estimator was replayed offline on the recorded z (live replay reproduces the pursuer's own estimate; frozen = theta held at theta_bar on the same trajectories).
+
+| Seed | Opponent set | Error live (m/s) | Error frozen | Live vs frozen | Drift at 2 s (median) |
+|---|---|---:|---:|---:|---:|
+| 0 | Cross pool (v2d) | 0.223 | 0.239 | -6.7 % | 0.077 |
+| 0 | Strong-16 | 0.260 | 0.272 | -4.2 % | 0.087 |
+| 0 | F8 switch evader alone | 0.342 | 0.368 | -7.1 % | 0.133 |
+| 0 | Earlier-rules switch evader alone | 0.254 | 0.267 | -4.7 % | 0.082 |
+| 100 | Cross pool (v2d) | 0.216 | 0.231 | -6.8 % | 0.071 |
+| 100 | Strong-16 | 0.246 | 0.258 | -4.5 % | 0.083 |
+| 100 | F8 switch evader alone | 0.304 | 0.323 | -6.1 % | 0.099 |
+| 100 | Earlier-rules switch evader alone | 0.254 | 0.260 | -2.2 % | 0.079 |
+| 200 | Cross pool (v2d) | 0.188 | 0.206 | -8.7 % | 0.060 |
+| 200 | Strong-16 | 0.194 | 0.205 | -5.3 % | 0.061 |
+| 200 | F8 switch evader alone | 0.209 | 0.222 | -6.2 % | 0.073 |
+| 200 | Earlier-rules switch evader alone | 0.177 | 0.189 | -6.4 % | 0.056 |
+
+Drift = ||theta_t - theta_bar||_F / ||theta_bar||_F. Lure exploiters (seed 0): RLS episodes end in pursuer crash 0.943, capture 0.047, timeout 0.000; F8 episodes end in timeout 0.622, capture 0.304, pursuer crash 0.010.
+
+**Predictions.** P1 (strong-16 error >= 1.2 x cross error on >= 2 of 3 seeds): **did not hold**; strong-16 is higher on every seed but by +16.6 / +13.9 / +3.2 %. The F8 (Roncero-rule) switch evader is the hardest to predict (+53 / +41 / +11 % vs cross). P2 (every error > offline test error 0.143): **held** (0.177-0.342). P3 (median drift at 2 s < 0.10 and live-vs-frozen error reduction < 10 % on every set): **held for the error** (2.2-8.7 %), **drift held in 11 of 12** (exception: seed 0 vs the F8 evader, 0.133). P4 (seed-0 RLS lured mostly into floor crashes, F8 mostly timeouts/near-misses): **held**. Thesis figures (trajectories) are drawn from `traj/` in the thesis repo. Descriptive; three seeds.
+
+
+<a id="f19"></a>
+
+## F19_plain26 (complete 2026-11-18; exploratory, 3 seeds; 0.10 m)
+
+Plain (no-estimator) pursuers trained under the v2d rules for 26 stages: `thesis-F11v2d-s{0,100}` (existing) and `thesis-F19-v2d-plain-26-s200` (verified clone of `thesis-F14-v2d-short-s200`, continued from stage 13; clone check passed). Seeds 0 / 100 reuse F11c's stage-24 exploiters; seed 200's own / lure exploiters were trained here (seeds 862 / 872, 100M frames). F14 / F15 evaluation protocol; the cross pool is the F14 Stage E pool minus the evaluated campaign (133 evaders, as for RLS-26).
+
+| Metric (stage 24) | Seed 0 | Seed 100 | Seed 200 | Mean |
+|---|---:|---:|---:|---:|
+| Strong-16 J | 0.843 | 0.748 | 0.895 | 0.829 |
+| Cross J | 0.931 | 0.968 | 0.957 | 0.952 |
+| G1 | 0.887 | 0.858 | 0.926 | 0.890 |
+| Own-rules exploitability | 0.501 | 0.140 | 0.473 | 0.371 |
+| Lure exploiter J / pursuer crash | 0.707 / 0.309 | 0.376 / 0.636 | 0.819 / 0.075 | 0.634 / 0.340 |
+| Post-switch capture / J | 0.444 / 0.868 | 0.600 / 0.813 | 0.594 / 0.783 | 0.546 / 0.821 |
+| Failure-penalized post-switch capture time (s) | 18.06 | 12.97 | 13.07 | 14.70 |
+| Fixed-control capture | 0.425 | 0.614 | 0.567 | 0.535 |
+
+| Paired contrast | Seed 0 | Seed 100 | Seed 200 | Mean | Decision |
+|---|---:|---:|---:|---:|---|
+| Own exploitability, plain-26 minus RLS-26 | +0.467 | +0.040 | +0.457 | +0.321 | Notable (RLS less exploitable) |
+| Own exploitability, F8 minus plain-26 | -0.163 | +0.567 | -0.398 | +0.002 | Inconclusive |
+| Post-switch capture, plain-26 minus RLS-26 | -0.247 | -0.071 | -0.173 | -0.163 | Notable (RLS better) |
+| Post-switch J, plain-26 minus RLS-26 | -0.017 | -0.018 | -0.122 | -0.052 | Notable (RLS better) |
+| Failure-penalized time (s), plain-26 minus RLS-26 | +8.26 | +2.45 | +3.30 | +4.67 | RLS faster on every seed |
+| Fixed-control capture, plain-26 minus RLS-26 | -0.297 | -0.073 | -0.201 | -0.191 | Notable (RLS better) |
+| Post-switch capture, plain-26 minus F8 | -0.160 | -0.035 | +0.059 | -0.046 | Inconclusive |
+| Strong-16 J, plain-26 minus RLS-26 | +0.164 | +0.149 | -0.037 | +0.092 | Inconclusive |
+| G1, plain-26 minus RLS-26 | +0.065 | +0.071 | -0.008 | +0.043 | Inconclusive |
+| Lure J, plain-26 minus RLS-26 | +0.636 | +0.329 | +0.145 | +0.370 | Notable (plain less lurable) |
+| Lure pursuer crash, plain-26 minus RLS-26 | -0.634 | -0.329 | -0.019 | -0.327 | Notable |
+| G1, plain-26 minus F8 | +0.017 | -0.048 | +0.055 | +0.008 | Inconclusive |
+
+**Predictions.** P1 (plain-26 strong-16 J above RLS-26 by >= 0.05 on all seeds): **did not hold** (seed 200 reverses; mean +0.092). P2 (plain-26 lured less than RLS-26 on every seed): **held**. P3 (estimator adds no clear exploit resistance at matched budget): **did not hold**; plain-26 is notably more exploitable than RLS-26 (+0.321) and no less exploitable than F8 (+0.002). P4 (plain-26 post-switch capture between F8 and RLS-26): **did not hold**; plain-26 (0.546) is below F8 (0.592) on average and notably below RLS-26 (0.710).
+
+**Reading.** At matched 26-stage budgets, the v2d rules alone do not reduce own-rules exploitability relative to F8, and they do not improve capture against switching evaders; the RLS-trained estimator pursuer is notably better than the plain pursuer on both. The 13-stage plain pursuer's low exploitability (0.124) does not persist to stage 24 (0.371). The plain pursuer is notably less lurable than RLS-26. Generalization differences are inconclusive. Descriptive; three seeds.
+
+
+<a id="f20"></a>
+
+## F20_cross_attack (complete 2026-11-19; eval only; 3 seeds; 0.10 m)
+
+The F14 single-rules (thesis-rule) exploiters swapped between F8 and RLS-26 within each seed (exact F14 checkpoints). Diagonal rows are the existing F14 evaluations.
+
+| Seed | Pursuer vs attacker | J | Capture | Pursuer crash | Timeout |
+|---|---|---:|---:|---:|---:|
+| 0 | F8 vs own | 0.369 | 0.304 | 0.010 | 0.622 |
+| 0 | F8 vs RLS's | 0.904 | 0.717 | 0.103 | 0.000 |
+| 0 | RLS vs own | 0.071 | 0.047 | 0.943 | 0.000 |
+| 0 | RLS vs F8's | 0.998 | 0.975 | 0.002 | 0.000 |
+| 100 | F8 vs own | 0.487 | 0.441 | 0.030 | 0.484 |
+| 100 | F8 vs RLS's | 0.847 | 0.370 | 0.209 | 0.000 |
+| 100 | RLS vs own | 0.048 | 0.022 | 0.965 | 0.000 |
+| 100 | RLS vs F8's | 0.961 | 0.934 | 0.040 | 0.000 |
+| 200 | F8 vs own | 0.424 | 0.396 | 0.001 | 0.574 |
+| 200 | F8 vs RLS's | 0.988 | 0.954 | 0.012 | 0.000 |
+| 200 | RLS vs own | 0.674 | 0.545 | 0.094 | 0.235 |
+| 200 | RLS vs F8's | 0.998 | 0.957 | 0.002 | 0.000 |
+
+(F8 vs RLS's attacker, seed 100: evader crash 0.449, i.e. the diving attacker often crashes itself.)
+
+**Predictions.** P1 (F8 crash < 0.10 vs RLS's attackers on every seed): **did not hold** (0.103 / 0.209 / 0.012), although F8 is lured far less than RLS by the same attackers (RLS 0.943 / 0.965 on seeds 0 / 100) and neutralizes them in 85-99 % of episodes. P2 (RLS J vs F8's attackers above F8's own J on every seed): **held** (0.998 / 0.961 / 0.998 vs 0.369 / 0.487 / 0.424). P3 (RLS crash < 0.10 vs F8's attackers): **held** (0.002 / 0.040 / 0.002).
+
+**Reading.** Each single-rules attacker exploits a weakness specific to the pursuer it was trained against and fails against the other pursuer: F8's attackers (hovering just outside the capture radius until the timeout) are captured by RLS-26 in 93-98 % of episodes; RLS's attackers (diving lures) neutralize F8 rarely and crash F8 in only 1-21 % of episodes. F8 is therefore much harder to lure than RLS-26 even by an attacker that learned to lure, but not immune. Consistent with (not a test of) the closing-speed-discount hypothesis from the F18 seed-0 recordings.

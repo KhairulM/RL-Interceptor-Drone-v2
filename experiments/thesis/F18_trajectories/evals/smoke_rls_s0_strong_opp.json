@@ -1,0 +1,28 @@
+{
+  "policies": [
+    {
+      "id": "thesis-F2-plain/evader:s7",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F2-plain/checkpoints/evader_stage7.pt",
+      "metadata": {
+        "campaign": "thesis-F2-plain",
+        "stage": 7,
+        "db_id": "evader:s7"
+      }
+    },
+    {
+      "id": "thesis-F3-uniform-s1/evader:s7",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F3-uniform-s1/checkpoints/evader_stage7.pt",
+      "metadata": {
+        "campaign": "thesis-F3-uniform-s1",
+        "stage": 7,
+        "db_id": "evader:s7"
+      }
+    }
+  ],
+  "probs": {
+    "thesis-F2-plain/evader:s7": 0.5,
+    "thesis-F3-uniform-s1/evader:s7": 0.5
+  }
+}

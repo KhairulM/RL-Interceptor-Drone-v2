@@ -1668,3 +1668,95 @@
 2026-11-17 13:08:33 === done F17c
 2026-11-17 13:10:13 F17 evaluations and analysis complete
 2026-11-17 13:10:13 === done F17c
+2026-11-18 13:34:56 === start F18 (--smoke; no git_sync)
+2026-11-18 13:34:57 F14: prerequisite ready: Stage A rule selection
+2026-11-18 13:36:02 F18 smoke passed: replay error 0.262 m/s over 102360 steps
+2026-11-18 13:36:02 === done F18
+2026-11-18 13:36:08 === start F18 (; no git_sync)
+2026-11-18 13:36:09 F18 smoke passed: replay error 0.262 m/s over 102360 steps
+2026-11-18 13:36:09 F14: prerequisite ready: Stage A rule selection
+2026-11-18 13:36:09 F14: prerequisite ready: Stage A rule selection
+2026-11-18 13:36:09 F14: prerequisite ready: Stage A rule selection
+2026-11-18 13:36:10 F14: prerequisite ready: Stage A rule selection
+2026-11-18 13:36:10 F14: prerequisite ready: Stage A rule selection
+2026-11-18 13:36:10 F14: prerequisite ready: Stage A rule selection
+2026-11-18 13:36:10 F14: prerequisite ready: Stage A rule selection
+2026-11-18 13:36:37 === start F18 (; no git_sync)
+2026-11-18 13:36:38 F18 smoke passed: replay error 0.262 m/s over 102360 steps
+2026-11-18 13:36:38 F14: prerequisite ready: Stage A rule selection
+2026-11-18 13:36:38 F14: prerequisite ready: Stage A rule selection
+2026-11-18 13:36:38 F14: prerequisite ready: Stage A rule selection
+2026-11-18 13:36:38 F14: prerequisite ready: Stage A rule selection
+2026-11-18 13:36:38 F14: prerequisite ready: Stage A rule selection
+2026-11-18 13:36:39 F14: prerequisite ready: Stage A rule selection
+2026-11-18 13:36:39 F14: prerequisite ready: Stage A rule selection
+2026-11-18 13:39:22 F18 recorded T1_rls_s0_switch_f8_to_f10
+2026-11-18 13:42:26 F18 recorded T1_f8_s0_switch_f8_to_f10
+2026-11-18 13:45:10 F18 recorded T1_rls_s0_switch_f10_to_f8
+2026-11-18 13:48:10 F18 recorded T1_f8_s0_switch_f10_to_f8
+2026-11-18 13:50:38 F18 recorded T1_rls_s0_lure
+2026-11-18 13:53:33 F18 recorded T1_f8_s0_lure
+2026-11-18 13:56:37 F18 recorded T2_rls_s0_strong
+2026-11-18 14:03:46 F18 recorded T2_rls_s0_cross
+2026-11-18 14:06:24 F18 recorded T2_rls_s0_fixed_f8ev
+2026-11-18 14:09:03 F18 recorded T2_rls_s0_fixed_earlier
+2026-11-18 14:12:36 F18 recorded T2_rls_s100_strong
+2026-11-18 14:19:50 F18 recorded T2_rls_s100_cross
+2026-11-18 14:22:41 F18 recorded T2_rls_s100_fixed_f8ev
+2026-11-18 14:25:23 F18 recorded T2_rls_s100_fixed_earlier
+2026-11-18 14:28:55 F18 recorded T2_rls_s200_strong
+2026-11-18 14:36:07 F18 recorded T2_rls_s200_cross
+2026-11-18 14:39:09 F18 recorded T2_rls_s200_fixed_f8ev
+2026-11-18 14:42:15 F18 recorded T2_rls_s200_fixed_earlier
+2026-11-18 14:43:49 F18 analysis done
+2026-11-18 14:43:49 === done F18
+2026-11-18 14:45:09 F14: prerequisite ready: Stage A rule selection
+2026-11-18 14:45:09 F14: prerequisite ready: Stage A rule selection
+2026-11-18 14:45:09 F14: prerequisite ready: Stage A rule selection
+2026-11-18 14:45:09 F14: prerequisite ready: Stage A rule selection
+2026-11-18 14:45:09 F14: prerequisite ready: Stage A rule selection
+2026-11-18 14:45:09 F14: prerequisite ready: Stage A rule selection
+2026-11-18 14:45:09 F14: prerequisite ready: Stage A rule selection
+2026-11-18 16:24:56 F14: prerequisite ready: Stage A rule selection
+2026-11-18 16:25:10 === start F19 lane s200 (no git_sync)
+2026-11-18 16:25:10 === start F19 lane evals (no git_sync)
+2026-11-18 16:25:11 F14 Stage E verified clone thesis-F14-v2d-short-s200 -> thesis-F19-v2d-plain-26-s200; resume stage=13 role=evader
+2026-11-18 16:25:11 campaign thesis-F19-v2d-plain-26-s200 start: n_stages=26 max_total_stages=26 frames_per_stage=50000000 uniform_mix=1.0 seed=200 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F19-v2d-plain-26-s200 pursuer_sampler=hedge evader_sampler=hedge task_overrides=[task.ablation.truncate_failures=true,task.ablation.no_timeout_evader=true,task.reward_approach_weight=7.0,task.reward_precision_weight=10.0,task.reward_action_smoothness_weight=0.5,task.reward_cmd_rate_weight=0.2,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500]
+2026-11-18 16:30:25 F19 eval thesis-F11v2d-s0_strong.json
+2026-11-18 16:40:22 F19 eval thesis-F11v2d-s0_cross.json
+2026-11-18 16:43:53 F19 eval thesis-F11v2d-s0_own.json
+2026-11-18 16:48:24 F19 eval thesis-F11v2d-s0_lure.json
+2026-11-18 16:53:01 F19 eval thesis-F11v2d-s0_switch_f8_to_f10_randomized.json
+2026-11-18 16:56:26 F19 eval thesis-F11v2d-s0_switch_f10_to_f8_randomized.json
+2026-11-18 16:59:44 F19 eval thesis-F11v2d-s0_fixed_thesis-F8b-roncero-s100.json
+2026-11-18 17:04:19 F19 eval thesis-F11v2d-s0_fixed_thesis-F10-nofix-s100.json
+2026-11-18 17:09:24 F19 eval thesis-F11v2d-s100_strong.json
+2026-11-18 17:18:13 F19 eval thesis-F11v2d-s100_cross.json
+2026-11-18 17:22:46 F19 eval thesis-F11v2d-s100_own.json
+2026-11-18 17:27:19 F19 eval thesis-F11v2d-s100_lure.json
+2026-11-18 17:31:13 F19 eval thesis-F11v2d-s100_switch_f8_to_f10_randomized.json
+2026-11-18 17:34:32 F19 eval thesis-F11v2d-s100_switch_f10_to_f8_randomized.json
+2026-11-18 17:38:40 F19 eval thesis-F11v2d-s100_fixed_thesis-F8b-roncero-s200.json
+2026-11-18 17:43:08 F19 eval thesis-F11v2d-s100_fixed_thesis-F10-nofix-s200.json
+2026-11-18 17:43:08 F19: analysis deferred (generator raised StopIteration)
+2026-11-18 17:43:08 === done F19 lane evals
+2026-11-18 19:31:29 campaign thesis-F19-v2d-plain-26-s200 exit 0
+2026-11-18 20:05:14 F19 eval thesis-F19-v2d-plain-26-s200_strong.json
+2026-11-18 20:12:48 F19 eval thesis-F19-v2d-plain-26-s200_cross.json
+2026-11-18 20:15:44 F19 eval thesis-F19-v2d-plain-26-s200_own.json
+2026-11-18 20:18:41 F19 eval thesis-F19-v2d-plain-26-s200_lure.json
+2026-11-18 20:21:42 F19 eval thesis-F19-v2d-plain-26-s200_switch_f8_to_f10_randomized.json
+2026-11-18 20:24:42 F19 eval thesis-F19-v2d-plain-26-s200_switch_f10_to_f8_randomized.json
+2026-11-18 20:27:40 F19 eval thesis-F19-v2d-plain-26-s200_fixed_thesis-F8b-roncero-s0.json
+2026-11-18 20:30:35 F19 eval thesis-F19-v2d-plain-26-s200_fixed_thesis-F10-nofix-s0.json
+2026-11-18 20:30:35 F19 analysis done
+2026-11-18 20:30:35 === done F19 lane s200
+2026-11-19 17:11:49 === start F20 (no git_sync)
+2026-11-19 17:14:37 F20 eval f8_s0_vs_rls_attacker
+2026-11-19 17:17:13 F20 eval rls_s0_vs_f8_attacker
+2026-11-19 17:20:00 F20 eval f8_s100_vs_rls_attacker
+2026-11-19 17:22:41 F20 eval rls_s100_vs_f8_attacker
+2026-11-19 17:25:25 F20 eval f8_s200_vs_rls_attacker
+2026-11-19 17:27:58 F20 eval rls_s200_vs_f8_attacker
+2026-11-19 17:27:58 F20 analysis done
+2026-11-19 17:27:58 === done F20

@@ -77,6 +77,9 @@ EXPERIMENTS = {
     "F15": "f15_switch_baseline:run_f15",
     "F17": "f17_roncero_acc:run_f17",
     "F17c": "f17_roncero_acc:run_f17c",
+    "F18": "f18_trajectories:run_f18",
+    "F19": "f19_plain26:run_f19",
+    "F20": "f20_cross_attack:run_f20",
 }
 
 # Registered before the GAE truncation fix became the PPO default (2026-11-11): these keep the old setting
