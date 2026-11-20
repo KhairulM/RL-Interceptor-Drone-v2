@@ -80,6 +80,8 @@ EXPERIMENTS = {
     "F18": "f18_trajectories:run_f18",
     "F19": "f19_plain26:run_f19",
     "F20": "f20_cross_attack:run_f20",
+    "F21": "f21_rls_ablation:run_f21",
+    "F21c": "f21_rls_ablation:run_f21c",
 }
 
 # Registered before the GAE truncation fix became the PPO default (2026-11-11): these keep the old setting
@@ -102,7 +104,7 @@ def main():
     mod, _, fn = EXPERIMENTS[args.exp].partition(":")
     getattr(importlib.import_module(mod), fn or "run")(args)
     log_progress(f"=== done {args.exp}")
-    if not args.smoke:      # user request (10-28): push code + text results after every finished experiment
+    if not args.smoke and args.exp not in {"F21", "F21c"}:  # F21 preserves the user's uncommitted F18-F20 work.
         import subprocess
         subprocess.run([os.path.join(HERE, "git_sync.sh"), f"thesis: {args.exp} finished"], check=False)
 
