@@ -1,0 +1,547 @@
+{
+  "parameters": {
+    "baseline": [
+      0.999,
+      0.01,
+      1.0
+    ],
+    "fast": [
+      0.98,
+      0.01,
+      1.0
+    ],
+    "cap": [
+      0.999,
+      0.01,
+      10.0
+    ],
+    "fast_cap": [
+      0.98,
+      0.01,
+      10.0
+    ],
+    "fast_cap_gain": [
+      0.98,
+      0.1,
+      10.0
+    ]
+  },
+  "training_config": {
+    "pursuer_sampler": "hedge",
+    "evader_sampler": "hedge",
+    "seed": 0,
+    "frames_per_stage": 50000000,
+    "n_stages": 26,
+    "max_total_stages": 26
+  },
+  "rules": [
+    "task.ablation.truncate_failures=true",
+    "task.ablation.no_timeout_evader=true",
+    "task.reward_approach_weight=7.0",
+    "task.reward_precision_weight=10.0",
+    "task.reward_action_smoothness_weight=0.5",
+    "task.reward_cmd_rate_weight=0.2",
+    "algo.gae_cut_at_truncation=true"
+  ],
+  "role_overrides": {
+    "baseline": {
+      "pursuer": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.delta=0.01",
+        "task.adapt.p_max_ratio=1.0",
+        "task.adapt.reset_on_episode=true",
+        "task.adapt.freeze=false"
+      ],
+      "evader": [
+        "task.adapt.opp_side=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.delta=0.01",
+        "task.adapt.p_max_ratio=1.0",
+        "task.adapt.reset_on_episode=true",
+        "task.adapt.freeze=false"
+      ]
+    },
+    "fast": {
+      "pursuer": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.forgetting=0.98",
+        "task.adapt.delta=0.01",
+        "task.adapt.p_max_ratio=1.0",
+        "task.adapt.reset_on_episode=true",
+        "task.adapt.freeze=false"
+      ],
+      "evader": [
+        "task.adapt.opp_side=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.forgetting=0.98",
+        "task.adapt.delta=0.01",
+        "task.adapt.p_max_ratio=1.0",
+        "task.adapt.reset_on_episode=true",
+        "task.adapt.freeze=false"
+      ]
+    },
+    "cap": {
+      "pursuer": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.delta=0.01",
+        "task.adapt.p_max_ratio=10.0",
+        "task.adapt.reset_on_episode=true",
+        "task.adapt.freeze=false"
+      ],
+      "evader": [
+        "task.adapt.opp_side=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.forgetting=0.999",
+        "task.adapt.delta=0.01",
+        "task.adapt.p_max_ratio=10.0",
+        "task.adapt.reset_on_episode=true",
+        "task.adapt.freeze=false"
+      ]
+    },
+    "fast_cap": {
+      "pursuer": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.forgetting=0.98",
+        "task.adapt.delta=0.01",
+        "task.adapt.p_max_ratio=10.0",
+        "task.adapt.reset_on_episode=true",
+        "task.adapt.freeze=false"
+      ],
+      "evader": [
+        "task.adapt.opp_side=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.forgetting=0.98",
+        "task.adapt.delta=0.01",
+        "task.adapt.p_max_ratio=10.0",
+        "task.adapt.reset_on_episode=true",
+        "task.adapt.freeze=false"
+      ]
+    },
+    "fast_cap_gain": {
+      "pursuer": [
+        "task.adapt.enabled=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.forgetting=0.98",
+        "task.adapt.delta=0.1",
+        "task.adapt.p_max_ratio=10.0",
+        "task.adapt.reset_on_episode=true",
+        "task.adapt.freeze=false"
+      ],
+      "evader": [
+        "task.adapt.opp_side=true",
+        "task.adapt.kind=nf",
+        "task.adapt.target=dvel",
+        "task.adapt.history=10",
+        "task.adapt.horizon=10",
+        "task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt",
+        "task.adapt.forgetting=0.98",
+        "task.adapt.delta=0.1",
+        "task.adapt.p_max_ratio=10.0",
+        "task.adapt.reset_on_episode=true",
+        "task.adapt.freeze=false"
+      ]
+    }
+  },
+  "sources": {
+    "thesis-F14-v2d-acc-rls-26-s0": {
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s0/checkpoints/pursuer_stage24.pt",
+      "sha256": "e3889256cdf143e4db14bc7ed14adfdd3cb12dcb383fa24e1e3a9445afde274f",
+      "resume_manifest": {
+        "source_campaign": "thesis-F12-acc-s0",
+        "destination_campaign": "thesis-F14-v2d-acc-rls-26-s0",
+        "arm": "rls",
+        "seed": 0,
+        "source_db_sha256": {
+          "evader_pool.json": "b627cec35442cd576c97936a59a4fdeef84b127606c5271bee7df0645beacd9e",
+          "matchups.json": "aa2337a35d2ec6ffe1f9935fa6808b637944d12baadf404003099d9c1536b16d",
+          "pursuer_pool.json": "a01ab9718dedfe27a85d775136a3848d822d26317c9a62ad76de828cf8a9bfcc"
+        },
+        "stage12_checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F12-acc-s0/checkpoints/pursuer_stage12.pt",
+        "stage12_checkpoint_sha256": "372d64e1f1ffb393c49d10a77a6f34aecea1a1b28e5eec3c5b4d06e7aa69d797",
+        "source_pursuer_stage": 12,
+        "source_evader_stage": 11,
+        "expected_resume": {
+          "stage": 13,
+          "role": "evader"
+        },
+        "continuation": {
+          "n_stages": 26,
+          "max_total_stages": 26,
+          "frames_per_stage": 50000000
+        }
+      },
+      "resume_manifest_sha256": "0ddb4f128240a8c3d662b18b3be286a5afbc7600c98116a8b5a368f5306b98a0",
+      "historic_commands": {
+        "thesis-F12-acc-s0": "n_stages=13 max_total_stages=13 frames_per_stage=50000000 uniform_mix=1.0 seed=0 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F12-acc-s0 pursuer_sampler=hedge evader_sampler=hedge task_overrides=[task.ablation.truncate_failures=true,task.ablation.no_timeout_evader=true,task.reward_approach_weight=7.0,task.reward_precision_weight=10.0,task.reward_action_smoothness_weight=0.5,task.reward_cmd_rate_weight=0.2,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500] role_task_overrides.pursuer=[task.adapt.enabled=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999] role_task_overrides.evader=[task.adapt.opp_side=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999]",
+        "thesis-F14-v2d-acc-rls-26-s0": "n_stages=26 max_total_stages=26 frames_per_stage=50000000 uniform_mix=1.0 seed=0 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F14-v2d-acc-rls-26-s0 pursuer_sampler=hedge evader_sampler=hedge task_overrides=[task.ablation.truncate_failures=true,task.ablation.no_timeout_evader=true,task.reward_approach_weight=7.0,task.reward_precision_weight=10.0,task.reward_action_smoothness_weight=0.5,task.reward_cmd_rate_weight=0.2,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500] role_task_overrides.pursuer=[task.adapt.enabled=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999] role_task_overrides.evader=[task.adapt.opp_side=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999]"
+      }
+    },
+    "thesis-F14-v2d-acc-rls-26-s100": {
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s100/checkpoints/pursuer_stage24.pt",
+      "sha256": "673f8ab84d4b14ff3efec8680c4f2650713701eb8be1e775e2de982d29f49c31",
+      "resume_manifest": {
+        "source_campaign": "thesis-F12-acc-s100",
+        "destination_campaign": "thesis-F14-v2d-acc-rls-26-s100",
+        "arm": "rls",
+        "seed": 100,
+        "source_db_sha256": {
+          "evader_pool.json": "d48382ecb7c44effcae85eadaaab737037508be076628acc721961cd87c6bcf2",
+          "matchups.json": "ce6b8b332a17c9a7f15b24ae545de5a386de7e1fa41f3ba2e2648f200b27b0c0",
+          "pursuer_pool.json": "f4a0e35e3a89987911350fbc8496f0ed7c40998b969492003c14777008b8378b"
+        },
+        "stage12_checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F12-acc-s100/checkpoints/pursuer_stage12.pt",
+        "stage12_checkpoint_sha256": "beb1270ca239fb70a4d9ea539584a70aff4d1fa955e97a90427c5e14a43c0063",
+        "source_pursuer_stage": 12,
+        "source_evader_stage": 11,
+        "expected_resume": {
+          "stage": 13,
+          "role": "evader"
+        },
+        "continuation": {
+          "n_stages": 26,
+          "max_total_stages": 26,
+          "frames_per_stage": 50000000
+        }
+      },
+      "resume_manifest_sha256": "48cf3fd4051e24acb3ab0a626209e41494dfd714759c1433211e29e61a529be7",
+      "historic_commands": {
+        "thesis-F12-acc-s100": "n_stages=13 max_total_stages=13 frames_per_stage=50000000 uniform_mix=1.0 seed=100 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F12-acc-s100 pursuer_sampler=hedge evader_sampler=hedge task_overrides=[task.ablation.truncate_failures=true,task.ablation.no_timeout_evader=true,task.reward_approach_weight=7.0,task.reward_precision_weight=10.0,task.reward_action_smoothness_weight=0.5,task.reward_cmd_rate_weight=0.2,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500] role_task_overrides.pursuer=[task.adapt.enabled=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999] role_task_overrides.evader=[task.adapt.opp_side=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999]",
+        "thesis-F14-v2d-acc-rls-26-s100": "n_stages=26 max_total_stages=26 frames_per_stage=50000000 uniform_mix=1.0 seed=100 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F14-v2d-acc-rls-26-s100 pursuer_sampler=hedge evader_sampler=hedge task_overrides=[task.ablation.truncate_failures=true,task.ablation.no_timeout_evader=true,task.reward_approach_weight=7.0,task.reward_precision_weight=10.0,task.reward_action_smoothness_weight=0.5,task.reward_cmd_rate_weight=0.2,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500] role_task_overrides.pursuer=[task.adapt.enabled=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999] role_task_overrides.evader=[task.adapt.opp_side=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999]"
+      }
+    },
+    "thesis-F14-v2d-acc-rls-26-s200": {
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt",
+      "sha256": "c4852b7c620eedcc9b4c5c111ec2b1ae87920ece765f36c210cb094238b7127b",
+      "resume_manifest": {
+        "source_campaign": "thesis-F14-v2d-acc-rls-s200",
+        "destination_campaign": "thesis-F14-v2d-acc-rls-26-s200",
+        "arm": "rls",
+        "seed": 200,
+        "source_db_sha256": {
+          "evader_pool.json": "70d17e3e4c65c879e5011150161bf0e60ee62edf19d7135ffc3be5d31b3adb32",
+          "matchups.json": "b60c98b87744cd0b7965fb99c5f67ea099b7fa1823025214d832b82583facb2b",
+          "pursuer_pool.json": "4d2d9a7d2193c7408b34733eff78b194233a6de0abf2f73c984b231d6ee98b7e"
+        },
+        "stage12_checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-s200/checkpoints/pursuer_stage12.pt",
+        "stage12_checkpoint_sha256": "2095477e65fc0325fee97c6c3d6c8c15ac734b28d1fb9ab53df01a186b18f98d",
+        "source_pursuer_stage": 12,
+        "source_evader_stage": 11,
+        "expected_resume": {
+          "stage": 13,
+          "role": "evader"
+        },
+        "continuation": {
+          "n_stages": 26,
+          "max_total_stages": 26,
+          "frames_per_stage": 50000000
+        }
+      },
+      "resume_manifest_sha256": "f4d297341eb81affbc19583dd99ff1c06811052bf6c264c55d7d1f5568ad4c72",
+      "historic_commands": {
+        "thesis-F14-v2d-acc-rls-s200": "n_stages=13 max_total_stages=13 frames_per_stage=50000000 uniform_mix=1.0 seed=200 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F14-v2d-acc-rls-s200 pursuer_sampler=hedge evader_sampler=hedge task_overrides=[task.ablation.truncate_failures=true,task.ablation.no_timeout_evader=true,task.reward_approach_weight=7.0,task.reward_precision_weight=10.0,task.reward_action_smoothness_weight=0.5,task.reward_cmd_rate_weight=0.2,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500] role_task_overrides.pursuer=[task.adapt.enabled=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999] role_task_overrides.evader=[task.adapt.opp_side=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999]",
+        "thesis-F14-v2d-acc-rls-26-s200": "n_stages=26 max_total_stages=26 frames_per_stage=50000000 uniform_mix=1.0 seed=200 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F14-v2d-acc-rls-26-s200 pursuer_sampler=hedge evader_sampler=hedge task_overrides=[task.ablation.truncate_failures=true,task.ablation.no_timeout_evader=true,task.reward_approach_weight=7.0,task.reward_precision_weight=10.0,task.reward_action_smoothness_weight=0.5,task.reward_cmd_rate_weight=0.2,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500] role_task_overrides.pursuer=[task.adapt.enabled=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999] role_task_overrides.evader=[task.adapt.opp_side=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999]"
+      }
+    },
+    "thesis-F14-v2d-acc-frozen-26-s0": {
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-26-s0/checkpoints/pursuer_stage24.pt",
+      "sha256": "8698d327ae06558e3c2b4b0073077f9b047e876fb653aace32656bc0e3a13c8e",
+      "resume_manifest": {
+        "source_campaign": "thesis-F14-v2d-acc-frozen-s0",
+        "destination_campaign": "thesis-F14-v2d-acc-frozen-26-s0",
+        "arm": "no_rls",
+        "seed": 0,
+        "source_db_sha256": {
+          "evader_pool.json": "05e15691caf185832b0d9b70200ea599bc2d4673c75c086e2cbcc181a356d463",
+          "matchups.json": "7ef58a04e483059eeefdf3180818ca828c079756db615a368fc1448891567cd9",
+          "pursuer_pool.json": "0bc8d02b1b9a690fb4c2a08e7310d08c3d88e566d1830c19df40f6641678e4f5"
+        },
+        "stage12_checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-s0/checkpoints/pursuer_stage12.pt",
+        "stage12_checkpoint_sha256": "4230a4dba03ef632e8005e17706f1622123b1f5b39236dd1b4039b554320cd20",
+        "source_pursuer_stage": 12,
+        "source_evader_stage": 11,
+        "expected_resume": {
+          "stage": 13,
+          "role": "evader"
+        },
+        "continuation": {
+          "n_stages": 26,
+          "max_total_stages": 26,
+          "frames_per_stage": 50000000
+        }
+      },
+      "resume_manifest_sha256": "e911dfd6b67b621b03a62055a06b667e5204fb4c78ed7ca712880a410881049c",
+      "historic_commands": {
+        "thesis-F14-v2d-acc-frozen-s0": "n_stages=13 max_total_stages=13 frames_per_stage=50000000 uniform_mix=1.0 seed=0 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F14-v2d-acc-frozen-s0 pursuer_sampler=hedge evader_sampler=hedge task_overrides=[task.ablation.truncate_failures=true,task.ablation.no_timeout_evader=true,task.reward_approach_weight=7.0,task.reward_precision_weight=10.0,task.reward_action_smoothness_weight=0.5,task.reward_cmd_rate_weight=0.2,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500] role_task_overrides.pursuer=[task.adapt.enabled=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999,task.adapt.freeze=true] role_task_overrides.evader=[task.adapt.opp_side=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999,task.adapt.freeze=true]",
+        "thesis-F14-v2d-acc-frozen-26-s0": "n_stages=26 max_total_stages=26 frames_per_stage=50000000 uniform_mix=1.0 seed=0 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F14-v2d-acc-frozen-26-s0 pursuer_sampler=hedge evader_sampler=hedge task_overrides=[task.ablation.truncate_failures=true,task.ablation.no_timeout_evader=true,task.reward_approach_weight=7.0,task.reward_precision_weight=10.0,task.reward_action_smoothness_weight=0.5,task.reward_cmd_rate_weight=0.2,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500] role_task_overrides.pursuer=[task.adapt.enabled=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999,task.adapt.freeze=true] role_task_overrides.evader=[task.adapt.opp_side=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999,task.adapt.freeze=true]"
+      }
+    },
+    "thesis-F14-v2d-acc-frozen-26-s100": {
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-26-s100/checkpoints/pursuer_stage24.pt",
+      "sha256": "00799286cefbb5e179f317335fe9671a583d40be094ebe9225029d5b63190a3e",
+      "resume_manifest": {
+        "source_campaign": "thesis-F14-v2d-acc-frozen-s100",
+        "destination_campaign": "thesis-F14-v2d-acc-frozen-26-s100",
+        "arm": "no_rls",
+        "seed": 100,
+        "source_db_sha256": {
+          "evader_pool.json": "071cc31007bb6e859ddec3d5481a4911322cfd87ffbf856a93c8bca4a006ad81",
+          "matchups.json": "56b7bdcf68023a64733e2a6a90381a03366f673cd7424588446d047f99297683",
+          "pursuer_pool.json": "1c6fa583b4bab14ff02e0751b038644c1c0c624d1c8d00c3dd453bdd3193f41c"
+        },
+        "stage12_checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-s100/checkpoints/pursuer_stage12.pt",
+        "stage12_checkpoint_sha256": "6c97ce3a859ea361b5889fbf770976d91490150f97c4aa7e775124e6fca76b1e",
+        "source_pursuer_stage": 12,
+        "source_evader_stage": 11,
+        "expected_resume": {
+          "stage": 13,
+          "role": "evader"
+        },
+        "continuation": {
+          "n_stages": 26,
+          "max_total_stages": 26,
+          "frames_per_stage": 50000000
+        }
+      },
+      "resume_manifest_sha256": "e8f660511574cef7a3917a591d0f186dfc7cab040a970e542ec220390b88f790",
+      "historic_commands": {
+        "thesis-F14-v2d-acc-frozen-s100": "n_stages=13 max_total_stages=13 frames_per_stage=50000000 uniform_mix=1.0 seed=100 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F14-v2d-acc-frozen-s100 pursuer_sampler=hedge evader_sampler=hedge task_overrides=[task.ablation.truncate_failures=true,task.ablation.no_timeout_evader=true,task.reward_approach_weight=7.0,task.reward_precision_weight=10.0,task.reward_action_smoothness_weight=0.5,task.reward_cmd_rate_weight=0.2,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500] role_task_overrides.pursuer=[task.adapt.enabled=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999,task.adapt.freeze=true] role_task_overrides.evader=[task.adapt.opp_side=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999,task.adapt.freeze=true]",
+        "thesis-F14-v2d-acc-frozen-26-s100": "n_stages=26 max_total_stages=26 frames_per_stage=50000000 uniform_mix=1.0 seed=100 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F14-v2d-acc-frozen-26-s100 pursuer_sampler=hedge evader_sampler=hedge task_overrides=[task.ablation.truncate_failures=true,task.ablation.no_timeout_evader=true,task.reward_approach_weight=7.0,task.reward_precision_weight=10.0,task.reward_action_smoothness_weight=0.5,task.reward_cmd_rate_weight=0.2,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500] role_task_overrides.pursuer=[task.adapt.enabled=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999,task.adapt.freeze=true] role_task_overrides.evader=[task.adapt.opp_side=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999,task.adapt.freeze=true]"
+      }
+    },
+    "thesis-F14-v2d-acc-frozen-26-s200": {
+      "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-26-s200/checkpoints/pursuer_stage24.pt",
+      "sha256": "23f1c35d3b82fcf7c77c9dcd27f528f9398ec5f75e95b7c6221fb37182e83fc8",
+      "resume_manifest": {
+        "source_campaign": "thesis-F14-v2d-acc-frozen-s200",
+        "destination_campaign": "thesis-F14-v2d-acc-frozen-26-s200",
+        "arm": "no_rls",
+        "seed": 200,
+        "source_db_sha256": {
+          "evader_pool.json": "bf977c04dd319a9d1c5dd6d070e7d71fd6c26e53a5fc5fea98ab79b63c1eef62",
+          "matchups.json": "52467209768918876ecb8b07468739b3f27bf44e1438ac51a11789d774e90ded",
+          "pursuer_pool.json": "280d6d3726c1feb4a9ec3c6c6d0cd1896593f0a0daf1fca9ca71fc8b642868fc"
+        },
+        "stage12_checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-frozen-s200/checkpoints/pursuer_stage12.pt",
+        "stage12_checkpoint_sha256": "8c84b9c835569504463e947760fb6b1d255d8793bc85fd14ec44d732e879e8c4",
+        "source_pursuer_stage": 12,
+        "source_evader_stage": 11,
+        "expected_resume": {
+          "stage": 13,
+          "role": "evader"
+        },
+        "continuation": {
+          "n_stages": 26,
+          "max_total_stages": 26,
+          "frames_per_stage": 50000000
+        }
+      },
+      "resume_manifest_sha256": "30927e7e9bd3056da8f2c0ff3c3de68ef3fdb0d5ee1c1f6a7c150c6699e50eb0",
+      "historic_commands": {
+        "thesis-F14-v2d-acc-frozen-s200": "n_stages=13 max_total_stages=13 frames_per_stage=50000000 uniform_mix=1.0 seed=200 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F14-v2d-acc-frozen-s200 pursuer_sampler=hedge evader_sampler=hedge task_overrides=[task.ablation.truncate_failures=true,task.ablation.no_timeout_evader=true,task.reward_approach_weight=7.0,task.reward_precision_weight=10.0,task.reward_action_smoothness_weight=0.5,task.reward_cmd_rate_weight=0.2,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500] role_task_overrides.pursuer=[task.adapt.enabled=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999,task.adapt.freeze=true] role_task_overrides.evader=[task.adapt.opp_side=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999,task.adapt.freeze=true]",
+        "thesis-F14-v2d-acc-frozen-26-s200": "n_stages=26 max_total_stages=26 frames_per_stage=50000000 uniform_mix=1.0 seed=200 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] run_name=thesis-F14-v2d-acc-frozen-26-s200 pursuer_sampler=hedge evader_sampler=hedge task_overrides=[task.ablation.truncate_failures=true,task.ablation.no_timeout_evader=true,task.reward_approach_weight=7.0,task.reward_precision_weight=10.0,task.reward_action_smoothness_weight=0.5,task.reward_cmd_rate_weight=0.2,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500] role_task_overrides.pursuer=[task.adapt.enabled=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999,task.adapt.freeze=true] role_task_overrides.evader=[task.adapt.opp_side=true,task.adapt.kind=nf,task.adapt.target=dvel,task.adapt.history=10,task.adapt.horizon=10,task.adapt.model_path=/home/user/Projects/RLInterceptorDrone/experiments/thesis/F5_acc_sp/estimator/models/nf_dvel_H10.pt,task.adapt.delta=0.01,task.adapt.forgetting=0.999,task.adapt.freeze=true]"
+      }
+    }
+  },
+  "estimator_sha256": "b63df0ef6896651ba28104469720534faaa91d446967f22439f2ecb2c4e59ae4",
+  "common_cross": [
+    {
+      "id": "thesis-F11v2d-s0/evader:s1",
+      "checkpoint_sha256": "8952d87cba81d50251b810edaa86361c0c99f806e18650d0668c6be4b2c62b45"
+    },
+    {
+      "id": "thesis-F11v2d-s0/evader:s3",
+      "checkpoint_sha256": "f21b4ee7d67ec281c3f02b0e6fc654b31c62a6179af6c62356d54049e295fd16"
+    },
+    {
+      "id": "thesis-F11v2d-s0/evader:s5",
+      "checkpoint_sha256": "6998b8367c620de9157e64a4f41aef47a7356c3f2fa2002ad3abdf4691729272"
+    },
+    {
+      "id": "thesis-F11v2d-s0/evader:s7",
+      "checkpoint_sha256": "3a8ab30760a32924c3c328d9f111ddcd835ed579e40b93612bbe9c834cea2c9d"
+    },
+    {
+      "id": "thesis-F11v2d-s0/evader:s9",
+      "checkpoint_sha256": "719700f75525f0d9217209e09227ddf2093edfd7a4707447f58ce3b0b5c85b76"
+    },
+    {
+      "id": "thesis-F11v2d-s0/evader:s11",
+      "checkpoint_sha256": "97b3135cca1ff9db77f675e58cebdeac3c71828d8e154922b92c949eab734d04"
+    },
+    {
+      "id": "thesis-F11v2d-s0/evader:s13",
+      "checkpoint_sha256": "9894ca574985ddfe1d5414bd046fe84e0f632ed85291ae4f41ac1a3b2f5a9e60"
+    },
+    {
+      "id": "thesis-F11v2d-s0/evader:s15",
+      "checkpoint_sha256": "9d27adb350f6b03f912ce6e679106235e9e0297b33dbda33999ed57b19b13f2f"
+    },
+    {
+      "id": "thesis-F11v2d-s0/evader:s17",
+      "checkpoint_sha256": "c1a3a8b389bebbd8e52dfb51d257ae714debcfb28d4591c9c559bc2a6503e7bf"
+    },
+    {
+      "id": "thesis-F11v2d-s0/evader:s19",
+      "checkpoint_sha256": "b51343e09ae29e1f9b4509a6b08e33870dcef101954de0cea69e7a33974d6473"
+    },
+    {
+      "id": "thesis-F11v2d-s0/evader:s21",
+      "checkpoint_sha256": "a15215b5a8846c1f83fe7b0cefb0aa1109a4f92088d9bf5c161fd7b03bf7fba6"
+    },
+    {
+      "id": "thesis-F11v2d-s0/evader:s23",
+      "checkpoint_sha256": "051bb3936520fe2173748c43c898540769645e4c380e960eec72390287d5a7c9"
+    },
+    {
+      "id": "thesis-F11v2d-s0/evader:s25",
+      "checkpoint_sha256": "2b8e948056445803031c0020ffe413126af09761a00ef4ae1bc99d2fe3c5e582"
+    },
+    {
+      "id": "thesis-F11v2d-s100/evader:s1",
+      "checkpoint_sha256": "49dd4e4bc3ab9e063324c911a8e0929c7d66cd5dcfb6e72a765459b82c5b76c7"
+    },
+    {
+      "id": "thesis-F11v2d-s100/evader:s3",
+      "checkpoint_sha256": "bdf478aef5721f12ffd057e443d65ac86a393ac76855e6a72682a56286224b54"
+    },
+    {
+      "id": "thesis-F11v2d-s100/evader:s5",
+      "checkpoint_sha256": "86941de5ac6895ac01308e7c29094fe99667f9dad21dc891333c19afe3b602d8"
+    },
+    {
+      "id": "thesis-F11v2d-s100/evader:s7",
+      "checkpoint_sha256": "64f5f807710783422dedf3cdb57cc9d41c05392cc103806730438e25c4f06bb4"
+    },
+    {
+      "id": "thesis-F11v2d-s100/evader:s9",
+      "checkpoint_sha256": "84207fcbc87d79e19c2999daa68e6db04417737f3b72d8ca2cff335d05c4a10d"
+    },
+    {
+      "id": "thesis-F11v2d-s100/evader:s11",
+      "checkpoint_sha256": "00ebd4b4deee75f63bb48c275ed11465f2ba33be60c7c2676afd4d28e6d3ae21"
+    },
+    {
+      "id": "thesis-F11v2d-s100/evader:s13",
+      "checkpoint_sha256": "7881b2e18dc76fd2a2507458cbf676130b5018701a63ba1789285d09649130f7"
+    },
+    {
+      "id": "thesis-F11v2d-s100/evader:s15",
+      "checkpoint_sha256": "2197cc4f9ac3e3cbf6ff429fe2714a27ce6c3e5d72ad066d9ff21eaa5592e378"
+    },
+    {
+      "id": "thesis-F11v2d-s100/evader:s17",
+      "checkpoint_sha256": "6d4e4e7b3a35da125c101f2fe581376f99a34820c247683b2bdc1fd8f8a88696"
+    },
+    {
+      "id": "thesis-F11v2d-s100/evader:s19",
+      "checkpoint_sha256": "f9758ced0dcf86db7aaec33e9b3f4083ebbb4b1520cf16e7570c31aa7ee7a09f"
+    },
+    {
+      "id": "thesis-F11v2d-s100/evader:s21",
+      "checkpoint_sha256": "5878b0ac74538487d2a3374d4bd4419b262b5b1aafca4db8504e48a7ff4fe519"
+    },
+    {
+      "id": "thesis-F11v2d-s100/evader:s23",
+      "checkpoint_sha256": "1d283f97b28ca6fefd2f2b84c7ed478a853feef84359c6921771c4128c01cf62"
+    },
+    {
+      "id": "thesis-F11v2d-s100/evader:s25",
+      "checkpoint_sha256": "1f422c55f100ede8f96b443c850aa4bfb0e4b44cc13a831e789564f38b4d0653"
+    },
+    {
+      "id": "thesis-F19-v2d-plain-26-s200/evader:s1",
+      "checkpoint_sha256": "a2487899b641179a294374656fd34fe0da88523c144117c0e2cac9496e721201"
+    },
+    {
+      "id": "thesis-F19-v2d-plain-26-s200/evader:s3",
+      "checkpoint_sha256": "4dd5b3e4a14de0bc855d15e08f2d9d87e631922ed7b0299b774f88785956ec93"
+    },
+    {
+      "id": "thesis-F19-v2d-plain-26-s200/evader:s5",
+      "checkpoint_sha256": "f0c682a0a70fe13fe26ef08b1fd6aa819b338e2791b6ece73dc092e62caa189c"
+    },
+    {
+      "id": "thesis-F19-v2d-plain-26-s200/evader:s7",
+      "checkpoint_sha256": "c9d39dc6a66346f41e6fc856f06e7fcf695526d2b71ef3b2f3e5c735c3cfc68d"
+    },
+    {
+      "id": "thesis-F19-v2d-plain-26-s200/evader:s9",
+      "checkpoint_sha256": "1eceeb6ef43fb7411e66440faa0de443972fb46e450acbb9108ce7015944d160"
+    },
+    {
+      "id": "thesis-F19-v2d-plain-26-s200/evader:s11",
+      "checkpoint_sha256": "41d1b0dc904c7ccb7a415303bde0d1f0a24374257071f306d6df522ae5595f98"
+    },
+    {
+      "id": "thesis-F19-v2d-plain-26-s200/evader:s13",
+      "checkpoint_sha256": "ab6c56183aeb6f415df7a81ff9e608158b78bc87868a626477cde295859edf76"
+    },
+    {
+      "id": "thesis-F19-v2d-plain-26-s200/evader:s15",
+      "checkpoint_sha256": "c4496be678eacb0f0348aa2533b90689619566a5d74e9ebcca1809545b75c797"
+    },
+    {
+      "id": "thesis-F19-v2d-plain-26-s200/evader:s17",
+      "checkpoint_sha256": "6b925239c9e9381cbd5530a8f85ba7afc2208add8ce7377c36bf9c26d829270b"
+    },
+    {
+      "id": "thesis-F19-v2d-plain-26-s200/evader:s19",
+      "checkpoint_sha256": "540fddebf871f979f2ef1c570191b86e2178f6016a67f69fdb88ed5b326ae0b2"
+    },
+    {
+      "id": "thesis-F19-v2d-plain-26-s200/evader:s21",
+      "checkpoint_sha256": "242dec19bf4e0791506b0dddd0863723955c3652b30479ae511d5ef8ec9dd765"
+    },
+    {
+      "id": "thesis-F19-v2d-plain-26-s200/evader:s23",
+      "checkpoint_sha256": "0be3051e54ebc402a311f8aa4264c66f8c100c1408ef5898f602303373a2ce85"
+    },
+    {
+      "id": "thesis-F19-v2d-plain-26-s200/evader:s25",
+      "checkpoint_sha256": "fd6660ec0fcdf65ce55320631f5048e5d813776b0cbf3cf142de0e6ebcd69124"
+    }
+  ]
+}

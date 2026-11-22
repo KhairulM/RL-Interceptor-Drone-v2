@@ -1,0 +1,104 @@
+{
+  "matchups": {
+    "thesis-F21-smoke-cap/evader:s1": {
+      "episodes": 338,
+      "eval_role": "pursuer",
+      "capture_rate": 0.011834319680929184,
+      "neutralization_rate": 1.0,
+      "win_rate": 1.0,
+      "decisive_episodes": 4,
+      "avg_time_to_capture": 1.6799999475479126,
+      "time_to_neutralize_censored": 10.213254928588867,
+      "avg_episode_time": 10.213254928588867,
+      "avg_min_distance": 0.8592764139175415,
+      "avg_motor_effort": 2341.778564453125,
+      "pursuer_crash_rate": 0.0,
+      "outcomes": {
+        "capture": 0.011834319680929184,
+        "pursuer_crash": 0.0,
+        "evader_crash": 0.0,
+        "pursuer_oob": 0.9349112510681152,
+        "evader_oob": 0.9881656765937805,
+        "timeout": 0.0
+      },
+      "behaviour": {
+        "features": [
+          "evader_speed",
+          "evader_altitude",
+          "evader_radius",
+          "evader_vz_abs",
+          "evader_accel",
+          "evader_lat_accel",
+          "evader_turn_rate",
+          "flee_cos",
+          "distance"
+        ],
+        "mean": [
+          0.5561403036117554,
+          2.0981225967407227,
+          1.3839770555496216,
+          0.2366025596857071,
+          0.9160468578338623,
+          0.6590782403945923,
+          0.7510020732879639,
+          0.020988494157791138,
+          1.703456163406372
+        ],
+        "std": [
+          0.26950231194496155,
+          0.30142703652381897,
+          0.49643170833587646,
+          0.18943001329898834,
+          0.6066137552261353,
+          0.4783799648284912,
+          0.8484323024749756,
+          0.4360891580581665,
+          0.4448878765106201
+        ]
+      },
+      "behaviour_pursuer": {
+        "features": [
+          "evader_speed",
+          "evader_altitude",
+          "evader_radius",
+          "evader_vz_abs",
+          "evader_accel",
+          "evader_lat_accel",
+          "evader_turn_rate",
+          "flee_cos",
+          "distance"
+        ],
+        "mean": [
+          0.8215910792350769,
+          2.9041714668273926,
+          1.3630064725875854,
+          0.37845680117607117,
+          1.2642066478729248,
+          0.8728104829788208,
+          0.9609482288360596,
+          0.07777941226959229,
+          1.703456163406372
+        ],
+        "std": [
+          0.38289403915405273,
+          0.7235099673271179,
+          0.6176563501358032,
+          0.2639358341693878,
+          0.6257734894752502,
+          0.564530611038208,
+          1.0705945491790771,
+          0.4054757356643677,
+          0.4448878765106201
+        ]
+      }
+    }
+  },
+  "eval": {
+    "cutoff_steps": 300,
+    "steps_run": 1232,
+    "step_dt": 0.02,
+    "num_envs": 256,
+    "switch": null,
+    "episodes": 338
+  }
+}

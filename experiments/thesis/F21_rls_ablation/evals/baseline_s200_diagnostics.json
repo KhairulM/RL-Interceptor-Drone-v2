@@ -1,0 +1,186 @@
+{
+  "f8_to_f10": {
+    "live": {
+      "error_windows": [
+        {
+          "start_s": 0.0,
+          "end_s": 0.5,
+          "count": 41592,
+          "mean_mps": 0.1896340323266789
+        },
+        {
+          "start_s": 0.5,
+          "end_s": 1.5,
+          "count": 74442,
+          "mean_mps": 0.18841083839192593
+        },
+        {
+          "start_s": 1.5,
+          "end_s": 3.0,
+          "count": 64238,
+          "mean_mps": 0.21855323044481134
+        }
+      ],
+      "snapshots": {
+        "0.5": {
+          "count": 1657,
+          "drift_initial_median": 0.05636013299226761,
+          "drift_switch_median": 0.030064839869737625,
+          "trace_ratio_median": 1.0,
+          "cap_occupancy": 0.8943874471937237
+        },
+        "1.5": {
+          "count": 1356,
+          "drift_initial_median": 0.07491233944892883,
+          "drift_switch_median": 0.05968084745109081,
+          "trace_ratio_median": 1.0,
+          "cap_occupancy": 0.9786135693215339
+        },
+        "3.0": {
+          "count": 627,
+          "drift_initial_median": 0.09928315132856369,
+          "drift_switch_median": 0.09071515500545502,
+          "trace_ratio_median": 1.0,
+          "cap_occupancy": 0.9728867623604466
+        }
+      }
+    },
+    "frozen": {
+      "error_windows": [
+        {
+          "start_s": 0.0,
+          "end_s": 0.5,
+          "count": 41592,
+          "mean_mps": 0.19013423606701332
+        },
+        {
+          "start_s": 0.5,
+          "end_s": 1.5,
+          "count": 74442,
+          "mean_mps": 0.20701825914543778
+        },
+        {
+          "start_s": 1.5,
+          "end_s": 3.0,
+          "count": 64238,
+          "mean_mps": 0.2241576023923331
+        }
+      ],
+      "snapshots": {
+        "0.5": {
+          "count": 1657,
+          "drift_initial_median": 0.0,
+          "drift_switch_median": 0.0,
+          "trace_ratio_median": 0.9999998211860657,
+          "cap_occupancy": 1
+        },
+        "1.5": {
+          "count": 1356,
+          "drift_initial_median": 0.0,
+          "drift_switch_median": 0.0,
+          "trace_ratio_median": 0.9999998211860657,
+          "cap_occupancy": 1
+        },
+        "3.0": {
+          "count": 627,
+          "drift_initial_median": 0.0,
+          "drift_switch_median": 0.0,
+          "trace_ratio_median": 0.9999998211860657,
+          "cap_occupancy": 1
+        }
+      }
+    }
+  },
+  "f10_to_f8": {
+    "live": {
+      "error_windows": [
+        {
+          "start_s": 0.0,
+          "end_s": 0.5,
+          "count": 33102,
+          "mean_mps": 0.2552154928517954
+        },
+        {
+          "start_s": 0.5,
+          "end_s": 1.5,
+          "count": 57808,
+          "mean_mps": 0.196267808094893
+        },
+        {
+          "start_s": 1.5,
+          "end_s": 3.0,
+          "count": 64402,
+          "mean_mps": 0.21344854529753127
+        }
+      ],
+      "snapshots": {
+        "0.5": {
+          "count": 1305,
+          "drift_initial_median": 0.055946458131074905,
+          "drift_switch_median": 0.03892781212925911,
+          "trace_ratio_median": 1.0,
+          "cap_occupancy": 0.8398467432950192
+        },
+        "1.5": {
+          "count": 1082,
+          "drift_initial_median": 0.07905321568250656,
+          "drift_switch_median": 0.07106982544064522,
+          "trace_ratio_median": 1.0,
+          "cap_occupancy": 0.9528650646950092
+        },
+        "3.0": {
+          "count": 729,
+          "drift_initial_median": 0.10676731169223785,
+          "drift_switch_median": 0.10220956802368164,
+          "trace_ratio_median": 1.0,
+          "cap_occupancy": 0.9547325102880658
+        }
+      }
+    },
+    "frozen": {
+      "error_windows": [
+        {
+          "start_s": 0.0,
+          "end_s": 0.5,
+          "count": 33102,
+          "mean_mps": 0.2673150797867864
+        },
+        {
+          "start_s": 0.5,
+          "end_s": 1.5,
+          "count": 57808,
+          "mean_mps": 0.21144827671393257
+        },
+        {
+          "start_s": 1.5,
+          "end_s": 3.0,
+          "count": 64402,
+          "mean_mps": 0.2248474253235527
+        }
+      ],
+      "snapshots": {
+        "0.5": {
+          "count": 1305,
+          "drift_initial_median": 0.0,
+          "drift_switch_median": 0.0,
+          "trace_ratio_median": 0.9999998211860657,
+          "cap_occupancy": 1
+        },
+        "1.5": {
+          "count": 1082,
+          "drift_initial_median": 0.0,
+          "drift_switch_median": 0.0,
+          "trace_ratio_median": 0.9999998211860657,
+          "cap_occupancy": 1
+        },
+        "3.0": {
+          "count": 729,
+          "drift_initial_median": 0.0,
+          "drift_switch_median": 0.0,
+          "trace_ratio_median": 0.9999998211860657,
+          "cap_occupancy": 1
+        }
+      }
+    }
+  }
+}

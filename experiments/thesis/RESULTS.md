@@ -6,23 +6,26 @@ Measured results only. Each section is filled when the experiment finishes, with
 - J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over seeds (with 2 seeds, the range of the two values); "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position + velocity, no acceleration).
 - Training radius and primary results: 0.10 m. **0.15 m values are eval-only exact re-scores** of the same episodes ([R15_rescore/](R15_rescore/), `rescore.py`). Every policy and exploiter was trained for 0.10 m, so **J at 0.15 m is an upper bound and exploitability a lower bound for a 0.15 m game**. Sections below write "(0.15 m convention)" for this. Exception: F7 trained its pursuers and exploiters at 0.15 m.
 
-## Summary (updated 2026-11-19 KST; details in the sections below)
+## Summary (updated 2026-11-22 KST; details in the sections below)
 
 One finding per bullet, 0.10 m unless marked; numbers are copied from the linked sections.
 
 - **F20 (single-rules exploiters swapped between F8 and RLS-26, 3 seeds):** each attacker exploits only the pursuer it was trained against. RLS-26 captures F8's hovering attackers in 93-98 % of episodes; F8 is crashed by RLS's diving attackers in only 1-21 % of episodes (RLS: 94-97 % on seeds 0 / 100) ([F20](#f20)).
 
+- **F21 (RLS parameter ablation in full self-play, 3 seeds):** reducing the forgetting factor from 0.999 (~20 s nominal memory) to 0.98 (~1 s) alone did not improve switch capture (paired change -0.002). Raising the covariance cap increased readout drift but not capture; adding a 10x larger initial covariance/absolute cap to fast RLS decreased capture by 0.077 vs fast+cap on all seeds. None of the tested variants showed a consistent switch/generalization benefit; descriptive, three seeds ([F21](#f21)).
+
 - **F19 (plain pursuer at 26 stages, 3 seeds):** at matched budget the v2d rules alone give no exploitability gain over F8 (+0.002) and no switching gain (post-switch capture 0.546 vs F8 0.592); RLS-26 is notably less exploitable than plain-26 (+0.321) and captures switching evaders notably more often (+0.163). Plain-26 is notably less lurable (lure J +0.370). The 13-stage plain result (exploitability 0.124) does not persist to 26 stages (0.371) ([F19](#f19)).
 
 - **F18 (offline estimator replay on recorded trajectories, 3 seeds):** the stage-24 RLS pursuer's estimate errs by 0.18-0.34 m/s against every evaluation set (offline test 0.143); strong-16 is only 3-17 % worse than the v2d cross pool (P1 not held), the F8 switch evader is the hardest (+11-53 %). Live RLS lowers the error by only 2-9 % and moves the readout by a median 6-13 % of its norm within 2 s. Against the lure exploiter the seed-0 RLS pursuer crashes in 94 % of episodes, F8 times out in 62 % ([F18](#f18)).
 
-**Latest thesis-level conclusions (F14, F15 and F17 complete; exploratory, 3 seeds each)**
+**Latest thesis-level conclusions (F14, F15, F17 and F21 complete; exploratory, 3 seeds each)**
 - **F17 removes F14's rule confound but does not support a G1/G2 gain from the estimator:** at 0.10 m, paired F17-minus-F8 G1 is +0.010 (seed differences -0.013/-0.013/+0.055), while own-Roncero-exploiter J is -0.363 (-0.428/-0.132/-0.528; lower in all three pairs, meeting the registered descriptive degradation threshold). The RLS pursuer's switch post-switch J is +0.051 but seed-variable; capture is +0.098 in all three pairs. Live-minus-frozen post-switch J is only +0.004 ([F17](#f17-roncero-acc)).
 - **The joint goal is not met:** learned acceleration + RLS under v2d improves resistance to same-rules exploiters relative to the Roncero-rule F8 reference, but not the combined G1 generalization score. At 13 stages, G1/G2 gaps are -0.050/+0.364; at 26 stages, -0.035/+0.323. Neither schedule beats F8 on both measures ([F14](#f14)).
 - **The generalization components disagree:** at 26 stages the strong held-out RL gap is -0.103, while the campaign-balanced cross-campaign gap is +0.034. These are different tests, and G1's average must not hide the remaining strong-set deficit. Extending training improves G1 by only +0.015 ([F14](#f14)).
 - **Training with RLS and updating RLS at test time are different effects:** at 26 stages, RLS-trained pursuers exceed no-RLS-trained pursuers by +0.140 G1 and +0.156 post-switch J. Freezing the same RLS-trained pursuer only at evaluation reduces post-switch J by 0.009. This is a small live-update benefit, not evidence that online updating explains most of the training-arm difference ([F14](#f14)).
 - **The estimator is not uniformly better than plain observations:** in Stage C's 13-stage comparison, RLS G1 is 0.833 versus plain v2d's 0.880, although same-rules-exploiter exploitability falls from 0.124 to 0.009. Beating the no-RLS-trained estimator arm is not the same as beating the plain pursuer ([F14](#f14)).
 - **F15 adds the missing F8 pursuer switch baseline:** at 0.10 m, post-switch J/capture is 0.822/0.592 for F8 versus 0.874/0.710 for stage-24 RLS. The mean J gap (+0.052) is seed-variable (RLS-minus-F8: +0.001/-0.067/+0.220), so it fails the registered all-three-seed direction criterion; RLS capture is higher on all three seeds. Live RLS exceeds the same checkpoint frozen at evaluation by only +0.009 J/capture ([F15](#f15-switch-baseline)).
+- **F21 tests the RLS timescale concern in closed-loop self-play:** shortening lambda's nominal memory from about 20 s to 1 s alone leaves post-switch capture unchanged (-0.002 paired mean). A higher cap increases the readout movement, but fast+cap still has -0.039 switch capture vs baseline; increasing initial covariance and its absolute cap further lowers capture by 0.077 vs fast+cap on all three seeds. Readout update effects remain small (live-minus-frozen capture +0.009 baseline, +0.002 fast+cap). These comparisons are descriptive and show no control benefit from the tested higher update rates; they do not establish equivalence or an optimal setting ([F21](#f21)).
 
 **Diagnostics (X0-X4)**
 - The game is mostly transitive; self-play pools are redundant (22 RL evaders = 3.8 distinct behaviours) ([X1](#x1), [X2](#x2)).
@@ -2167,3 +2170,56 @@ The F14 single-rules (thesis-rule) exploiters swapped between F8 and RLS-26 with
 **Predictions.** P1 (F8 crash < 0.10 vs RLS's attackers on every seed): **did not hold** (0.103 / 0.209 / 0.012), although F8 is lured far less than RLS by the same attackers (RLS 0.943 / 0.965 on seeds 0 / 100) and neutralizes them in 85-99 % of episodes. P2 (RLS J vs F8's attackers above F8's own J on every seed): **held** (0.998 / 0.961 / 0.998 vs 0.369 / 0.487 / 0.424). P3 (RLS crash < 0.10 vs F8's attackers): **held** (0.002 / 0.040 / 0.002).
 
 **Reading.** Each single-rules attacker exploits a weakness specific to the pursuer it was trained against and fails against the other pursuer: F8's attackers (hovering just outside the capture radius until the timeout) are captured by RLS-26 in 93-98 % of episodes; RLS's attackers (diving lures) neutralize F8 rarely and crash F8 in only 1-21 % of episodes. F8 is therefore much harder to lure than RLS-26 even by an attacker that learned to lure, but not immune. Consistent with (not a test of) the closing-speed-discount hypothesis from the F18 seed-0 recordings.
+
+
+<a id="f21"></a>
+
+## F21_rls_ablation (complete 2026-11-22; exploratory, three training seeds)
+
+**Question.** Does faster RLS updating improve response to 0.5-1.5 s switching evaders when the RLS setting is used in both sides of a complete, evolving self-play campaign? All four new arms trained both pursuer and evader populations; this was not pursuer training against a frozen evader bank.
+
+**Design and reuse.** F11 v2d rules, Hedge on both roles, 26 stages x 50M frames, seeds 0/100/200, F5 learned `nf_dvel_H10` basis. Adapter settings were mirrored to frozen pursuer opponents during evader training. The five measured settings below include the F14 RLS baseline (reused) plus four new full campaigns; the F14 no-RLS-trained control was also reused. The F14 campaigns supply their matched baseline/control evaluations. The same 39-policy plain-26 cross bank, drawn from F19, was evaluated for every arm; each new RLS checkpoint was also evaluated against fresh own-rule and lure exploiters. Switching evaluations reused F15's protocol and were paired by seed, direction and randomized 0.5/1.0/1.5 s switch time. The primary switch endpoints below are at 0.10 m; generalization/exploiter endpoints are also re-scored at 0.15 m.
+
+At 50 Hz, the nominal exponential memory scale `-dt/log(lambda)` is 20.0 s at lambda=0.999 and 0.99 s at lambda=0.98. This is not a measured settling time: delayed labels, initial covariance and its trace cap also govern updates. Delta=0.1 with cap ratio 10 raises both initial covariance and its absolute trace cap tenfold versus fast+cap.
+
+| Arm | lambda / delta / cap ratio | G1 | Own-rule J | Lure J | Post-switch neutralization (J) | Post-switch capture | Live - frozen capture |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Baseline (F14 RLS) | 0.999 / 0.01 / 1 | 0.827 | 0.950 | 0.264 | 0.874 | 0.710 | +0.009 |
+| Fast | 0.98 / 0.01 / 1 | 0.855 | 0.812 | 0.250 | 0.865 | 0.708 | -0.001 |
+| Cap | 0.999 / 0.01 / 10 | 0.747 | 0.791 | 0.050 | 0.754 | 0.612 | +0.002 |
+| Fast + cap | 0.98 / 0.01 / 10 | 0.808 | 0.997 | 0.075 | 0.822 | 0.671 | +0.002 |
+| Fast + cap + gain | 0.98 / 0.1 / 10 | 0.817 | 0.732 | 0.045 | 0.775 | 0.594 | +0.010 |
+| No-RLS-trained control (F14) | no estimator trained or updated | 0.644 | 0.727 | 0.076 | 0.717 | 0.569 | — |
+
+Arm values are means over three seeds; switch neutralization/capture averages the six direction-by-switch-time cells. “No-RLS-trained” is a training control, distinct from freezing a trained RLS adapter at evaluation (the live-minus-frozen column). For exact per-seed G1, exploitability, failure modes, 0.15 m rescoring and diagnostics, see [`F21_rls_ablation/results.json`](./F21_rls_ablation/results.json) and [`summary.md`](./F21_rls_ablation/summary.md).
+
+**0.15 m convention (eval-only re-score of the same episodes; switch endpoints are not re-scored).** Means over three seeds, from `results.json` (`r0.15`):
+
+| Arm | G1 | Own-rule J | Lure J |
+|---|---:|---:|---:|
+| Baseline (F14 RLS) | 0.940 | 0.986 | 0.822 |
+| Fast | 0.958 | 0.975 | 0.651 |
+| Cap | 0.913 | 0.828 | 0.655 |
+| Fast + cap | 0.934 | 1.000 | 0.700 |
+| Fast + cap + gain | 0.934 | 0.908 | 0.651 |
+| No-RLS-trained control (F14) | 0.882 | 0.995 | 0.675 |
+
+At 0.15 m every arm's lure J rises sharply (baseline 0.264 -> 0.822): most lure-exploiter episodes end within 0.15 m but outside 0.10 m. All policies and exploiters were trained for 0.10 m, so these J values are upper bounds for a 0.15 m game.
+
+**Registered paired switch-capture contrasts (F21 variant minus comparator).**
+
+| Contrast | Seed 0 | Seed 100 | Seed 200 | Mean | Decision |
+|---|---:|---:|---:|---:|---|
+| Fast - baseline | +0.009 | +0.022 | -0.037 | -0.002 | Inconclusive |
+| Cap - baseline | -0.194 | +0.026 | -0.125 | -0.098 | Inconclusive |
+| Fast + cap - fast | -0.010 | -0.020 | -0.080 | -0.037 | Inconclusive |
+| Fast + cap - cap | +0.193 | -0.023 | +0.007 | +0.059 | Inconclusive |
+| Fast + cap + gain - fast + cap | -0.147 | -0.050 | -0.034 | -0.077 | Notable decrease |
+
+The registered rule labels a difference notable only if the absolute mean is at least 0.05 and all three seed differences agree in sign; this is descriptive, not a significance test. The negative gain-arm contrast is consistent across seeds. In contrast, cap alone's -0.098 capture change has mixed signs and is inconclusive. The fast+cap arm versus baseline is -0.039 (-0.001 / +0.002 / -0.118), so it does not meet the predicted +0.05 improvement threshold.
+
+**Readout diagnostics and predictions.** On F21's own recorded switching trajectories, median relative drift from the readout-at-switch after 0.5 s was 0.043 for baseline versus 0.077 for fast+cap; at 1.5 s it was 0.089 versus 0.189. Fast+cap drift exceeded baseline on each seed (P2 held). But this extra readout movement did not improve capture (P3 not held). Live-minus-frozen capture was +0.009 for baseline and +0.002 for fast+cap, with per-seed differences in the contrast +0.004 / -0.011 / -0.014; P4 did not hold. Fast alone did not improve capture by the registered threshold (P1 held as a null prediction). The cap-only arm's lure J contrast versus baseline was -0.214 (-0.046 / -0.020 / -0.578), meeting the descriptive rule for lower J, driven largely by seed 200; interpret cautiously.
+
+**Reading / limitations.** Shortening lambda from 0.999 to 0.98 alone changed mean post-switch capture by only -0.002 and did not increase the live-update benefit. A looser cap and faster forgetting substantially increased readout drift, but not switch capture; increasing delta and its absolute cap further reduced capture versus fast+cap on all three seeds. More RLS movement is therefore not evidence of more useful adaptation. The own/lure attacker and G1 results vary materially by seed, all estimates use three training seeds, and the F14 baseline/frozen-trained arms are reused rather than rerun. No population-level significance or optimal-parameter claim is supported.
+
+**Execution.** Four new arms x three seeds = 12 campaigns (15.6B frames), plus 24 fresh 100M-frame attackers (2.4B frames); F14 baseline and frozen-trained campaigns/evaluations were reused. All four two-role smoke campaigns and live/frozen smoke evaluations passed; all 18 arm-seed evaluation entries and the combined analysis completed on 2026-11-22. No runs were excluded. F16 is next; no automatic commit/push was performed.
