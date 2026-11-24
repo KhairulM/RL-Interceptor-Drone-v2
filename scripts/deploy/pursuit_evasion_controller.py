@@ -13,9 +13,11 @@ can be driven three ways (``opponent.mode`` in the config):
                  both learned policies compete on hardware (the real self-play
                  deployment);
 * ``cf``       - a real Crazyflie tracked by mocap but commanded elsewhere;
-* ``scripted`` - hover / linear / circular / pure_pursuit / flee position
-                 setpoints, mirroring the seed heuristics the population was
-                 trained against.
+* ``scripted`` - the opponent Crazyflie flies hover / linear / circular /
+                 pure_pursuit / flee position setpoints, mirroring the seed
+                 heuristics the population was trained against
+                 (``opponent.scripted.virtual: true``: no opponent drone, the
+                 agent chases a virtual point).
 
 Policies that observe extra estimator outputs carry the estimator in their
 artifact and run it here, once per control tick, exactly as in training: the
@@ -132,8 +134,11 @@ class ScriptedMotionConfig:
 
     type: str = 'hover'          # hover | linear | circular | pure_pursuit | flee
     yaw_deg: float = 0.0         # yaw of every setpoint (deg)
+    # false: the opponent Crazyflie takes off and flies the setpoints.
+    # true: no opponent drone; the agent chases a virtual point that jumps to each setpoint.
+    virtual: bool = False
     # Start / hover point [x, y, z] in mocap world coordinates (m); flee holds its z.
-    # Omitted: [2, 0, flight.takeoff_height].
+    # Omitted: where the opponent is after take-off (virtual: [2, 0, flight.takeoff_height]).
     anchor: Optional[list] = None
     speed: float = 1.0           # linear and flee speed (m/s)
     direction: list = field(default_factory=lambda: [1.0, 0.0, 0.0])   # linear, world frame
@@ -577,7 +582,9 @@ class PursuitEvasionController:
 
         self.drone_pose_pub = DronePosePublisher(world_frame=self.mocap_config.world_frame)
         self.own = CrazyflieDrone(self.self_config, pose_publisher=self.drone_pose_pub)
-        opponent_cls = ScriptedDrone if self.opponent_mode == 'scripted' else CrazyflieDrone
+        # False only for a virtual scripted opponent: then no drone is connected, flown or monitored.
+        self.opponent_flies = not (self.opponent_mode == 'scripted' and self.motion.virtual)
+        opponent_cls = CrazyflieDrone if self.opponent_flies else ScriptedDrone
         self.opponent = opponent_cls(self.opponent_drone_config, pose_publisher=self.drone_pose_pub)
 
         self.mocap_tf_publisher: Optional[MocapTfPublisher] = None
@@ -619,7 +626,7 @@ class PursuitEvasionController:
                     break
 
                 self.own.publish_pose()
-                if self.opponent_mode != 'scripted':
+                if self.opponent_flies:
                     self.opponent.publish_pose()
                 clock.wait()
         except KeyboardInterrupt:
@@ -643,7 +650,7 @@ class PursuitEvasionController:
     def _episode_over(self, own_state: pec.DroneState, opponent_state: pec.DroneState, now: float) -> bool:
         """Check the run-ending conditions (stale state, crash, evader exit, timeout, capture); log the first hit."""
         ep = self.cfg.episode
-        real_opponent = self.opponent_mode != 'scripted'
+        real_opponent = self.opponent_flies
         # SAFETY_PLAN B2: the opponent's state can go stale too (policy / cf mode).
         for role, state, monitored in ((self.role, own_state, True),
                                        (self.opponent_role, opponent_state, real_opponent)):
@@ -782,7 +789,7 @@ class PursuitEvasionController:
 
         rigid_ids = self._rigid_ids
         self.mocap_receiver.register(rigid_ids[self.role], self.own, frame_id=self.role)
-        if self.opponent_mode != 'scripted':
+        if self.opponent_flies:
             self.mocap_receiver.register(
                 rigid_ids[self.opponent_role], self.opponent, frame_id=self.opponent_role)
         self.mocap_receiver.start()
@@ -796,7 +803,7 @@ class PursuitEvasionController:
     def _monitored_states(self, own_state=None, opponent_state=None) -> dict:
         """States the safety layer checks: the agent, plus the opponent when it is a real drone."""
         states = {self.role: own_state if own_state is not None else self.own.get_state()}
-        if self.opponent_mode != 'scripted':
+        if self.opponent_flies:
             states[self.opponent_role] = (opponent_state if opponent_state is not None
                                           else self.opponent.get_state())
         return states
@@ -804,7 +811,7 @@ class PursuitEvasionController:
     def _mocap_health(self) -> Optional[dict]:
         if self.mocap_receiver is None:
             return None
-        roles = [self.role] + ([self.opponent_role] if self.opponent_mode != 'scripted' else [])
+        roles = [self.role] + ([self.opponent_role] if self.opponent_flies else [])
         return {r: self.mocap_receiver.health(self._rigid_ids[r]) for r in roles}
 
     def _arm_and_takeoff(self) -> None:
@@ -813,7 +820,7 @@ class PursuitEvasionController:
         # position blocks the take-off instead of only logging a warning.
         problems = []
         for key, drone, tracked in (('own', self.own, True),
-                                    ('opp', self.opponent, self.opponent_mode != 'scripted')):
+                                    ('opp', self.opponent, self.opponent_flies)):
             if not tracked:
                 continue
             if self.mocap_config.enabled and not status[key].get('mocap_aligned', False):
@@ -827,14 +834,19 @@ class PursuitEvasionController:
                 raise RuntimeError('[pe] Pre-flight checks failed, not taking off: ' + '; '.join(problems))
             logger.warning('[pe] Pre-flight problems (strict_preflight off, continuing): %s', '; '.join(problems))
         flight = self.cfg.flight
-        self.own.takeoff(flight.takeoff_height, duration=flight.takeoff_duration)
-        self.opponent.takeoff(flight.takeoff_height, duration=flight.takeoff_duration)
+        # Start both take-offs, then wait once, so the drones climb together.
+        started = [d.takeoff_async(flight.takeoff_height, duration=flight.takeoff_duration)
+                   for d in (self.own, self.opponent)]
+        if any(started):
+            time.sleep(flight.takeoff_duration + 1.0)
 
     def _initialize_motion_anchor(self) -> None:
         takeoff_height = self.cfg.flight.takeoff_height
-        if self.opponent_mode == 'scripted':
+        if not self.opponent_flies:
             self.motion_anchor[2] = takeoff_height
             return
+        if self.opponent_mode == 'scripted' and self.motion.anchor is not None:
+            return  # configured anchor, used as given
         deadline = time.time() + 2.0
         while time.time() < deadline:
             state = self.opponent.get_state()

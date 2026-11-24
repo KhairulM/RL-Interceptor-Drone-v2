@@ -21,7 +21,7 @@ DEPLOY = REPO / "scripts/deploy"
 ARTIFACT = DEPLOY / "artifacts/thesis_F14_rls_s200"
 TRAJ = REPO / "experiments/thesis/F18_trajectories/traj/T2_rls_s200_cross.pt"
 PE_CONFIGS = ["config_pursuit_evasion", "config_sim_pvp", "config_sim_pvp_lpf", "config_sim_pvp_v4",
-              "config_sim_pursuer_hover", "config_sim_pursuer_vs_hover"]
+              "config_sim_pursuer_hover", "config_sim_pursuer_vs_hover", "config_sim_f14", "config_real_f14"]
 
 
 def _stub(name, **attrs):
@@ -160,7 +160,11 @@ class ConfigTest(unittest.TestCase):
             with self.subTest(name):
                 cfg = pe_ctrl.ControllerConfig.from_yaml_dict(self._yaml(name), name)
                 self.assertTrue(cfg.policy.artifact_dir)
-                pec.load_drone_config_from_yaml(str(DEPLOY / f"{name}.yaml"), "pursuer")
+                for role in ("pursuer", "evader"):
+                    drone_cfg = pec.load_drone_config_from_yaml(str(DEPLOY / f"{name}.yaml"), role)
+                    # cflib's send_setpoint sends yaw as-is and the firmware negates it (legacy packet); measured
+                    # in CrazySim 2026-11-24: +45 deg/s commanded -> -48 deg/s yaw. Roll and pitch arrive as sent.
+                    self.assertEqual(list(drone_cfg.rate_sign), [1.0, 1.0, -1.0])
                 pec.load_mocap_config_from_yaml(str(DEPLOY / f"{name}.yaml"))
 
     def test_defaults_when_sections_are_omitted(self):
@@ -198,6 +202,27 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(c.opponent_agent.role, "evader")
         self.assertAlmostEqual(c.control_dt, 0.02)
         self.assertAlmostEqual(c.capture_radius, c.metadata.capture_radius)
+
+    @unittest.skipUnless(HAVE_ARTIFACT, "F14 RLS artifact missing")
+    def test_scripted_opponent_flies_a_real_drone_unless_virtual(self):
+        import tempfile
+        import yaml
+        import drone
+        base = self._yaml("config_pursuit_evasion")
+        for virtual, cls in ((False, drone.CrazyflieDrone), (True, drone.ScriptedDrone)):
+            with self.subTest(virtual=virtual):
+                cfg = dict(base, opponent={"mode": "scripted", "scripted": {"type": "hover", "virtual": virtual}})
+                with tempfile.NamedTemporaryFile("w", suffix=".yaml", dir=DEPLOY, delete=False) as f:
+                    yaml.safe_dump(cfg, f)
+                cwd = os.getcwd()
+                os.chdir(DEPLOY)
+                try:
+                    c = pe_ctrl.PursuitEvasionController(argparse.Namespace(config=f.name))
+                finally:
+                    os.chdir(cwd)
+                    os.unlink(f.name)
+                self.assertIsInstance(c.opponent, cls)
+                self.assertEqual(c.opponent_flies, not virtual)
 
 
 if __name__ == "__main__":

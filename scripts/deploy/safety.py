@@ -45,9 +45,11 @@ class Verdict:
 @dataclass
 class SafetyConfig:
     enabled: bool = True
-    # Hardware geofence (arena + margin) for BOTH drones; separate from the training rule that only the evader is
-    # confined. Predictive check: position + velocity * stop_lookahead_s.
-    geofence_margin: float = 0.3
+    # Hardware geofence: arena + margin (walls and ceiling). Predictive check: position + velocity * stop_lookahead_s.
+    evader_geofence_margin: float = 0.3  # m
+    # m, pursuer; None = not fenced (training lets the pursuer leave the arena freely; simulator only, SAFETY_PLAN B8).
+    # On hardware set it to the room the lab has beyond the arena walls and below the ceiling.
+    pursuer_geofence_margin: Optional[float] = 0.3
     stop_lookahead_s: float = 0.3
     min_altitude: float = 0.10
     max_descent_speed: float = 2.5      # m/s, checked below descent_check_alt
@@ -111,8 +113,8 @@ class SafetyMonitor:
         self.latched = Verdict()
         self._hold_since: Dict[str, float] = {}
 
-    def _fence(self, local: np.ndarray) -> bool:
-        a, m = self.arena, self.cfg.geofence_margin
+    def _fence(self, local: np.ndarray, m: float) -> bool:
+        a = self.arena
         return bool(abs(local[0]) > a.half_xy + m or abs(local[1]) > a.half_xy + m or local[2] > a.z_max + m)
 
     def check_drone(self, v: Verdict, role: str, state, now: float, mocap_age: Optional[float] = None,
@@ -148,10 +150,12 @@ class SafetyMonitor:
         if speed > c.max_speed:
             v.raise_to(Level.LAND, f'{role}: speed {speed:.1f} m/s')
         local = np.asarray(state.pos, dtype=np.float64) - self.arena.origin
-        if self._fence(local):
-            v.raise_to(Level.LAND, f'{role}: outside the geofence at {np.round(local, 2).tolist()}')
-        elif self._fence(local + np.asarray(state.lin_vel) * c.stop_lookahead_s):
-            v.raise_to(Level.HOLD, f'{role}: about to leave the geofence')
+        margin = c.pursuer_geofence_margin if role == 'pursuer' else c.evader_geofence_margin
+        if margin is not None:
+            if self._fence(local, margin):
+                v.raise_to(Level.LAND, f'{role}: outside the geofence at {np.round(local, 2).tolist()}')
+            elif self._fence(local + np.asarray(state.lin_vel) * c.stop_lookahead_s, margin):
+                v.raise_to(Level.HOLD, f'{role}: about to leave the geofence')
         if local[2] < c.descent_check_alt and state.lin_vel[2] < -c.max_descent_speed:
             # HOLD, not motors off: a position setpoint makes the firmware brake with full thrust, while cutting the
             # motors at this height only makes the impact harder (CrazySim test 2026-11-12). If the drone still hits

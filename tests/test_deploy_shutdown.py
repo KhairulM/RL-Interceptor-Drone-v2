@@ -48,6 +48,13 @@ class FakeDrone(pec_ctrl.CrazyflieDrone):
         self.log.append(("land", self.name, time.time()))
         return True
 
+    def arm(self):
+        return {"estimator_converged": True}
+
+    def takeoff_async(self, height, duration=3.0):
+        self.log.append(("takeoff", self.name, time.time()))
+        return True
+
     def emergency_stop(self):
         self.log.append(("estop", self.name, time.time()))
         self.armed = False
@@ -103,6 +110,22 @@ class ShutdownTest(unittest.TestCase):
         self.assertIn("hold", kinds)
         self.assertLess(kinds.index("hold"), kinds.index("land"))
         self.assertEqual(sorted(n for k, n, _ in log if k == "land"), ["evader", "pursuer"])
+
+
+class TakeoffTest(unittest.TestCase):
+
+    def test_both_takeoffs_start_together(self):          # was takeoff(own) -> 4 s -> takeoff(opponent)
+        c, log = controller()
+        c.opponent_flies = True
+        c.mocap_config = SimpleNamespace(enabled=False)
+        c.safety_cfg = SafetyConfig(enabled=False)
+        c.cfg = SimpleNamespace(flight=SimpleNamespace(takeoff_height=1.0, takeoff_duration=0.1))
+        start = time.time()
+        c._arm_and_takeoff()
+        takeoffs = [(n, t) for kind, n, t in log if kind == "takeoff"]
+        self.assertEqual([n for n, _ in takeoffs], ["pursuer", "evader"])
+        self.assertLess(abs(takeoffs[1][1] - takeoffs[0][1]), 0.05)
+        self.assertGreaterEqual(time.time() - start, 1.1)  # waits once for the take-off to finish
 
 
 if __name__ == "__main__":

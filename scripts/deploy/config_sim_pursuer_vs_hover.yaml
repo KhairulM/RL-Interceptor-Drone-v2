@@ -50,7 +50,7 @@ pursuer:
   control_dt: 0.02
   log_period_ms: 20
   max_thrust_pwm: 65535.0
-  rate_sign: [1.0, 1.0, 1.0]
+  rate_sign: [1.0, 1.0, -1.0]  # [roll, pitch, yaw]; the firmware negates yaw in the legacy setpoint packet
   state_timeout: 0.1
   min_altitude: 0.1
 
@@ -63,7 +63,7 @@ evader:
   control_dt: 0.02
   log_period_ms: 20
   max_thrust_pwm: 65535.0
-  rate_sign: [1.0, 1.0, 1.0]
+  rate_sign: [1.0, 1.0, -1.0]  # [roll, pitch, yaw]; the firmware negates yaw in the legacy setpoint packet
   state_timeout: 0.1
   min_altitude: 0.1
 

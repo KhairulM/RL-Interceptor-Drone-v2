@@ -1,0 +1,71 @@
+# PursuitEvasion controller configuration (pursuit_evasion_controller.py).
+# CrazySim variant: F14 RLS seed-200 pursuer vs the same campaign's final evader.
+# config_pursuit_evasion.yaml documents every key.
+# Run with:  python pursuit_evasion_controller.py --config config_sim_f14.yaml
+
+policy:
+  artifact_dir: artifacts/thesis_F14_rls_s200/pursuer   # estimator + RLS, obs 31
+
+opponent:
+  mode: policy                 # policy | cf | scripted
+  artifact_dir: artifacts/thesis_F14_rls_s200/evader    # stage 25
+  scripted:
+    type: hover
+
+
+arena:
+  origin: [0.0, 0.0, 0.0]      # CrazySim world; pursuer spawns at (-1, 0), evader at (1, 0)
+  scripted_margin: 0.3
+
+episode:
+  stop_on_capture: true
+  capture_radius: 0.10         
+  stop_on_evader_exit: true
+  state_timeout: 0.5
+  min_altitude: 0.10
+
+flight:
+  takeoff_height: 1.0
+  takeoff_duration: 3.0
+  land_duration: 3.0
+  control_dt: 0.0
+  command_rate_lpf_tau: 0.03    # raise to 0.02-0.05 if the pursuer rolls / oscillates
+
+logging:
+  log_commands: true
+  debug_obs: false             # true prints the estimator output (opp_acc/10(body))
+  debug_period_s: 0.5
+  publish_tf: true
+
+# -- Pursuer drone (CrazySim instance 0; cflib port = firmware port 19950 - 100) --
+pursuer:
+  name: pursuer
+  uri: udp://127.0.0.1:19850
+  cache_dir: ./cache-pursuer
+  control_dt: 0.02
+  log_period_ms: 20
+  max_thrust_pwm: 65535.0
+  rate_sign: [1.0, 1.0, -1.0]  # [roll, pitch, yaw]; the firmware negates yaw in the legacy setpoint packet
+  state_timeout: 0.1
+  min_altitude: 0.1
+
+# -- Evader drone (CrazySim instance 1) -------------------------------------------
+evader:
+  name: evader
+  uri: udp://127.0.0.1:19851
+  cache_dir: ./cache-evader
+  control_dt: 0.02
+  log_period_ms: 20
+  max_thrust_pwm: 65535.0
+  rate_sign: [1.0, 1.0, -1.0]  # [roll, pitch, yaw]; the firmware negates yaw in the legacy setpoint packet
+  state_timeout: 0.1
+  min_altitude: 0.1
+
+mocap:
+  enabled: false               # CrazySim feeds the firmware its pose
+
+# Safety layer: defaults from safety.py (enabled; tilt > 60 deg or body rate > 720 deg/s -> motors off).
+safety:
+  enabled: true
+  pursuer_geofence_margin: 0.5   # the pursuer may leave the arena (as in training); the evader stays fenced
+  inject: {kind: none, at_s: 5.0}   # stale_opponent | nan_action | position_jump | tilt

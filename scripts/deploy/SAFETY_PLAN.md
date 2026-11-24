@@ -62,7 +62,7 @@ harder, a position setpoint makes the firmware brake.
 | 6 | Telemetry from a drone stops (radio dropouts) | per log block (position, attitude, gyro) time since the last packet > `telemetry_timeout` (0.1 s), checked for **both** drones | HOLD; LAND if > 0.3 s. If the link is lost the firmware levels after 0.5 s and cuts motors after 2 s by itself; document this |
 | 7 | NaN / Inf in a state or a policy output | `np.isfinite` on the observation and the action | HOLD (EMERGENCY if the state itself is non-finite) |
 | 8 | Tumbling or extreme attitude | tilt from the quaternion > `max_tilt` (60 deg), or body rate > `max_body_rate` (720 deg/s) | EMERGENCY |
-| 9 | Flying out of the space (either drone; the training rule that only the evader is confined is separate) | hard geofence = arena + `geofence_margin` (0.3 m) incl. ceiling; predictive check `p + v * t_stop` (0.3 s) | HOLD at the boundary, LAND if outside the hard fence |
+| 9 | Flying out of the space (either drone; the training rule that only the evader is confined is separate) | hard geofence = arena + `evader_geofence_margin` (evader) / `pursuer_geofence_margin` (pursuer; both 0.3 m by default, `null` = pursuer not fenced, simulator only) incl. ceiling; predictive check `p + v * t_stop` (0.3 s) | HOLD at the boundary, LAND if outside the hard fence |
 | 10 | Too low / hitting the floor | z < `min_altitude` (0.10 m) during the chase, or vertical speed < -`max_descent` (2.5 m/s) below 0.6 m | LAND below the threshold; HOLD (firmware brakes) if falling faster than the limit near the floor. Changed from EMERGENCY after the CrazySim test: motors off at 0.6 m makes the impact harder |
 | 11 | Drones about to collide | centre distance < `min_separation` (0.20 m on hardware; the 0.10 m training capture radius means physical contact) | treat as capture: HOLD both, then LAND |
 | 12 | Battery low | log `pm.vbat`; pre-flight >= 3.8 V; in flight < 3.3 V for 1 s | pre-flight: refuse to take off; in flight: LAND |
@@ -98,7 +98,7 @@ harder, a position setpoint makes the firmware brake.
    a NaN, stalls the loop for 0.3 s, or drives a scripted opponent out of the fence; check each response visually and
    in the log. Mocap faults are tested by feeding synthetic frames into `MocapReceiver._on_rigid_body`.
 3. **Hardware, staged:** (a) props off: pre-flight checks and mocap gating with the drones carried by hand (swap the
-   rigid bodies, block markers); (b) one drone, scripted opponent, low speed limits; (c) both drones with policy mode.
+   rigid bodies, block markers); (b) one drone, virtual scripted opponent (`opponent.scripted.virtual: true`), low speed limits; (c) both drones with policy mode.
 
 ### A5. Open questions for you
 
@@ -132,6 +132,7 @@ Severity: **high** = can cause a crash or uncontrolled flight; **medium** = wron
 | B15 | low | config | `trajectory: save` is advertised but nothing in the controller implements trajectory logging. | no reference to `trajectory` in the controller | implement (A3 step 6) or remove. **Removed** from the PE configs in the 11-2026 config refactor |
 | B16 | low | `mocap._on_rigid_body` | `_first_send_stamp` is read and written outside the lock (the rest of the per-body state is locked). | lines 163-166 | move under the lock |
 | B17 | to check | config vs CrazySim | The config uses UDP ports 19850 / 19851; `sitl_multiagent_text.sh` starts the firmware on 19950 / 19951. An earlier CrazySim test stalled in the cflib handshake. Not verified which port cflib must use. | config lines 71 / 84; launcher | verify in CrazySim |
+| B18 | high | `drone.send_ctbr` / config `rate_sign` | The yaw-rate command reaches the drone with the wrong sign: cflib's legacy `send_setpoint` sends yaw as-is and the firmware negates it (`crtp_commander_rpyt.c`, "legacy rate input is inverted"); roll and pitch arrive as sent. Measured in CrazySim 2026-11-24: +45 deg/s commanded -> -48 deg/s. Yaw feedback through the policy is then positive, so the drones oscillate in yaw. | `rate_sign: [1, 1, 1]` in every config | **Fixed** (`rate_sign: [1, 1, -1]`) in the PursuitEvasion configs (tested) and the intercept configs (`config_v2.yaml`, `config_sim_intercept_esn.yaml`) |
 
 Not bugs, but worth knowing: on a radio link loss the host cannot do anything; the firmware itself levels the drone
 after 0.5 s without setpoints and stops the motors after 2 s. Landing commands (`land()`) use the onboard estimator, so

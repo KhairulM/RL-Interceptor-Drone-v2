@@ -43,7 +43,7 @@ pursuer:
   control_dt: 0.02                 # 0 = use the policy's training dt.
   log_period_ms: 20                 # Log decoded body rates + thrust every N ms (0 = disable).
   max_thrust_pwm: 65535.0              # Upper clamp on commanded thrust (0..65535).
-  rate_sign: [1.0, 1.0, 1.0]           # Per-axis sign flips: [roll, pitch, yaw].
+  rate_sign: [1.0, 1.0, -1.0]          # Per-axis sign flips: [roll, pitch, yaw]; the firmware negates yaw in the legacy setpoint packet.
   state_timeout: 0.1                   # Stop if state is stale this long (s).
   min_altitude: 0.1                   # Safety cutoff altitude (m).
 
@@ -57,7 +57,7 @@ evader:
   control_dt: 0.02                 # 0 = use the policy's training dt.
   log_period_ms: 20                 # Log decoded body rates + thrust every N ms (0 = disable).
   max_thrust_pwm: 65535.0              # Upper clamp on commanded thrust (0..65535).
-  rate_sign: [1.0, 1.0, 1.0]           # Per-axis sign flips: [roll, pitch, yaw].
+  rate_sign: [1.0, 1.0, -1.0]          # Per-axis sign flips: [roll, pitch, yaw]; the firmware negates yaw in the legacy setpoint packet.
 
 # -- Run logging -------------------------------------------------------------
 # Each run takes the first trial number N whose folders are still empty, per

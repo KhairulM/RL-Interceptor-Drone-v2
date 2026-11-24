@@ -67,6 +67,13 @@ class MonitorTest(unittest.TestCase):
         self.assertEqual(self.mon().check({"pursuer": st(pos=(2.2, 0, 1), vel=(2, 0, 0))}, 10.0).level, L.HOLD)
         self.assertEqual(self.mon().check({"pursuer": st(pos=(0, 0, 3.4))}, 10.0).level, L.LAND)   # ceiling
 
+    def test_pursuer_fence_off_keeps_evader_fenced(self):
+        def free():
+            return self.mon(pursuer_geofence_margin=None)    # fresh monitor per check: verdicts latch
+        self.assertEqual(free().check({"pursuer": st(pos=(5.0, 0, 3.6), vel=(3, 0, 0))}, 10.0).level, L.OK)
+        self.assertEqual(free().check({"evader": st(pos=(2.4, 0, 1))}, 10.0).level, L.LAND)
+        self.assertEqual(free().check({"evader": st(pos=(2.2, 0, 1), vel=(2, 0, 0))}, 10.0).level, L.HOLD)
+
     def test_floor_and_fast_descent(self):
         self.assertEqual(self.mon().check({"pursuer": st(pos=(0, 0, 0.05))}, 10.0).level, L.LAND)
         self.assertEqual(self.mon().check({"pursuer": st(pos=(0, 0, 0.4), vel=(0, 0, -3))}, 10.0).level, L.HOLD)

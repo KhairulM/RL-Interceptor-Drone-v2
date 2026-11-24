@@ -1,0 +1,540 @@
+/home/user/Projects/RLInterceptorDrone/.venv-crazyswarm/lib/python3.10/site-packages/torch/jit/_serialization.py:176: DeprecationWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+15:22:51 [INFO] __main__: [pe] Loaded ppo pursuer policy (obs_dim=31) from /home/user/Projects/RLInterceptorDrone/scripts/deploy/artifacts/thesis_F14_rls_s200/pursuer/policy_ts.pt
+15:22:51 [INFO] __main__: [pe] pursuer opponent adapter: nf/dvel H=10 K=10, RLS online (lambda=0.999, delta=0.01)
+/home/user/Projects/RLInterceptorDrone/.venv-crazyswarm/lib/python3.10/site-packages/torch/jit/_serialization.py:176: DeprecationWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+15:22:51 [INFO] __main__: [pe] Loaded ppo evader policy (obs_dim=28) from /home/user/Projects/RLInterceptorDrone/scripts/deploy/artifacts/thesis_F14_rls_s200/evader/policy_ts.pt
+15:22:51 [INFO] cflib.crazyflie: Callback->Connection initialized[udp://127.0.0.1:19850]
+15:22:51 [INFO] cflib.crazyflie: We are connected[udp://127.0.0.1:19850], request connection setup
+15:22:51 [INFO] cflib.crazyflie.platformservice: Request _request_protocol_version()
+15:22:51 [INFO] cflib.crazyflie: Callback->Connected to [udp://127.0.0.1:19850]
+15:22:51 [INFO] cflib.crazyflie.platformservice: _crt_service_callback
+15:22:51 [INFO] cflib.crazyflie.platformservice: Request protocol version
+15:22:51 [INFO] cflib.crazyflie.platformservice: _platform_callback
+15:22:51 [INFO] cflib.crazyflie.platformservice: Protocol version (platform): 7
+15:22:51 [INFO] cflib.crazyflie.toc: TOC for port [5] found in cache
+15:22:51 [INFO] cflib.crazyflie: Log TOC finished updating
+15:22:51 [INFO] cflib.crazyflie.mem: 2 memories found
+15:22:51 [INFO] cflib.crazyflie: Memories finished updating
+15:22:51 [INFO] cflib.crazyflie.toc: TOC for port [2] found in cache
+15:22:51 [INFO] cflib.crazyflie: Param TOC finished updating
+15:22:51 [INFO] cflib.crazyflie: Callback->Connection setup finished [udp://127.0.0.1:19850]
+15:22:51 [INFO] drone: [pursuer] Connected to udp://127.0.0.1:19850
+15:22:52 [INFO] cflib.crazyflie: All parameters updated
+15:22:52 [INFO] cflib.crazyflie: Callback->Connection completed [udp://127.0.0.1:19850]
+15:22:52 [INFO] cflib.crazyflie: Callback->Connection initialized[udp://127.0.0.1:19851]
+15:22:52 [INFO] cflib.crazyflie: We are connected[udp://127.0.0.1:19851], request connection setup
+15:22:52 [INFO] cflib.crazyflie.platformservice: Request _request_protocol_version()
+15:22:52 [INFO] cflib.crazyflie.log: Have successfully started logging for id=1
+15:22:52 [INFO] cflib.crazyflie: Callback->Connected to [udp://127.0.0.1:19851]
+15:22:52 [INFO] cflib.crazyflie.platformservice: _crt_service_callback
+15:22:52 [INFO] cflib.crazyflie.platformservice: Request protocol version
+15:22:52 [INFO] cflib.crazyflie.platformservice: _platform_callback
+15:22:52 [INFO] cflib.crazyflie.platformservice: Protocol version (platform): 7
+15:22:52 [INFO] cflib.crazyflie.log: Have successfully started logging for id=2
+15:22:52 [INFO] cflib.crazyflie.log: Have successfully started logging for id=3
+15:22:52 [INFO] cflib.crazyflie.toc: TOC for port [5] found in cache
+15:22:52 [INFO] cflib.crazyflie: Log TOC finished updating
+15:22:52 [INFO] cflib.crazyflie.mem: 2 memories found
+15:22:52 [INFO] cflib.crazyflie: Memories finished updating
+15:22:52 [INFO] cflib.crazyflie.toc: TOC for port [2] found in cache
+15:22:52 [INFO] cflib.crazyflie: Param TOC finished updating
+15:22:52 [INFO] cflib.crazyflie: Callback->Connection setup finished [udp://127.0.0.1:19851]
+15:22:52 [INFO] drone: [evader] Connected to udp://127.0.0.1:19851
+15:22:53 [INFO] cflib.crazyflie: All parameters updated
+15:22:53 [INFO] cflib.crazyflie: Callback->Connection completed [udp://127.0.0.1:19851]
+15:22:53 [INFO] cflib.crazyflie.log: Have successfully started logging for id=1
+15:22:53 [INFO] cflib.crazyflie.log: Have successfully started logging for id=2
+15:22:53 [INFO] cflib.crazyflie.log: Have successfully started logging for id=3
+15:22:54 [INFO] drone: [pursuer] Arming request sent. Waiting for Mocap to align orientation...
+15:23:04 [WARNING] drone: [pursuer] Mocap orientation not aligned. Position estimate may be inaccurate.
+15:23:04 [INFO] cflib.crazyflie.log: Have successfully started logging for id=4
+15:23:05 [INFO] cflib.crazyflie.log: Have successfully stopped logging for id=4
+15:23:05 [INFO] cflib.crazyflie.log: Have successfully deleted id=4
+15:23:05 [INFO] drone: [pursuer] Armed. Commander unlocked. Ready to take off.
+15:23:06 [INFO] drone: [evader] Arming request sent. Waiting for Mocap to align orientation...
+15:23:16 [WARNING] drone: [evader] Mocap orientation not aligned. Position estimate may be inaccurate.
+15:23:16 [INFO] cflib.crazyflie.log: Have successfully started logging for id=4
+15:23:17 [INFO] cflib.crazyflie.log: Have successfully stopped logging for id=4
+15:23:17 [INFO] cflib.crazyflie.log: Have successfully deleted id=4
+15:23:17 [INFO] drone: [evader] Armed. Commander unlocked. Ready to take off.
+15:23:17 [INFO] drone: [pursuer] Taking off to 1.00 m over 3.0 s...
+15:23:17 [INFO] drone: [evader] Taking off to 1.00 m over 3.0 s...
+15:23:21 [INFO] __main__: [pe] Running pursuer policy at 50.0 Hz vs evader (policy). Ctrl+C tostop.
+15:23:21 [INFO] __main__: [pe] alt=1.09m dist=2.00m rates(deg/s)=[-14,+23,-15] thrust_pwm=60968
+15:23:21 [WARNING] __main__: [pe] Control loop overran its 20.0 ms budget by 51.4 ms (1/1 ticks late); the policy is running slower than its trained 50.0 Hz.
+15:23:21 [INFO] __main__: [pe] alt=1.09m dist=2.00m rates(deg/s)=[-11,+32,-15] thrust_pwm=62310
+15:23:21 [INFO] __main__: [pe] alt=1.09m dist=2.00m rates(deg/s)=[-9,+33,-15] thrust_pwm=62590
+15:23:21 [INFO] __main__: [pe] alt=1.09m dist=2.00m rates(deg/s)=[-9,+32,-15] thrust_pwm=62971
+15:23:21 [INFO] __main__: [pe] alt=1.09m dist=2.00m rates(deg/s)=[-11,+32,-15] thrust_pwm=62968
+15:23:21 [INFO] __main__: [pe] alt=1.09m dist=2.00m rates(deg/s)=[-11,+32,-15] thrust_pwm=63193
+15:23:21 [INFO] __main__: [pe] alt=1.09m dist=2.00m rates(deg/s)=[-12,+31,-15] thrust_pwm=63296
+15:23:21 [INFO] __main__: [pe] alt=1.09m dist=2.00m rates(deg/s)=[-12,+32,-15] thrust_pwm=63146
+15:23:22 [INFO] __main__: [pe] alt=1.09m dist=2.00m rates(deg/s)=[-13,+27,-15] thrust_pwm=63433
+15:23:22 [INFO] __main__: [pe] alt=1.09m dist=2.00m rates(deg/s)=[-11,+22,-15] thrust_pwm=63604
+15:23:22 [INFO] __main__: [pe] alt=1.10m dist=2.00m rates(deg/s)=[-9,+17,-15] thrust_pwm=63363
+15:23:22 [INFO] __main__: [pe] alt=1.10m dist=2.00m rates(deg/s)=[-7,+11,-16] thrust_pwm=63366
+15:23:22 [INFO] __main__: [pe] alt=1.10m dist=2.00m rates(deg/s)=[-4,+6,-16] thrust_pwm=63508
+15:23:22 [INFO] __main__: [pe] alt=1.11m dist=1.99m rates(deg/s)=[-2,+1,-17] thrust_pwm=63542
+15:23:22 [INFO] __main__: [pe] alt=1.11m dist=1.99m rates(deg/s)=[-1,-2,-17] thrust_pwm=63582
+15:23:22 [INFO] __main__: [pe] alt=1.12m dist=1.99m rates(deg/s)=[-0,-4,-17] thrust_pwm=63583
+15:23:22 [INFO] __main__: [pe] alt=1.13m dist=1.99m rates(deg/s)=[+0,-4,-18] thrust_pwm=63574
+15:23:22 [INFO] __main__: [pe] alt=1.13m dist=1.98m rates(deg/s)=[-0,-2,-18] thrust_pwm=63559
+15:23:22 [INFO] __main__: [pe] alt=1.14m dist=1.98m rates(deg/s)=[-2,+0,-18] thrust_pwm=63518
+15:23:22 [INFO] __main__: [pe] alt=1.15m dist=1.97m rates(deg/s)=[-3,+4,-18] thrust_pwm=63487
+15:23:22 [INFO] __main__: [pe] alt=1.16m dist=1.97m rates(deg/s)=[-6,+7,-19] thrust_pwm=63468
+15:23:22 [INFO] __main__: [pe] alt=1.17m dist=1.96m rates(deg/s)=[-9,+13,-19] thrust_pwm=62901
+15:23:22 [INFO] __main__: [pe] alt=1.19m dist=1.96m rates(deg/s)=[-10,+17,-19] thrust_pwm=62805
+15:23:22 [INFO] __main__: [pe] alt=1.20m dist=1.95m rates(deg/s)=[-11,+18,-20] thrust_pwm=62893
+15:23:22 [INFO] __main__: [pe] alt=1.21m dist=1.94m rates(deg/s)=[-11,+18,-20] thrust_pwm=63043
+15:23:22 [INFO] __main__: [pe] alt=1.23m dist=1.93m rates(deg/s)=[-10,+18,-20] thrust_pwm=63079
+15:23:22 [INFO] __main__: [pe] alt=1.24m dist=1.93m rates(deg/s)=[-9,+18,-20] thrust_pwm=63023
+15:23:22 [INFO] __main__: [pe] alt=1.26m dist=1.92m rates(deg/s)=[-7,+17,-20] thrust_pwm=62998
+15:23:22 [INFO] __main__: [pe] alt=1.28m dist=1.91m rates(deg/s)=[-4,+16,-20] thrust_pwm=62735
+15:23:22 [INFO] __main__: [pe] alt=1.30m dist=1.90m rates(deg/s)=[-2,+15,-20] thrust_pwm=62454
+15:23:22 [INFO] __main__: [pe] alt=1.31m dist=1.89m rates(deg/s)=[-1,+13,-20] thrust_pwm=62517
+15:23:22 [INFO] __main__: [pe] alt=1.33m dist=1.88m rates(deg/s)=[+1,+13,-19] thrust_pwm=62017
+15:23:22 [INFO] __main__: [pe] alt=1.35m dist=1.87m rates(deg/s)=[+3,+16,-18] thrust_pwm=60373
+15:23:22 [INFO] __main__: [pe] alt=1.37m dist=1.86m rates(deg/s)=[+10,+14,-19] thrust_pwm=61097
+15:23:22 [INFO] __main__: [pe] alt=1.39m dist=1.85m rates(deg/s)=[+10,+19,-19] thrust_pwm=58912
+15:23:22 [INFO] __main__: [pe] alt=1.41m dist=1.83m rates(deg/s)=[+12,+15,-19] thrust_pwm=60284
+15:23:22 [INFO] __main__: [pe] alt=1.44m dist=1.81m rates(deg/s)=[+14,+16,-19] thrust_pwm=60019
+15:23:22 [INFO] __main__: [pe] alt=1.46m dist=1.80m rates(deg/s)=[+11,+16,-19] thrust_pwm=57277
+15:23:22 [INFO] __main__: [pe] alt=1.49m dist=1.78m rates(deg/s)=[+14,+10,-19] thrust_pwm=56705
+15:23:22 [INFO] __main__: [pe] alt=1.51m dist=1.76m rates(deg/s)=[+14,+9,-21] thrust_pwm=53461
+15:23:22 [INFO] __main__: [pe] alt=1.54m dist=1.75m rates(deg/s)=[+12,+10,-23] thrust_pwm=48586
+15:23:22 [INFO] __main__: [pe] alt=1.57m dist=1.72m rates(deg/s)=[+12,-3,-26] thrust_pwm=47184
+15:23:22 [INFO] __main__: [pe] alt=1.60m dist=1.70m rates(deg/s)=[+8,-14,-31] thrust_pwm=45993
+15:23:22 [INFO] __main__: [pe] alt=1.62m dist=1.69m rates(deg/s)=[+4,-18,-34] thrust_pwm=44271
+15:23:22 [INFO] __main__: [pe] alt=1.65m dist=1.66m rates(deg/s)=[-2,-27,-39] thrust_pwm=39817
+15:23:22 [INFO] __main__: [pe] alt=1.68m dist=1.64m rates(deg/s)=[-10,-38,-45] thrust_pwm=35698
+15:23:22 [INFO] __main__: [pe] alt=1.71m dist=1.61m rates(deg/s)=[-18,-47,-50] thrust_pwm=34115
+15:23:22 [INFO] __main__: [pe] alt=1.73m dist=1.59m rates(deg/s)=[-27,-53,-52] thrust_pwm=33328
+15:23:22 [INFO] __main__: [pe] alt=1.76m dist=1.57m rates(deg/s)=[-30,-59,-54] thrust_pwm=32312
+15:23:22 [INFO] __main__: [pe] alt=1.79m dist=1.54m rates(deg/s)=[-30,-66,-57] thrust_pwm=32204
+15:23:22 [INFO] __main__: [pe] alt=1.82m dist=1.51m rates(deg/s)=[-23,-70,-60] thrust_pwm=32052
+15:23:22 [INFO] __main__: [pe] alt=1.84m dist=1.49m rates(deg/s)=[-14,-71,-61] thrust_pwm=32099
+15:23:22 [INFO] __main__: [pe] alt=1.87m dist=1.46m rates(deg/s)=[-3,-70,-59] thrust_pwm=31714
+15:23:22 [INFO] __main__: [pe] alt=1.89m dist=1.43m rates(deg/s)=[+11,-69,-57] thrust_pwm=30516
+15:23:22 [INFO] __main__: [pe] alt=1.92m dist=1.41m rates(deg/s)=[+26,-66,-55] thrust_pwm=30254
+15:23:22 [INFO] __main__: [pe] alt=1.94m dist=1.38m rates(deg/s)=[+47,-64,-54] thrust_pwm=30222
+15:23:22 [INFO] __main__: [pe] alt=1.97m dist=1.36m rates(deg/s)=[+72,-40,-54] thrust_pwm=36186
+15:23:22 [INFO] __main__: [pe] alt=1.99m dist=1.32m rates(deg/s)=[+95,-51,-56] thrust_pwm=25577
+15:23:23 [INFO] __main__: [pe] alt=2.02m dist=1.29m rates(deg/s)=[+102,-63,-62] thrust_pwm=20238
+15:23:23 [INFO] __main__: [pe] alt=2.04m dist=1.26m rates(deg/s)=[+105,-64,-67] thrust_pwm=18137
+15:23:23 [INFO] __main__: [pe] alt=2.05m dist=1.24m rates(deg/s)=[+97,-63,-68] thrust_pwm=16187
+15:23:23 [INFO] __main__: [pe] alt=2.07m dist=1.23m rates(deg/s)=[+101,-38,-73] thrust_pwm=20382
+15:23:23 [INFO] __main__: [pe] alt=2.09m dist=1.20m rates(deg/s)=[+95,-34,-68] thrust_pwm=21805
+15:23:23 [INFO] __main__: [pe] alt=2.11m dist=1.17m rates(deg/s)=[+79,-47,-62] thrust_pwm=21451
+15:23:23 [INFO] __main__: [pe] alt=2.13m dist=1.15m rates(deg/s)=[+63,-40,-54] thrust_pwm=23852
+15:23:23 [INFO] __main__: [pe] alt=2.14m dist=1.12m rates(deg/s)=[+41,-39,-50] thrust_pwm=25442
+15:23:23 [INFO] __main__: [pe] alt=2.15m dist=1.10m rates(deg/s)=[+26,-36,-48] thrust_pwm=26710
+15:23:23 [INFO] __main__: [pe] alt=2.16m dist=1.09m rates(deg/s)=[+9,-27,-52] thrust_pwm=25934
+15:23:23 [INFO] __main__: [pe] alt=2.17m dist=1.07m rates(deg/s)=[+1,-25,-52] thrust_pwm=27721
+15:23:23 [INFO] __main__: [pe] alt=2.18m dist=1.05m rates(deg/s)=[+13,-21,-51] thrust_pwm=28248
+15:23:23 [INFO] __main__: [pe] alt=2.18m dist=1.03m rates(deg/s)=[+11,-13,-49] thrust_pwm=29186
+15:23:23 [INFO] __main__: [pe] alt=2.19m dist=1.02m rates(deg/s)=[+1,+0,-49] thrust_pwm=30853
+15:23:23 [INFO] __main__: [pe] alt=2.19m dist=1.00m rates(deg/s)=[-3,+5,-50] thrust_pwm=32660
+15:23:23 [INFO] __main__: [pe] alt=2.19m dist=0.98m rates(deg/s)=[-10,+17,-50] thrust_pwm=34254
+15:23:23 [INFO] __main__: [pe] alt=2.19m dist=0.97m rates(deg/s)=[-13,+32,-51] thrust_pwm=37387
+15:23:23 [INFO] __main__: [pe] alt=2.18m dist=0.95m rates(deg/s)=[-20,+45,-51] thrust_pwm=40152
+15:23:23 [INFO] __main__: [pe] alt=2.18m dist=0.94m rates(deg/s)=[-30,+56,-49] thrust_pwm=41940
+15:23:23 [INFO] __main__: [pe] alt=2.17m dist=0.93m rates(deg/s)=[-37,+62,-47] thrust_pwm=43789
+15:23:23 [INFO] __main__: [pe] alt=2.16m dist=0.91m rates(deg/s)=[-44,+68,-45] thrust_pwm=44922
+15:23:23 [INFO] __main__: [pe] alt=2.15m dist=0.90m rates(deg/s)=[-51,+75,-42] thrust_pwm=46927
+15:23:23 [INFO] __main__: [pe] alt=2.15m dist=0.89m rates(deg/s)=[-58,+79,-39] thrust_pwm=49659
+15:23:23 [INFO] __main__: [pe] alt=2.14m dist=0.88m rates(deg/s)=[-58,+79,-37] thrust_pwm=52880
+15:23:23 [INFO] __main__: [pe] alt=2.12m dist=0.87m rates(deg/s)=[-56,+79,-35] thrust_pwm=55434
+15:23:23 [INFO] __main__: [pe] alt=2.11m dist=0.86m rates(deg/s)=[-46,+75,-35] thrust_pwm=56832
+15:23:23 [INFO] __main__: [pe] alt=2.11m dist=0.86m rates(deg/s)=[-22,+61,-39] thrust_pwm=57966
+15:23:23 [INFO] __main__: [pe] alt=2.10m dist=0.85m rates(deg/s)=[-17,+53,-39] thrust_pwm=58924
+15:23:23 [INFO] __main__: [pe] alt=2.08m dist=0.84m rates(deg/s)=[-13,+47,-39] thrust_pwm=59549
+15:23:23 [INFO] __main__: [pe] alt=2.07m dist=0.84m rates(deg/s)=[-7,+39,-41] thrust_pwm=59816
+15:23:23 [INFO] __main__: [pe] alt=2.05m dist=0.82m rates(deg/s)=[+3,+27,-44] thrust_pwm=59773
+15:23:23 [INFO] __main__: [pe] alt=2.05m dist=0.82m rates(deg/s)=[+15,+18,-48] thrust_pwm=60105
+15:23:23 [INFO] __main__: [pe] alt=2.04m dist=0.82m rates(deg/s)=[+15,+13,-49] thrust_pwm=59918
+15:23:23 [INFO] __main__: [pe] alt=2.03m dist=0.81m rates(deg/s)=[+14,+11,-48] thrust_pwm=59728
+15:23:23 [INFO] __main__: [pe] alt=2.02m dist=0.80m rates(deg/s)=[+3,+11,-48] thrust_pwm=58976
+15:23:23 [INFO] __main__: [pe] alt=2.01m dist=0.80m rates(deg/s)=[-22,+10,-45] thrust_pwm=57208
+15:23:23 [INFO] __main__: [pe] alt=2.00m dist=0.79m rates(deg/s)=[-31,+9,-39] thrust_pwm=57014
+15:23:23 [INFO] __main__: [pe] alt=1.99m dist=0.79m rates(deg/s)=[-41,+10,-40] thrust_pwm=56743
+15:23:23 [INFO] __main__: [pe] alt=1.98m dist=0.78m rates(deg/s)=[-35,+9,-40] thrust_pwm=56833
+15:23:23 [INFO] __main__: [pe] alt=1.97m dist=0.78m rates(deg/s)=[-35,+10,-43] thrust_pwm=57448
+15:23:23 [INFO] __main__: [pe] alt=1.97m dist=0.78m rates(deg/s)=[-36,+10,-41] thrust_pwm=57246
+15:23:23 [INFO] __main__: [pe] alt=1.95m dist=0.77m rates(deg/s)=[-30,+7,-38] thrust_pwm=56247
+15:23:23 [INFO] __main__: [pe] alt=1.95m dist=0.77m rates(deg/s)=[-12,+4,-38] thrust_pwm=56000
+15:23:23 [INFO] __main__: [pe] alt=1.94m dist=0.77m rates(deg/s)=[+7,+3,-39] thrust_pwm=56233
+15:23:23 [INFO] __main__: [pe] alt=1.93m dist=0.77m rates(deg/s)=[+23,+4,-41] thrust_pwm=57055
+15:23:23 [INFO] __main__: [pe] alt=1.93m dist=0.77m rates(deg/s)=[+41,+4,-43] thrust_pwm=57394
+15:23:23 [INFO] __main__: [pe] alt=1.92m dist=0.76m rates(deg/s)=[+69,+2,-49] thrust_pwm=54576
+15:23:23 [INFO] __main__: [pe] alt=1.91m dist=0.77m rates(deg/s)=[+77,+12,-51] thrust_pwm=53556
+15:23:23 [INFO] __main__: [pe] alt=1.91m dist=0.76m rates(deg/s)=[+68,+13,-52] thrust_pwm=53391
+15:23:23 [INFO] __main__: [pe] alt=1.90m dist=0.76m rates(deg/s)=[+81,+11,-47] thrust_pwm=51185
+15:23:24 [INFO] __main__: [pe] alt=1.90m dist=0.76m rates(deg/s)=[+78,+11,-48] thrust_pwm=49975
+15:23:24 [INFO] __main__: [pe] alt=1.89m dist=0.76m rates(deg/s)=[+61,+10,-48] thrust_pwm=48940
+15:23:24 [INFO] __main__: [pe] alt=1.89m dist=0.76m rates(deg/s)=[+31,+5,-44] thrust_pwm=48288
+15:23:24 [INFO] __main__: [pe] alt=1.88m dist=0.76m rates(deg/s)=[+5,-11,-35] thrust_pwm=46755
+15:23:24 [INFO] __main__: [pe] alt=1.88m dist=0.76m rates(deg/s)=[+1,-18,-29] thrust_pwm=45757
+15:23:24 [INFO] __main__: [pe] alt=1.88m dist=0.77m rates(deg/s)=[-12,-27,-31] thrust_pwm=47562
+15:23:24 [INFO] __main__: [pe] alt=1.88m dist=0.77m rates(deg/s)=[-28,-36,-31] thrust_pwm=48491
+15:23:24 [INFO] __main__: [pe] alt=1.87m dist=0.77m rates(deg/s)=[-35,-42,-32] thrust_pwm=48364
+15:23:24 [INFO] __main__: [pe] alt=1.87m dist=0.78m rates(deg/s)=[-36,-45,-34] thrust_pwm=50249
+15:23:24 [INFO] __main__: [pe] alt=1.87m dist=0.78m rates(deg/s)=[-41,-51,-35] thrust_pwm=49835
+15:23:24 [INFO] __main__: [pe] alt=1.86m dist=0.77m rates(deg/s)=[-39,-54,-34] thrust_pwm=47142
+15:23:24 [INFO] __main__: [pe] alt=1.86m dist=0.77m rates(deg/s)=[-24,-46,-32] thrust_pwm=46295
+15:23:24 [INFO] __main__: [pe] alt=1.86m dist=0.77m rates(deg/s)=[-25,-45,-34] thrust_pwm=47183
+15:23:24 [INFO] __main__: [pe] alt=1.86m dist=0.78m rates(deg/s)=[-14,-34,-34] thrust_pwm=47621
+15:23:24 [INFO] __main__: [pe] alt=1.86m dist=0.78m rates(deg/s)=[-11,-22,-37] thrust_pwm=46261
+15:23:24 [INFO] __main__: [pe] alt=1.85m dist=0.78m rates(deg/s)=[-8,-14,-39] thrust_pwm=45272
+15:23:24 [INFO] __main__: [pe] alt=1.85m dist=0.78m rates(deg/s)=[-2,-2,-40] thrust_pwm=43993
+15:23:24 [INFO] __main__: [pe] alt=1.85m dist=0.78m rates(deg/s)=[-4,+7,-39] thrust_pwm=43882
+15:23:24 [INFO] __main__: [pe] alt=1.85m dist=0.78m rates(deg/s)=[-10,+14,-37] thrust_pwm=44410
+15:23:24 [INFO] __main__: [pe] alt=1.85m dist=0.79m rates(deg/s)=[-16,+17,-33] thrust_pwm=45041
+15:23:24 [INFO] __main__: [pe] alt=1.85m dist=0.79m rates(deg/s)=[-23,+18,-29] thrust_pwm=45506
+15:23:24 [INFO] __main__: [pe] alt=1.85m dist=0.79m rates(deg/s)=[-30,+15,-24] thrust_pwm=45439
+15:23:24 [INFO] __main__: [pe] alt=1.85m dist=0.79m rates(deg/s)=[-35,+9,-21] thrust_pwm=45934
+15:23:24 [INFO] __main__: [pe] alt=1.85m dist=0.79m rates(deg/s)=[-40,+0,-18] thrust_pwm=47283
+15:23:24 [INFO] __main__: [pe] alt=1.85m dist=0.79m rates(deg/s)=[-43,-7,-17] thrust_pwm=47630
+15:23:24 [INFO] __main__: [pe] alt=1.85m dist=0.79m rates(deg/s)=[-41,-12,-15] thrust_pwm=47954
+15:23:24 [INFO] __main__: [pe] alt=1.85m dist=0.81m rates(deg/s)=[-36,-14,-13] thrust_pwm=49856
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.79m rates(deg/s)=[-30,-18,-12] thrust_pwm=48700
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.79m rates(deg/s)=[-20,-20,-11] thrust_pwm=47660
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.79m rates(deg/s)=[-10,-18,-11] thrust_pwm=47019
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.78m rates(deg/s)=[+4,-15,-11] thrust_pwm=44747
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.80m rates(deg/s)=[+2,-9,-12] thrust_pwm=46870
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.78m rates(deg/s)=[+25,-2,-12] thrust_pwm=45382
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.78m rates(deg/s)=[+38,+2,-19] thrust_pwm=45053
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.78m rates(deg/s)=[+45,+10,-22] thrust_pwm=43989
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.77m rates(deg/s)=[+45,+16,-22] thrust_pwm=42893
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.77m rates(deg/s)=[+47,+23,-21] thrust_pwm=43841
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.77m rates(deg/s)=[+47,+29,-19] thrust_pwm=44006
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.78m rates(deg/s)=[+44,+31,-15] thrust_pwm=46416
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.78m rates(deg/s)=[+44,+33,-13] thrust_pwm=45816
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.77m rates(deg/s)=[+46,+35,-15] thrust_pwm=44099
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.76m rates(deg/s)=[+47,+34,-18] thrust_pwm=42453
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.76m rates(deg/s)=[+41,+33,-20] thrust_pwm=42621
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.74m rates(deg/s)=[+27,+33,-19] thrust_pwm=39599
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.75m rates(deg/s)=[+17,+34,-14] thrust_pwm=40767
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.73m rates(deg/s)=[-4,+32,-10] thrust_pwm=36255
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.73m rates(deg/s)=[-3,+28,-3] thrust_pwm=36551
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.72m rates(deg/s)=[-9,+22,-3] thrust_pwm=34295
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.71m rates(deg/s)=[-22,+14,-3] thrust_pwm=32786
+15:23:24 [INFO] __main__: [pe] alt=1.84m dist=0.70m rates(deg/s)=[-33,+5,-2] thrust_pwm=33006
+15:23:25 [INFO] __main__: [pe] alt=1.83m dist=0.67m rates(deg/s)=[-54,-14,-2] thrust_pwm=31542
+15:23:25 [INFO] __main__: [pe] alt=1.83m dist=0.67m rates(deg/s)=[-47,-14,+2] thrust_pwm=33763
+15:23:25 [INFO] __main__: [pe] alt=1.83m dist=0.65m rates(deg/s)=[-52,-28,-3] thrust_pwm=29465
+15:23:25 [INFO] __main__: [pe] alt=1.83m dist=0.64m rates(deg/s)=[-57,-34,-8] thrust_pwm=29638
+15:23:25 [INFO] __main__: [pe] alt=1.82m dist=0.62m rates(deg/s)=[-57,-38,-12] thrust_pwm=30342
+15:23:25 [INFO] __main__: [pe] alt=1.82m dist=0.60m rates(deg/s)=[-54,-38,-18] thrust_pwm=31911
+15:23:25 [INFO] __main__: [pe] alt=1.81m dist=0.58m rates(deg/s)=[-55,-34,-24] thrust_pwm=35075
+15:23:25 [INFO] __main__: [pe] alt=1.80m dist=0.56m rates(deg/s)=[-57,-28,-30] thrust_pwm=38260
+15:23:25 [INFO] __main__: [pe] alt=1.80m dist=0.55m rates(deg/s)=[-59,-23,-28] thrust_pwm=43718
+15:23:25 [INFO] __main__: [pe] alt=1.79m dist=0.51m rates(deg/s)=[-67,-24,-26] thrust_pwm=48663
+15:23:25 [INFO] __main__: [pe] alt=1.78m dist=0.49m rates(deg/s)=[-78,-46,-14] thrust_pwm=50922
+15:23:25 [INFO] __main__: [pe] alt=1.78m dist=0.48m rates(deg/s)=[-70,-72,-5] thrust_pwm=48800
+15:23:25 [INFO] __main__: [pe] alt=1.77m dist=0.45m rates(deg/s)=[-54,-100,-3] thrust_pwm=46831
+15:23:25 [INFO] __main__: [pe] alt=1.76m dist=0.42m rates(deg/s)=[-30,-110,-12] thrust_pwm=47773
+15:23:25 [INFO] __main__: [pe] alt=1.74m dist=0.40m rates(deg/s)=[+5,-110,-17] thrust_pwm=52734
+15:23:25 [INFO] __main__: [pe] alt=1.73m dist=0.37m rates(deg/s)=[+36,-102,-22] thrust_pwm=58662
+15:23:25 [INFO] __main__: [pe] alt=1.72m dist=0.34m rates(deg/s)=[+55,-85,-26] thrust_pwm=61517
+15:23:25 [INFO] __main__: [pe] alt=1.71m dist=0.30m rates(deg/s)=[+65,-71,-22] thrust_pwm=61951
+15:23:25 [INFO] __main__: [pe] alt=1.70m dist=0.27m rates(deg/s)=[+66,-62,-17] thrust_pwm=61833
+15:23:25 [INFO] __main__: [pe] alt=1.69m dist=0.24m rates(deg/s)=[+56,-46,-14] thrust_pwm=62120
+15:23:25 [INFO] __main__: [pe] alt=1.68m dist=0.21m rates(deg/s)=[+41,-26,-10] thrust_pwm=62675
+15:23:25 [INFO] __main__: [pe] alt=1.66m dist=0.18m rates(deg/s)=[+30,-7,-1] thrust_pwm=62906
+15:23:25 [INFO] __main__: [pe] alt=1.66m dist=0.17m rates(deg/s)=[+23,+7,+5] thrust_pwm=63027
+15:23:25 [INFO] __main__: [pe] alt=1.65m dist=0.14m rates(deg/s)=[+18,+14,+6] thrust_pwm=63161
+15:23:25 [INFO] __main__: [pe] alt=1.64m dist=0.13m rates(deg/s)=[+8,+13,+4] thrust_pwm=63539
+15:23:25 [INFO] __main__: [pe] alt=1.62m dist=0.14m rates(deg/s)=[-0,+8,+2] thrust_pwm=63897
+15:23:25 [INFO] __main__: [pe] alt=1.61m dist=0.15m rates(deg/s)=[+6,+34,+91] thrust_pwm=61943
+15:23:25 [INFO] __main__: [pe] alt=1.60m dist=0.18m rates(deg/s)=[-1,+47,+124] thrust_pwm=59581
+15:23:25 [INFO] __main__: [pe] alt=1.59m dist=0.21m rates(deg/s)=[-17,+28,+70] thrust_pwm=61442
+15:23:25 [INFO] __main__: [pe] alt=1.58m dist=0.23m rates(deg/s)=[-36,-20,-3] thrust_pwm=63770
+15:23:25 [INFO] __main__: [pe] alt=1.57m dist=0.28m rates(deg/s)=[-47,-41,-9] thrust_pwm=64159
+15:23:25 [INFO] __main__: [pe] alt=1.56m dist=0.32m rates(deg/s)=[-58,-51,+0] thrust_pwm=63833
+15:23:25 [INFO] __main__: [pe] alt=1.55m dist=0.35m rates(deg/s)=[-54,-55,+15] thrust_pwm=62385
+15:23:25 [INFO] __main__: [pe] alt=1.54m dist=0.39m rates(deg/s)=[-29,-40,+32] thrust_pwm=58697
+15:23:25 [INFO] __main__: [pe] alt=1.53m dist=0.43m rates(deg/s)=[-1,-18,+18] thrust_pwm=56963
+15:23:25 [INFO] __main__: [pe] alt=1.52m dist=0.47m rates(deg/s)=[+18,+4,+6] thrust_pwm=57390
+15:23:25 [INFO] __main__: [pe] alt=1.51m dist=0.51m rates(deg/s)=[+30,+13,-4] thrust_pwm=61071
+15:23:25 [INFO] __main__: [pe] alt=1.49m dist=0.56m rates(deg/s)=[+37,+23,-3] thrust_pwm=62967
+15:23:25 [INFO] __main__: [pe] alt=1.49m dist=0.59m rates(deg/s)=[+38,+31,+1] thrust_pwm=63084
+15:23:25 [INFO] __main__: [pe] alt=1.47m dist=0.63m rates(deg/s)=[+32,+36,+3] thrust_pwm=63028
+15:23:25 [INFO] __main__: [pe] alt=1.46m dist=0.68m rates(deg/s)=[+24,+37,+9] thrust_pwm=63008
+15:23:25 [INFO] __main__: [pe] alt=1.45m dist=0.72m rates(deg/s)=[+11,+31,+8] thrust_pwm=63134
+15:23:25 [INFO] __main__: [pe] alt=1.43m dist=0.76m rates(deg/s)=[+0,+18,+3] thrust_pwm=63534
+15:23:25 [INFO] __main__: [pe] alt=1.42m dist=0.79m rates(deg/s)=[-9,+1,-4] thrust_pwm=63914
+15:23:25 [INFO] __main__: [pe] alt=1.41m dist=0.84m rates(deg/s)=[-19,-18,-7] thrust_pwm=64075
+15:23:25 [INFO] __main__: [pe] alt=1.40m dist=0.88m rates(deg/s)=[-26,-31,-6] thrust_pwm=64165
+15:23:25 [INFO] __main__: [pe] alt=1.38m dist=0.92m rates(deg/s)=[-26,-37,-5] thrust_pwm=64166
+15:23:25 [INFO] __main__: [pe] alt=1.37m dist=0.97m rates(deg/s)=[-17,-38,-5] thrust_pwm=63950
+15:23:25 [INFO] __main__: [pe] alt=1.36m dist=1.01m rates(deg/s)=[-2,-32,-4] thrust_pwm=63462
+15:23:25 [INFO] __main__: [pe] alt=1.35m dist=1.06m rates(deg/s)=[+15,-16,-1] thrust_pwm=62610
+15:23:26 [INFO] __main__: [pe] alt=1.34m dist=1.10m rates(deg/s)=[+29,+2,+0] thrust_pwm=61968
+15:23:26 [INFO] __main__: [pe] alt=1.33m dist=1.15m rates(deg/s)=[+34,+13,-2] thrust_pwm=61877
+15:23:26 [INFO] __main__: [pe] alt=1.31m dist=1.19m rates(deg/s)=[+36,+15,-5] thrust_pwm=62771
+15:23:26 [INFO] __main__: [pe] alt=1.30m dist=1.22m rates(deg/s)=[+34,+13,-0] thrust_pwm=63362
+15:23:26 [INFO] __main__: [pe] alt=1.29m dist=1.27m rates(deg/s)=[+31,+13,+2] thrust_pwm=63349
+15:23:26 [INFO] __main__: [pe] alt=1.28m dist=1.31m rates(deg/s)=[+27,+11,+3] thrust_pwm=63280
+15:23:26 [INFO] __main__: [pe] alt=1.28m dist=1.35m rates(deg/s)=[+21,+7,+2] thrust_pwm=63278
+15:23:26 [INFO] __main__: [pe] alt=1.27m dist=1.39m rates(deg/s)=[+13,+0,+2] thrust_pwm=63407
+15:23:26 [INFO] __main__: [pe] alt=1.26m dist=1.43m rates(deg/s)=[+6,-8,+1] thrust_pwm=63601
+15:23:26 [INFO] __main__: [pe] alt=1.25m dist=1.47m rates(deg/s)=[+1,-16,-1] thrust_pwm=63782
+15:23:26 [INFO] __main__: [pe] alt=1.25m dist=1.50m rates(deg/s)=[+1,-18,-2] thrust_pwm=63695
+15:23:26 [INFO] __main__: [pe] alt=1.24m dist=1.55m rates(deg/s)=[+7,-14,-5] thrust_pwm=63184
+15:23:26 [INFO] __main__: [pe] alt=1.23m dist=1.58m rates(deg/s)=[+17,-8,-8] thrust_pwm=62413
+15:23:26 [INFO] __main__: [pe] alt=1.23m dist=1.61m rates(deg/s)=[+24,+3,-9] thrust_pwm=61643
+15:23:26 [INFO] __main__: [pe] alt=1.22m dist=1.65m rates(deg/s)=[+29,+12,-9] thrust_pwm=61159
+15:23:26 [INFO] __main__: [pe] alt=1.22m dist=1.68m rates(deg/s)=[+31,+16,-10] thrust_pwm=61326
+15:23:26 [INFO] __main__: [pe] alt=1.22m dist=1.72m rates(deg/s)=[+33,+17,-8] thrust_pwm=61583
+15:23:26 [INFO] __main__: [pe] alt=1.21m dist=1.75m rates(deg/s)=[+32,+13,-4] thrust_pwm=62137
+15:23:26 [INFO] __main__: [pe] alt=1.21m dist=1.79m rates(deg/s)=[+29,+7,+0] thrust_pwm=62701
+15:23:26 [INFO] __main__: [pe] alt=1.21m dist=1.82m rates(deg/s)=[+24,+1,+3] thrust_pwm=62773
+15:23:26 [INFO] __main__: [pe] alt=1.21m dist=1.85m rates(deg/s)=[+19,-4,+5] thrust_pwm=62989
+15:23:26 [INFO] __main__: [pe] alt=1.21m dist=1.88m rates(deg/s)=[+14,-9,+5] thrust_pwm=63041
+15:23:26 [INFO] __main__: [pe] alt=1.21m dist=1.91m rates(deg/s)=[+9,-12,+4] thrust_pwm=62966
+15:23:26 [INFO] __main__: [pe] alt=1.21m dist=1.94m rates(deg/s)=[+6,-12,+2] thrust_pwm=62832
+15:23:26 [INFO] __main__: [pe] alt=1.21m dist=1.97m rates(deg/s)=[+6,-11,-0] thrust_pwm=62498
+15:23:26 [INFO] __main__: [pe] alt=1.21m dist=2.00m rates(deg/s)=[+8,-6,-2] thrust_pwm=61964
+15:23:26 [INFO] __main__: [pe] alt=1.22m dist=2.02m rates(deg/s)=[+11,+0,-3] thrust_pwm=61216
+15:23:26 [INFO] __main__: [pe] alt=1.22m dist=2.05m rates(deg/s)=[+14,+7,-5] thrust_pwm=60468
+15:23:26 [INFO] __main__: [pe] alt=1.22m dist=2.07m rates(deg/s)=[+16,+13,-5] thrust_pwm=60032
+15:23:26 [INFO] __main__: [pe] alt=1.23m dist=2.09m rates(deg/s)=[+18,+17,-5] thrust_pwm=60066
+15:23:26 [INFO] __main__: [pe] alt=1.23m dist=2.12m rates(deg/s)=[+20,+18,-4] thrust_pwm=60433
+15:23:26 [INFO] __main__: [pe] alt=1.24m dist=2.14m rates(deg/s)=[+22,+17,-2] thrust_pwm=60908
+15:23:26 [INFO] __main__: [pe] alt=1.24m dist=2.16m rates(deg/s)=[+23,+13,+1] thrust_pwm=61429
+15:23:26 [INFO] __main__: [pe] alt=1.25m dist=2.18m rates(deg/s)=[+22,+8,+2] thrust_pwm=61671
+15:23:26 [INFO] __main__: [pe] alt=1.26m dist=2.20m rates(deg/s)=[+20,+3,+3] thrust_pwm=61764
+15:23:26 [INFO] __main__: [pe] alt=1.26m dist=2.23m rates(deg/s)=[+17,-2,+3] thrust_pwm=61830
+15:23:26 [INFO] __main__: [pe] alt=1.27m dist=2.25m rates(deg/s)=[+15,-2,+2] thrust_pwm=61595
+15:23:26 [INFO] __main__: [pe] alt=1.28m dist=2.27m rates(deg/s)=[+13,-2,+0] thrust_pwm=61301
+15:23:26 [INFO] __main__: [pe] alt=1.29m dist=2.28m rates(deg/s)=[+12,-2,-0] thrust_pwm=61135
+15:23:26 [INFO] __main__: [pe] alt=1.30m dist=2.28m rates(deg/s)=[+12,+1,-1] thrust_pwm=60536
+15:23:26 [INFO] __main__: [pe] alt=1.31m dist=2.31m rates(deg/s)=[+11,+7,-2] thrust_pwm=59660
+15:23:26 [INFO] __main__: [pe] alt=1.33m dist=2.33m rates(deg/s)=[+12,+12,-3] thrust_pwm=58899
+15:23:26 [INFO] __main__: [pe] alt=1.34m dist=2.34m rates(deg/s)=[+12,+19,-4] thrust_pwm=58151
+15:23:26 [INFO] __main__: [pe] alt=1.34m dist=2.34m rates(deg/s)=[+14,+20,-4] thrust_pwm=58652
+15:23:26 [INFO] __main__: [pe] alt=1.36m dist=2.35m rates(deg/s)=[+17,+24,-4] thrust_pwm=58522
+15:23:26 [INFO] __main__: [pe] alt=1.38m dist=2.38m rates(deg/s)=[+19,+25,-4] thrust_pwm=58114
+15:23:26 [INFO] __main__: [pe] alt=1.40m dist=2.37m rates(deg/s)=[+21,+23,-4] thrust_pwm=58767
+15:23:26 [INFO] __main__: [pe] alt=1.40m dist=2.39m rates(deg/s)=[+22,+19,-3] thrust_pwm=59661
+15:23:26 [INFO] __main__: [pe] alt=1.42m dist=2.43m rates(deg/s)=[+21,+16,-2] thrust_pwm=59470
+15:23:26 [INFO] __main__: [pe] alt=1.43m dist=2.41m rates(deg/s)=[+19,+13,-2] thrust_pwm=59133
+15:23:27 [INFO] __main__: [pe] alt=1.45m dist=2.42m rates(deg/s)=[+17,+9,-2] thrust_pwm=58836
+15:23:27 [INFO] __main__: [pe] alt=1.47m dist=2.46m rates(deg/s)=[+15,+6,-2] thrust_pwm=58535
+15:23:27 [INFO] __main__: [pe] alt=1.49m dist=2.44m rates(deg/s)=[+12,+2,-2] thrust_pwm=58493
+15:23:27 [INFO] __main__: [pe] alt=1.51m dist=2.45m rates(deg/s)=[+9,-1,-1] thrust_pwm=58216
+15:23:27 [INFO] __main__: [pe] alt=1.53m dist=2.45m rates(deg/s)=[+7,-1,-1] thrust_pwm=57703
+15:23:27 [INFO] __main__: [pe] alt=1.55m dist=2.47m rates(deg/s)=[+5,+3,-0] thrust_pwm=56656
+15:23:27 [INFO] __main__: [pe] alt=1.58m dist=2.47m rates(deg/s)=[+4,+6,-0] thrust_pwm=55697
+15:23:27 [INFO] __main__: [pe] alt=1.58m dist=2.49m rates(deg/s)=[+5,+9,-0] thrust_pwm=56125
+15:23:27 [INFO] __main__: [pe] alt=1.61m dist=2.47m rates(deg/s)=[+5,+9,-0] thrust_pwm=56378
+15:23:27 [INFO] __main__: [pe] alt=1.63m dist=2.50m rates(deg/s)=[+5,+8,-0] thrust_pwm=56007
+15:23:27 [INFO] __main__: [pe] alt=1.66m dist=2.50m rates(deg/s)=[+5,+7,-0] thrust_pwm=56179
+15:23:27 [INFO] __main__: [pe] alt=1.68m dist=2.48m rates(deg/s)=[+5,+5,-0] thrust_pwm=56359
+15:23:27 [INFO] __main__: [pe] alt=1.73m dist=2.47m rates(deg/s)=[+5,+2,+0] thrust_pwm=55610
+15:23:27 [INFO] __main__: [pe] alt=1.73m dist=2.50m rates(deg/s)=[+6,-1,+1] thrust_pwm=56343
+15:23:27 [INFO] __main__: [pe] alt=1.76m dist=2.47m rates(deg/s)=[+7,-4,+1] thrust_pwm=56581
+15:23:27 [INFO] __main__: [pe] alt=1.79m dist=2.47m rates(deg/s)=[+7,-7,+2] thrust_pwm=55751
+15:23:27 [INFO] __main__: [pe] alt=1.81m dist=2.47m rates(deg/s)=[+6,-9,+1] thrust_pwm=54647
+15:23:27 [INFO] __main__: [pe] alt=1.84m dist=2.47m rates(deg/s)=[+5,-8,+1] thrust_pwm=53612
+15:23:27 [INFO] __main__: [pe] alt=1.87m dist=2.47m rates(deg/s)=[+5,-8,+1] thrust_pwm=53128
+15:23:27 [INFO] __main__: [pe] alt=1.88m dist=2.48m rates(deg/s)=[+4,-7,+1] thrust_pwm=52922
+15:23:27 [INFO] __main__: [pe] alt=1.92m dist=2.46m rates(deg/s)=[+3,-6,+1] thrust_pwm=52177
+15:23:27 [INFO] __main__: [pe] alt=1.95m dist=2.46m rates(deg/s)=[+3,-4,+1] thrust_pwm=51316
+15:23:27 [INFO] __main__: [pe] alt=1.98m dist=2.45m rates(deg/s)=[+3,-2,+1] thrust_pwm=51124
+15:23:27 [INFO] __main__: [pe] alt=2.00m dist=2.46m rates(deg/s)=[+3,-1,+1] thrust_pwm=51813
+15:23:27 [INFO] __main__: [pe] alt=2.03m dist=2.46m rates(deg/s)=[+3,-1,+1] thrust_pwm=52448
+15:23:27 [INFO] __main__: [pe] alt=2.06m dist=2.45m rates(deg/s)=[+3,-2,+2] thrust_pwm=52345
+15:23:27 [INFO] __main__: [pe] alt=2.09m dist=2.44m rates(deg/s)=[+4,-3,+2] thrust_pwm=52258
+15:23:27 [INFO] __main__: [pe] alt=2.12m dist=2.44m rates(deg/s)=[+4,-4,+2] thrust_pwm=51905
+15:23:27 [INFO] __main__: [pe] alt=2.15m dist=2.43m rates(deg/s)=[+4,-5,+2] thrust_pwm=51765
+15:23:27 [INFO] __main__: [pe] alt=2.19m dist=2.42m rates(deg/s)=[+4,-6,+2] thrust_pwm=50996
+15:23:27 [INFO] __main__: [pe] alt=2.22m dist=2.42m rates(deg/s)=[+4,-6,+2] thrust_pwm=50190
+15:23:27 [INFO] __main__: [pe] alt=2.25m dist=2.41m rates(deg/s)=[+4,-6,+2] thrust_pwm=49739
+15:23:27 [INFO] __main__: [pe] alt=2.28m dist=2.40m rates(deg/s)=[+4,-6,+2] thrust_pwm=48832
+15:23:27 [INFO] __main__: [pe] alt=2.31m dist=2.38m rates(deg/s)=[+3,-6,+2] thrust_pwm=48200
+15:23:27 [INFO] __main__: [pe] alt=2.34m dist=2.37m rates(deg/s)=[+3,-4,+2] thrust_pwm=47501
+15:23:27 [INFO] __main__: [pe] alt=2.37m dist=2.37m rates(deg/s)=[+2,-3,+2] thrust_pwm=47300
+15:23:27 [INFO] __main__: [pe] alt=2.41m dist=2.36m rates(deg/s)=[+2,-2,+1] thrust_pwm=47476
+15:23:27 [INFO] __main__: [pe] alt=2.44m dist=2.34m rates(deg/s)=[+1,-3,+1] thrust_pwm=47938
+15:23:27 [INFO] __main__: [pe] alt=2.46m dist=2.35m rates(deg/s)=[+1,-3,+0] thrust_pwm=48217
+15:23:27 [INFO] __main__: [pe] alt=2.49m dist=2.33m rates(deg/s)=[-0,-4,-0] thrust_pwm=47905
+15:23:27 [INFO] __main__: [pe] alt=2.52m dist=2.32m rates(deg/s)=[-1,-4,-1] thrust_pwm=47448
+15:23:27 [INFO] __main__: [pe] alt=2.56m dist=2.30m rates(deg/s)=[-2,-4,-2] thrust_pwm=46502
+15:23:27 [INFO] __main__: [pe] alt=2.59m dist=2.29m rates(deg/s)=[-4,-4,-2] thrust_pwm=45754
+15:23:27 [INFO] __main__: [pe] alt=2.62m dist=2.27m rates(deg/s)=[-5,-5,-3] thrust_pwm=45249
+15:23:27 [INFO] __main__: [pe] alt=2.65m dist=2.26m rates(deg/s)=[-7,-6,-4] thrust_pwm=44821
+15:23:27 [INFO] __main__: [pe] alt=2.68m dist=2.25m rates(deg/s)=[-10,-7,-4] thrust_pwm=44835
+15:23:27 [INFO] __main__: [pe] alt=2.71m dist=2.23m rates(deg/s)=[-14,-9,-5] thrust_pwm=44311
+15:23:27 [INFO] __main__: [pe] alt=2.74m dist=2.21m rates(deg/s)=[-17,-9,-6] thrust_pwm=43386
+15:23:27 [INFO] __main__: [pe] alt=2.77m dist=2.20m rates(deg/s)=[-21,-9,-7] thrust_pwm=42389
+15:23:27 [INFO] __main__: [pe] alt=2.80m dist=2.18m rates(deg/s)=[-24,-9,-8] thrust_pwm=41758
+15:23:28 [INFO] __main__: [pe] alt=2.83m dist=2.16m rates(deg/s)=[-27,-10,-9] thrust_pwm=41328
+15:23:28 [INFO] __main__: [pe] alt=2.85m dist=2.16m rates(deg/s)=[-28,-11,-9] thrust_pwm=41123
+15:23:28 [INFO] __main__: [pe] alt=2.88m dist=2.14m rates(deg/s)=[-30,-12,-10] thrust_pwm=40450
+15:23:28 [INFO] __main__: [pe] alt=2.91m dist=2.12m rates(deg/s)=[-34,-13,-11] thrust_pwm=39460
+15:23:28 [INFO] __main__: [pe] alt=2.93m dist=2.10m rates(deg/s)=[-37,-14,-12] thrust_pwm=38137
+15:23:28 [INFO] __main__: [pe] alt=2.96m dist=2.08m rates(deg/s)=[-40,-13,-13] thrust_pwm=36709
+15:23:28 [INFO] __main__: [pe] alt=2.99m dist=2.06m rates(deg/s)=[-41,-11,-13] thrust_pwm=35160
+15:23:28 [INFO] __main__: [pe] alt=3.02m dist=2.04m rates(deg/s)=[-43,-10,-14] thrust_pwm=34641
+15:23:28 [INFO] __main__: [pe] alt=3.04m dist=2.02m rates(deg/s)=[-46,-12,-15] thrust_pwm=34585
+15:23:28 [INFO] __main__: [pe] alt=3.07m dist=1.99m rates(deg/s)=[-48,-11,-16] thrust_pwm=34069
+15:23:28 [INFO] __main__: [pe] alt=3.10m dist=1.97m rates(deg/s)=[-51,-9,-17] thrust_pwm=33174
+15:23:28 [INFO] __main__: [pe] alt=3.12m dist=1.95m rates(deg/s)=[-55,-6,-18] thrust_pwm=32223
+15:23:28 [INFO] __main__: [pe] alt=3.14m dist=1.93m rates(deg/s)=[-55,-5,-19] thrust_pwm=32079
+15:23:28 [INFO] __main__: [pe] alt=3.16m dist=1.92m rates(deg/s)=[-53,-4,-19] thrust_pwm=31562
+15:23:28 [INFO] __main__: [pe] alt=3.18m dist=1.89m rates(deg/s)=[-54,-3,-20] thrust_pwm=31702
+15:23:28 [INFO] __main__: [pe] alt=3.20m dist=1.87m rates(deg/s)=[-54,-2,-21] thrust_pwm=31851
+15:23:28 [INFO] __main__: [pe] alt=3.22m dist=1.84m rates(deg/s)=[-52,+0,-22] thrust_pwm=31502
+15:23:28 [INFO] __main__: [pe] alt=3.23m dist=1.82m rates(deg/s)=[-52,+5,-23] thrust_pwm=30641
+15:23:28 [INFO] __main__: [pe] alt=3.25m dist=1.79m rates(deg/s)=[-50,+9,-24] thrust_pwm=29862
+15:23:28 [INFO] __main__: [pe] alt=3.27m dist=1.76m rates(deg/s)=[-46,+15,-26] thrust_pwm=29691
+15:23:28 [INFO] __main__: [pe] alt=3.28m dist=1.74m rates(deg/s)=[-43,+19,-27] thrust_pwm=29550
+15:23:28 [INFO] __main__: [pe] alt=3.29m dist=1.72m rates(deg/s)=[-37,+24,-28] thrust_pwm=28694
+15:23:28 [INFO] __main__: [pe] alt=3.31m dist=1.69m rates(deg/s)=[-30,+30,-29] thrust_pwm=28544
+15:23:28 [INFO] __main__: [pe] alt=3.32m dist=1.66m rates(deg/s)=[-26,+37,-31] thrust_pwm=28749
+15:23:28 [INFO] __main__: [pe] alt=3.33m dist=1.63m rates(deg/s)=[-21,+45,-33] thrust_pwm=27551
+15:23:28 [INFO] __main__: [pe] alt=3.34m dist=1.60m rates(deg/s)=[-19,+51,-35] thrust_pwm=25926
+15:23:28 [INFO] __main__: [pe] alt=3.35m dist=1.57m rates(deg/s)=[-9,+51,-35] thrust_pwm=26685
+15:23:28 [INFO] __main__: [pe] alt=3.36m dist=1.54m rates(deg/s)=[+1,+55,-36] thrust_pwm=26484
+15:23:28 [INFO] __main__: [pe] alt=3.36m dist=1.51m rates(deg/s)=[+3,+60,-37] thrust_pwm=26163
+15:23:28 [INFO] __main__: [pe] alt=3.37m dist=1.48m rates(deg/s)=[+7,+65,-38] thrust_pwm=26813
+15:23:28 [INFO] __main__: [pe] alt=3.37m dist=1.45m rates(deg/s)=[+13,+69,-39] thrust_pwm=27571
+15:23:28 [INFO] __main__: [pe] alt=3.37m dist=1.42m rates(deg/s)=[+16,+72,-40] thrust_pwm=28200
+15:23:28 [INFO] __main__: [pe] alt=3.37m dist=1.38m rates(deg/s)=[+16,+75,-40] thrust_pwm=29250
+15:23:28 [INFO] __main__: [pe] alt=3.37m dist=1.35m rates(deg/s)=[+20,+75,-40] thrust_pwm=30755
+15:23:28 [INFO] __main__: [pe] alt=3.37m dist=1.31m rates(deg/s)=[+19,+76,-41] thrust_pwm=32321
+15:23:28 [INFO] __main__: [pe] alt=3.37m dist=1.28m rates(deg/s)=[+20,+71,-41] thrust_pwm=34310
+15:23:28 [INFO] __main__: [pe] alt=3.37m dist=1.25m rates(deg/s)=[+25,+54,-40] thrust_pwm=39125
+15:23:28 [INFO] __main__: [pe] alt=3.36m dist=1.23m rates(deg/s)=[+15,+51,-38] thrust_pwm=39024
+15:23:28 [INFO] __main__: [pe] alt=3.36m dist=1.19m rates(deg/s)=[+10,+61,-39] thrust_pwm=39773
+15:23:28 [INFO] __main__: [pe] alt=3.35m dist=1.16m rates(deg/s)=[+16,+37,-41] thrust_pwm=44903
+15:23:28 [INFO] __main__: [pe] alt=3.35m dist=1.12m rates(deg/s)=[+13,+19,-38] thrust_pwm=47947
+15:23:28 [INFO] __main__: [pe] alt=3.34m dist=1.08m rates(deg/s)=[+1,+32,-36] thrust_pwm=47076
+15:23:28 [INFO] __main__: [pe] alt=3.33m dist=1.05m rates(deg/s)=[-0,+17,-38] thrust_pwm=49352
+15:23:28 [INFO] __main__: [pe] alt=3.32m dist=1.02m rates(deg/s)=[-2,+17,-37] thrust_pwm=49855
+15:23:28 [INFO] __main__: [pe] alt=3.31m dist=0.98m rates(deg/s)=[-9,+23,-39] thrust_pwm=49291
+15:23:28 [INFO] __main__: [pe] alt=3.30m dist=0.95m rates(deg/s)=[-12,+25,-40] thrust_pwm=49112
+15:23:28 [INFO] __main__: [pe] alt=3.28m dist=0.91m rates(deg/s)=[-11,+19,-41] thrust_pwm=48981
+15:23:28 [INFO] __main__: [pe] alt=3.28m dist=0.90m rates(deg/s)=[-14,+23,-41] thrust_pwm=47608
+15:23:28 [INFO] __main__: [pe] alt=3.27m dist=0.86m rates(deg/s)=[-14,+19,-41] thrust_pwm=47043
+15:23:28 [INFO] __main__: [pe] alt=3.25m dist=0.83m rates(deg/s)=[-16,+20,-41] thrust_pwm=47157
+15:23:29 [INFO] __main__: [pe] alt=3.24m dist=0.80m rates(deg/s)=[-18,+26,-42] thrust_pwm=46811
+15:23:29 [INFO] __main__: [pe] alt=3.23m dist=0.77m rates(deg/s)=[-17,+30,-43] thrust_pwm=46147
+15:23:29 [INFO] __main__: [pe] alt=3.22m dist=0.74m rates(deg/s)=[-16,+33,-44] thrust_pwm=45489
+15:23:29 [INFO] __main__: [pe] alt=3.20m dist=0.71m rates(deg/s)=[-11,+31,-45] thrust_pwm=44832
+15:23:29 [INFO] __main__: [pe] alt=3.19m dist=0.68m rates(deg/s)=[-8,+29,-46] thrust_pwm=44084
+15:23:29 [INFO] __main__: [pe] alt=3.18m dist=0.65m rates(deg/s)=[-3,+23,-45] thrust_pwm=42845
+15:23:29 [INFO] __main__: [pe] alt=3.17m dist=0.64m rates(deg/s)=[-7,+27,-44] thrust_pwm=43164
+15:23:29 [INFO] __main__: [pe] alt=3.16m dist=0.61m rates(deg/s)=[-4,+21,-43] thrust_pwm=42162
+15:23:29 [INFO] __main__: [pe] alt=3.14m dist=0.59m rates(deg/s)=[-1,+14,-40] thrust_pwm=41539
+15:23:29 [INFO] __main__: [pe] alt=3.13m dist=0.56m rates(deg/s)=[+2,+4,-36] thrust_pwm=41033
+15:23:29 [INFO] __main__: [pe] alt=3.12m dist=0.54m rates(deg/s)=[+9,-9,-33] thrust_pwm=39307
+15:23:29 [INFO] __main__: [pe] alt=3.10m dist=0.52m rates(deg/s)=[+10,-17,-29] thrust_pwm=38808
+15:23:29 [INFO] __main__: [pe] alt=3.09m dist=0.51m rates(deg/s)=[+11,-24,-35] thrust_pwm=35497
+15:23:29 [INFO] __main__: [pe] alt=3.07m dist=0.49m rates(deg/s)=[+12,-23,-19] thrust_pwm=40946
+15:23:29 [INFO] __main__: [pe] alt=3.06m dist=0.48m rates(deg/s)=[+11,-26,-23] thrust_pwm=40182
+15:23:29 [INFO] __main__: [pe] alt=3.04m dist=0.46m rates(deg/s)=[+7,-23,-23] thrust_pwm=40623
+15:23:29 [INFO] __main__: [pe] alt=3.02m dist=0.45m rates(deg/s)=[+10,-24,-19] thrust_pwm=42424
+15:23:29 [INFO] __main__: [pe] alt=3.01m dist=0.44m rates(deg/s)=[-2,-18,-14] thrust_pwm=45104
+15:23:29 [INFO] __main__: [pe] alt=2.99m dist=0.43m rates(deg/s)=[-7,-17,-10] thrust_pwm=46106
+15:23:29 [INFO] __main__: [pe] alt=2.97m dist=0.42m rates(deg/s)=[-9,-12,-9] thrust_pwm=47215
+15:23:29 [INFO] __main__: [pe] alt=2.96m dist=0.42m rates(deg/s)=[-15,-13,-9] thrust_pwm=47498
+15:23:29 [INFO] __main__: [pe] alt=2.94m dist=0.41m rates(deg/s)=[-14,-14,-8] thrust_pwm=47900
+15:23:29 [INFO] __main__: [pe] alt=2.92m dist=0.41m rates(deg/s)=[-18,-13,-5] thrust_pwm=48258
+15:23:29 [INFO] __main__: [pe] alt=2.90m dist=0.41m rates(deg/s)=[-14,-18,-4] thrust_pwm=48453
+15:23:29 [INFO] __main__: [pe] alt=2.90m dist=0.42m rates(deg/s)=[-12,-17,-2] thrust_pwm=49122
+15:23:29 [INFO] __main__: [pe] alt=2.88m dist=0.42m rates(deg/s)=[-5,-21,-0] thrust_pwm=49394
+15:23:29 [INFO] __main__: [pe] alt=2.86m dist=0.42m rates(deg/s)=[+4,-29,-3] thrust_pwm=48502
+15:23:29 [INFO] __main__: [pe] alt=2.84m dist=0.42m rates(deg/s)=[+8,-33,-1] thrust_pwm=48670
+15:23:29 [INFO] __main__: [pe] alt=2.82m dist=0.43m rates(deg/s)=[+9,-33,+1] thrust_pwm=49286
+15:23:29 [INFO] __main__: [pe] alt=2.81m dist=0.43m rates(deg/s)=[+6,-33,+3] thrust_pwm=49499
+15:23:29 [INFO] __main__: [pe] alt=2.79m dist=0.44m rates(deg/s)=[+8,-32,+4] thrust_pwm=49358
+15:23:29 [INFO] __main__: [pe] alt=2.77m dist=0.45m rates(deg/s)=[+2,-31,+4] thrust_pwm=49033
+15:23:29 [INFO] __main__: [pe] alt=2.75m dist=0.46m rates(deg/s)=[-2,-30,+5] thrust_pwm=48890
+15:23:29 [INFO] __main__: [pe] alt=2.74m dist=0.48m rates(deg/s)=[-7,-28,+6] thrust_pwm=49039
+15:23:29 [INFO] __main__: [pe] alt=2.72m dist=0.49m rates(deg/s)=[-15,-26,+8] thrust_pwm=49058
+15:23:29 [INFO] __main__: [pe] alt=2.70m dist=0.50m rates(deg/s)=[-14,-29,+9] thrust_pwm=48875
+15:23:29 [INFO] __main__: [pe] alt=2.69m dist=0.52m rates(deg/s)=[-21,-25,+8] thrust_pwm=49509
+15:23:29 [INFO] __main__: [pe] alt=2.67m dist=0.53m rates(deg/s)=[-18,-28,+9] thrust_pwm=49368
+15:23:29 [INFO] __main__: [pe] alt=2.65m dist=0.55m rates(deg/s)=[-19,-30,+9] thrust_pwm=49491
+15:23:29 [INFO] __main__: [pe] alt=2.63m dist=0.56m rates(deg/s)=[-16,-32,+10] thrust_pwm=49276
+15:23:29 [INFO] __main__: [pe] alt=2.63m dist=0.59m rates(deg/s)=[-9,-32,+9] thrust_pwm=49456
+15:23:29 [INFO] __main__: [pe] alt=2.60m dist=0.60m rates(deg/s)=[-4,-36,+9] thrust_pwm=49052
+15:23:29 [INFO] __main__: [pe] alt=2.59m dist=0.61m rates(deg/s)=[+4,-37,+8] thrust_pwm=49239
+15:23:29 [INFO] __main__: [pe] alt=2.58m dist=0.64m rates(deg/s)=[+0,-36,+8] thrust_pwm=49006
+15:23:29 [INFO] __main__: [pe] alt=2.56m dist=0.63m rates(deg/s)=[+18,-41,+8] thrust_pwm=49727
+15:23:29 [INFO] __main__: [pe] alt=2.55m dist=0.66m rates(deg/s)=[+13,-40,+6] thrust_pwm=49203
+15:23:29 [INFO] __main__: [pe] alt=2.53m dist=0.65m rates(deg/s)=[+24,-43,+7] thrust_pwm=49449
+15:23:29 [INFO] __main__: [pe] alt=2.52m dist=0.70m rates(deg/s)=[+12,-40,+3] thrust_pwm=48430
+15:23:29 [INFO] __main__: [pe] alt=2.50m dist=0.72m rates(deg/s)=[+13,-40,+3] thrust_pwm=48486
+15:23:29 [INFO] __main__: [pe] alt=2.49m dist=0.73m rates(deg/s)=[+13,-39,-0] thrust_pwm=48932
+15:23:30 [INFO] __main__: [pe] alt=2.48m dist=0.75m rates(deg/s)=[+10,-38,-1] thrust_pwm=49150
+15:23:30 [INFO] __main__: [pe] alt=2.46m dist=0.77m rates(deg/s)=[+12,-40,-1] thrust_pwm=49412
+15:23:30 [INFO] __main__: [pe] alt=2.45m dist=0.79m rates(deg/s)=[+18,-38,-2] thrust_pwm=50514
+15:23:30 [INFO] __main__: [pe] alt=2.44m dist=0.81m rates(deg/s)=[+21,-37,-3] thrust_pwm=50662
+15:23:30 [INFO] __main__: [pe] alt=2.42m dist=0.82m rates(deg/s)=[+22,-39,-4] thrust_pwm=50884
+15:23:30 [INFO] __main__: [pe] alt=2.41m dist=0.84m rates(deg/s)=[+26,-42,-5] thrust_pwm=51497
+15:23:30 [INFO] __main__: [pe] alt=2.40m dist=0.86m rates(deg/s)=[+30,-45,-6] thrust_pwm=51771
+15:23:30 [INFO] __main__: [pe] alt=2.39m dist=0.89m rates(deg/s)=[+39,-51,-7] thrust_pwm=53025
+15:23:30 [INFO] __main__: [pe] alt=2.37m dist=0.90m rates(deg/s)=[+42,-53,-7] thrust_pwm=52783
+15:23:30 [INFO] __main__: [pe] alt=2.36m dist=0.92m rates(deg/s)=[+47,-58,-8] thrust_pwm=53287
+15:23:30 [INFO] __main__: [pe] alt=2.35m dist=0.92m rates(deg/s)=[+53,-60,-8] thrust_pwm=52359
+15:23:30 [INFO] __main__: [pe] alt=2.35m dist=0.97m rates(deg/s)=[+49,-68,-11] thrust_pwm=53614
+15:23:30 [INFO] __main__: [pe] alt=2.34m dist=0.97m rates(deg/s)=[+50,-68,-9] thrust_pwm=54443
+15:23:30 [INFO] __main__: [pe] alt=2.33m dist=1.02m rates(deg/s)=[+57,-76,-11] thrust_pwm=55731
+15:23:30 [INFO] __main__: [pe] alt=2.32m dist=1.03m rates(deg/s)=[+56,-77,-11] thrust_pwm=55939
+15:23:30 [INFO] __main__: [pe] alt=2.31m dist=1.03m rates(deg/s)=[+50,-74,-9] thrust_pwm=55123
+15:23:30 [INFO] __main__: [pe] alt=2.30m dist=1.06m rates(deg/s)=[+42,-75,-11] thrust_pwm=56535
+15:23:30 [INFO] __main__: [pe] alt=2.29m dist=1.08m rates(deg/s)=[+41,-78,-11] thrust_pwm=57700
+15:23:30 [INFO] __main__: [pe] alt=2.28m dist=1.09m rates(deg/s)=[+36,-73,-10] thrust_pwm=58186
+15:23:30 [INFO] __main__: [pe] alt=2.27m dist=1.11m rates(deg/s)=[+31,-70,-10] thrust_pwm=58500
+15:23:30 [INFO] __main__: [pe] alt=2.27m dist=1.14m rates(deg/s)=[+31,-66,-10] thrust_pwm=59073
+15:23:30 [INFO] __main__: [pe] alt=2.26m dist=1.16m rates(deg/s)=[+28,-60,-9] thrust_pwm=58991
+15:23:30 [INFO] __main__: [pe] alt=2.25m dist=1.19m rates(deg/s)=[+29,-57,-10] thrust_pwm=58714
+15:23:30 [INFO] __main__: [pe] alt=2.24m dist=1.22m rates(deg/s)=[+31,-53,-10] thrust_pwm=58560
+15:23:30 [INFO] __main__: [pe] alt=2.24m dist=1.24m rates(deg/s)=[+32,-48,-10] thrust_pwm=58411
+15:23:30 [INFO] __main__: [pe] alt=2.23m dist=1.27m rates(deg/s)=[+39,-47,-11] thrust_pwm=57957
+15:23:30 [INFO] __main__: [pe] alt=2.23m dist=1.30m rates(deg/s)=[+44,-42,-11] thrust_pwm=57970
+15:23:30 [INFO] __main__: [pe] alt=2.22m dist=1.33m rates(deg/s)=[+49,-36,-10] thrust_pwm=58538
+15:23:30 [INFO] __main__: [pe] alt=2.22m dist=1.36m rates(deg/s)=[+53,-33,-10] thrust_pwm=58074
+15:23:30 [INFO] __main__: [pe] alt=2.21m dist=1.39m rates(deg/s)=[+55,-32,-10] thrust_pwm=57715
+15:23:30 [INFO] __main__: [pe] alt=2.21m dist=1.42m rates(deg/s)=[+54,-33,-10] thrust_pwm=57691
+15:23:30 [INFO] __main__: [pe] alt=2.20m dist=1.46m rates(deg/s)=[+53,-34,-9] thrust_pwm=57882
+15:23:30 [INFO] __main__: [pe] alt=2.20m dist=1.49m rates(deg/s)=[+54,-36,-8] thrust_pwm=58009
+15:23:30 [INFO] __main__: [pe] alt=2.19m dist=1.53m rates(deg/s)=[+52,-34,-6] thrust_pwm=58590
+15:23:30 [INFO] __main__: [pe] alt=2.19m dist=1.57m rates(deg/s)=[+50,-32,-5] thrust_pwm=59151
+15:23:30 [INFO] __main__: [pe] alt=2.18m dist=1.61m rates(deg/s)=[+51,-32,-5] thrust_pwm=59332
+15:23:30 [INFO] __main__: [pe] alt=2.17m dist=1.65m rates(deg/s)=[+51,-32,-4] thrust_pwm=59593
+15:23:30 [INFO] __main__: [pe] alt=2.17m dist=1.70m rates(deg/s)=[+51,-30,-3] thrust_pwm=60035
+15:23:30 [INFO] __main__: [pe] alt=2.16m dist=1.74m rates(deg/s)=[+52,-29,-3] thrust_pwm=60252
+15:23:30 [INFO] __main__: [pe] alt=2.15m dist=1.79m rates(deg/s)=[+55,-30,-5] thrust_pwm=60409
+15:23:30 [INFO] __main__: [pe] alt=2.15m dist=1.83m rates(deg/s)=[+53,-30,-6] thrust_pwm=60488
+15:23:30 [INFO] __main__: [pe] alt=2.14m dist=1.88m rates(deg/s)=[+56,-31,-7] thrust_pwm=60586
+15:23:30 [INFO] __main__: [pe] alt=2.13m dist=1.94m rates(deg/s)=[+62,-31,-9] thrust_pwm=60623
+15:23:30 [INFO] __main__: [pe] alt=2.12m dist=1.99m rates(deg/s)=[+71,-33,-12] thrust_pwm=60525
+15:23:30 [INFO] __main__: [pe] alt=2.11m dist=2.04m rates(deg/s)=[+78,-35,-14] thrust_pwm=60612
+15:23:30 [INFO] __main__: [pe] alt=2.10m dist=2.10m rates(deg/s)=[+84,-36,-15] thrust_pwm=60928
+15:23:30 [INFO] __main__: [pe] alt=2.09m dist=2.16m rates(deg/s)=[+88,-37,-16] thrust_pwm=61368
+15:23:30 [INFO] __main__: [pe] alt=2.07m dist=2.22m rates(deg/s)=[+94,-38,-17] thrust_pwm=61624
+15:23:30 [INFO] __main__: [pe] alt=2.06m dist=2.28m rates(deg/s)=[+101,-39,-17] thrust_pwm=61634
+15:23:30 [INFO] __main__: [pe] alt=2.04m dist=2.35m rates(deg/s)=[+109,-41,-18] thrust_pwm=61353
+15:23:31 [INFO] __main__: [pe] alt=2.02m dist=2.41m rates(deg/s)=[+116,-42,-18] thrust_pwm=61185
+15:23:31 [INFO] __main__: [pe] alt=2.01m dist=2.46m rates(deg/s)=[+122,-41,-18] thrust_pwm=61130
+15:23:31 [INFO] __main__: [pe] alt=1.99m dist=2.54m rates(deg/s)=[+131,-39,-19] thrust_pwm=60414
+15:23:31 [INFO] __main__: [pe] alt=1.97m dist=2.61m rates(deg/s)=[+142,-31,-21] thrust_pwm=58756
+15:23:31 [ERROR] __main__: [pe] SAFETY EMERGENCY: EMERGENCY: pursuer: tilt 64 deg
+15:23:31 [WARNING] drone: [pursuer] EMERGENCY STOP
+15:23:31 [INFO] drone: [evader] Landing over 3.0 s...
+15:23:36 [INFO] drone: [pursuer] Disarmed. Commander locked. Motors stopped.
+15:23:36 [INFO] cflib.crazyflie: Closing link
+15:23:37 [INFO] cflib.crazyflie.param: Disconnected, cleaning up threads
+15:23:37 [INFO] cflib.crazyflie: Callback->Disconnected from [udp://127.0.0.1:19850]
+15:23:38 [INFO] drone: [pursuer] Disconnected from udp://127.0.0.1:19850
+15:23:39 [INFO] drone: [evader] Disarmed. Commander locked. Motors stopped.
+15:23:39 [INFO] cflib.crazyflie: Closing link
+15:23:39 [INFO] cflib.crazyflie.param: Disconnected, cleaning up threads
+15:23:39 [INFO] cflib.crazyflie: Callback->Disconnected from [udp://127.0.0.1:19851]
+15:23:40 [INFO] drone: [evader] Disconnected from udp://127.0.0.1:19851

@@ -32,9 +32,10 @@ opponent:
   # final evader, stage 25).
   artifact_dir: artifacts/thesis_F14_rls_s200/evader
   # mode: cf  -> a real Crazyflie tracked by mocap but flown by something else.
-  # mode: scripted  -> position setpoints:
+  # mode: scripted  -> the opponent Crazyflie takes off and flies position setpoints:
   scripted:
     type: hover                # hover | linear | circular | pure_pursuit | flee
+    virtual: false             # true: no opponent drone; the agent chases a virtual point.
     yaw_deg: 0.0               # Yaw of every setpoint (deg).
     anchor: [0.5, 0.0, 1.0]    # Start / hover point [x, y, z] (m, mocap world); flee holds this z.
     speed: 1.0                 # linear / flee speed (m/s).
@@ -89,7 +90,7 @@ pursuer:
   control_dt: 0.02
   log_period_ms: 20
   max_thrust_pwm: 65535.0
-  rate_sign: [1.0, 1.0, 1.0]
+  rate_sign: [1.0, 1.0, -1.0]  # [roll, pitch, yaw]; the firmware negates yaw in the legacy setpoint packet
   state_timeout: 0.1
   min_altitude: 0.1
 
@@ -102,7 +103,7 @@ evader:
   control_dt: 0.02
   log_period_ms: 20
   max_thrust_pwm: 65535.0
-  rate_sign: [1.0, 1.0, 1.0]
+  rate_sign: [1.0, 1.0, -1.0]  # [roll, pitch, yaw]; the firmware negates yaw in the legacy setpoint packet
   state_timeout: 0.1
   min_altitude: 0.1
 
@@ -128,7 +129,9 @@ safety:
   enabled: true
   strict_preflight: true        # refuse to take off if mocap is not aligned / the estimator has not converged /
                                 # a drone starts outside the arena, not level or with a stale / non-finite state
-  geofence_margin: 0.3          # hard fence = arena + margin, for BOTH drones (incl. ceiling) -> LAND
+  evader_geofence_margin: 0.3   # evader's hard fence = arena + margin (incl. ceiling) -> LAND
+  pursuer_geofence_margin: 0.3  # pursuer's fence; null = none (training lets the pursuer leave the arena).
+                                # Set to the room the lab has beyond the arena walls and below the ceiling.
   stop_lookahead_s: 0.3         # predicted position (p + v * t) outside the fence -> HOLD
   min_altitude: 0.10            # -> LAND
   max_descent_speed: 2.5        # m/s below descent_check_alt -> HOLD (brake; motors-off would hit harder)

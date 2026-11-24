@@ -296,6 +296,15 @@ class CrazyflieDrone(Drone):
         self.cf.high_level_commander.takeoff(height, duration)
         time.sleep(duration + 1.0)  # wait for takeoff to complete
 
+    def takeoff_async(self, height, duration: float = 3.0) -> bool:
+        """Start a high-level take-off and return immediately (take off several drones at once)."""
+        if not self._require_connected('takeoff') or not self._require_armed('takeoff'):
+            return False
+        logger.info('[%s] Taking off to %.2f m over %.1f s...', self.name, height, duration)
+        self._relax_setpoint_priority(wait_s=0.02)
+        self.cf.high_level_commander.takeoff(height, duration)
+        return True
+
     def land(self, duration: float = 3.0):
         if not self._require_connected('land') or not self._require_armed('land'):
             return
@@ -540,6 +549,10 @@ class ScriptedDrone(Drone):
         self._state_buffer.update_pos_vel(0.0, 0.0, height, 0.0, 0.0, 0.0)
         self._state_buffer.update_quat(1.0, 0.0, 0.0, 0.0)
         self._state_buffer.update_gyro_deg(0.0, 0.0, 0.0)
+
+    def takeoff_async(self, height, duration: float = 3.0) -> bool:
+        self.takeoff(height, duration)
+        return False  # nothing to wait for
 
     def land(self, duration: float = 3.0) -> None:
         logger.info('[%s] Scripted landing (no-op)', self.name)
