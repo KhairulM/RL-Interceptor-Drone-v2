@@ -9,6 +9,9 @@ policy:
 opponent:
   mode: policy                 # policy | cf | scripted
   artifact_dir: artifacts/thesis_F14_rls_s200/evader    # stage 25
+  # Switching evaders (thesis F14/F15), e.g. F8 -> F10: artifact_dir: artifacts/thesis_F8_roncero_s0/evader and
+  #   switch: {artifact_dir: artifacts/thesis_F10_nofix_s0/evader, after_s: 1.0}   (swap for F10 -> F8)
+  switch: null
   # For a one-drone run (SAFETY_PLAN stage b): mode: scripted, with scripted.virtual: true.
   scripted:
     type: hover
@@ -22,7 +25,7 @@ episode:
   stop_on_capture: true
   capture_radius: 0.10         # m, the trained radius (centre to centre; the propellers may touch)
   stop_on_evader_exit: true
-  stop_on_timeout: false
+  stop_on_timeout: true        # end at the training episode length (30 s) = "timeout" outcome
   state_timeout: 0.5
   min_altitude: 0.10
 
@@ -38,6 +41,7 @@ logging:
   debug_obs: false             # true prints the estimator output (opp_acc/10(body))
   debug_period_s: 0.5
   publish_tf: true
+  csv_dir: logs/flights         # one CSV + JSON per flight (flight_log.py)
 
 pursuer:
   name: pursuer

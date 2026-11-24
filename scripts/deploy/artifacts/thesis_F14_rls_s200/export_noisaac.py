@@ -9,7 +9,8 @@ the opponent adapter (obs 28 + 3 = 31) and its learned basis, adapter_basis.pt.
 Adapter settings are the F14 RLS arm's task.adapt: kind=nf, target=dvel, history=10, horizon=10, delta=0.01,
 forgetting=0.999, and the task defaults for the rest.
 
-Usage (repo .venv, no Isaac):  .venv/bin/python scripts/deploy/artifacts/thesis_F14_rls_s200/export_noisaac.py
+Usage (repo .venv, no Isaac):  .venv/bin/python scripts/deploy/artifacts/thesis_F14_rls_s200/export_noisaac.py [folder ...]
+(no folder: export every EXPORTS entry; e.g. `evader_stage23` exports only that one)
 """
 import os
 import shutil
@@ -37,9 +38,10 @@ ADAPTER = pec.OpponentAdapterConfig(
     forgetting=0.999, delta=0.01, p_max_ratio=1.0, freeze=False, reset_on_episode=True,
 )
 EXPORTS = [
-    # role, checkpoint, obs_dim
-    ("pursuer", os.path.join(CAMPAIGN, "checkpoints/pursuer_stage24.pt"), 28 + 3),
-    ("evader", os.path.join(CAMPAIGN, "checkpoints/evader_stage25.pt"), 28),
+    # output folder, role, checkpoint, obs_dim
+    ("pursuer", "pursuer", os.path.join(CAMPAIGN, "checkpoints/pursuer_stage24.pt"), 28 + 3),
+    ("evader", "evader", os.path.join(CAMPAIGN, "checkpoints/evader_stage25.pt"), 28),
+    ("evader_stage23", "evader", os.path.join(CAMPAIGN, "checkpoints/evader_stage23.pt"), 28),   # second-to-last
 ]
 
 
@@ -53,8 +55,8 @@ def build(ckpt, obs_dim):
     return extract_deterministic_actor(policy, "ppo")
 
 
-def export(role, ckpt, obs_dim):
-    out = os.path.join(HERE, role)
+def export(name, role, ckpt, obs_dim):
+    out = os.path.join(HERE, name)
     actor = build(ckpt, obs_dim)
     with torch.no_grad(), set_exploration_type(ExplorationType.MODE):
         traced = torch.jit.trace(actor, torch.zeros(1, obs_dim), check_trace=False)
@@ -86,8 +88,11 @@ def export(role, ckpt, obs_dim):
 
 
 def main():
-    for role, ckpt, obs_dim in EXPORTS:
-        export(role, ckpt, obs_dim)
+    """Export every entry of EXPORTS, or only the output folders named on the command line."""
+    wanted = set(sys.argv[1:])
+    for name, role, ckpt, obs_dim in EXPORTS:
+        if not wanted or name in wanted:
+            export(name, role, ckpt, obs_dim)
 
 
 if __name__ == "__main__":

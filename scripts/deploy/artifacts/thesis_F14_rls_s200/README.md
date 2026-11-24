@@ -10,6 +10,8 @@
     control tick, as in training.
 - `evader/`: the same campaign's final evader (`evader_stage25.pt`; evaders are trained at odd stages). Plain 28-D
   observation.
+- `evader_stage23/`: the same campaign's second-to-last evader (`evader_stage23.pt`), plain 28-D observation
+  (exported 2026-11-24: `export_noisaac.py evader_stage23`).
 
 Exported without Isaac by `export_noisaac.py`, the same method as `../thesis_F8b_roncero_s0`:
 - Each checkpoint loads strictly and has TorchScript trace error 0.

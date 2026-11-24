@@ -44,9 +44,10 @@ class _Any:
 
 
 for name in ("rclpy", "geometry_msgs", "geometry_msgs.msg", "tf2_msgs", "tf2_msgs.msg", "cflib", "cflib.crazyflie",
-             "cflib.crazyflie.log", "cflib.crazyflie.syncLogger", "NatNetClient"):
+             "cflib.crazyflie.log", "cflib.crazyflie.syncLogger", "cflib.crtp", "cflib.crtp.crtpstack", "NatNetClient"):
     _stub(name, ok=lambda: True, init=lambda: None, create_node=_Any, TransformStamped=_Any, PoseStamped=_Any,
-          TFMessage=_Any, Crazyflie=_Any, LogConfig=_Any, SyncLogger=_Any, NatNetClient=_Any, publisher=_Any())
+          TFMessage=_Any, Crazyflie=_Any, LogConfig=_Any, SyncLogger=_Any, NatNetClient=_Any, publisher=_Any(),
+          CRTPPacket=_Any, CRTPPort=_Any)
 sys.path.insert(0, str(DEPLOY))
 import pursuit_evasion_common as pec  # noqa: E402
 import pursuit_evasion_controller as pe_ctrl  # noqa: E402
@@ -190,11 +191,11 @@ class ConfigTest(unittest.TestCase):
                 {"policy": {"artifact_dir": "x"}, "opponent": {"scripted": {"type": "zigzag"}}}, "t")
 
     @unittest.skipUnless(HAVE_ARTIFACT, "F14 RLS artifact missing")
-    def test_controller_builds_from_main_config(self):
+    def test_controller_builds_from_f14_config(self):
         cwd = os.getcwd()
         os.chdir(DEPLOY)
         try:
-            c = pe_ctrl.PursuitEvasionController(argparse.Namespace(config="config_pursuit_evasion.yaml"))
+            c = pe_ctrl.PursuitEvasionController(argparse.Namespace(config="config_real_f14.yaml"))
         finally:
             os.chdir(cwd)
         self.assertEqual((c.role, c.opponent_role, c.opponent_mode), ("pursuer", "evader", "policy"))
@@ -223,6 +224,81 @@ class ConfigTest(unittest.TestCase):
                     os.unlink(f.name)
                 self.assertIsInstance(c.opponent, cls)
                 self.assertEqual(c.opponent_flies, not virtual)
+
+    def test_switch_config(self):
+        cfg = pe_ctrl.ControllerConfig.from_yaml_dict(
+            {"policy": {"artifact_dir": "x"},
+             "opponent": {"mode": "policy", "artifact_dir": "a", "switch": {"artifact_dir": "b", "after_s": 0.5}}}, "t")
+        self.assertEqual((cfg.opponent.switch.artifact_dir, cfg.opponent.switch.after_s), ("b", 0.5))
+        self.assertIsNone(pe_ctrl.ControllerConfig.from_yaml_dict(
+            {"policy": {"artifact_dir": "x"}, "opponent": {"mode": "policy", "artifact_dir": "a", "switch": None}},
+            "t").opponent.switch)
+        for bad, msg in (({"mode": "scripted", "switch": {"artifact_dir": "b"}}, "needs opponent.mode: policy"),
+                         ({"mode": "policy", "artifact_dir": "a", "switch": {"after_s": 1.0}}, "switch.artifact_dir"),
+                         ({"mode": "policy", "artifact_dir": "a", "switch": {"artifact_dir": "b", "after_s": 0}},
+                          "after_s"),
+                         ({"mode": "policy", "artifact_dir": "a", "switch": {"artifact_dir": "b", "aftr_s": 1}},
+                          "aftr_s")):
+            with self.subTest(msg=msg), self.assertRaisesRegex(ValueError, msg):
+                pe_ctrl.ControllerConfig.from_yaml_dict({"policy": {"artifact_dir": "x"}, "opponent": bad}, "t")
+
+    @unittest.skipUnless(HAVE_ARTIFACT and (DEPLOY / "artifacts/thesis_F10_nofix_s0/evader").is_dir(),
+                         "F14 / F10 artifacts missing")
+    def test_opponent_switch_hands_the_drone_to_the_second_policy(self):
+        import tempfile
+        import yaml
+        f8, f10 = "artifacts/thesis_F8_roncero_s0/evader", "artifacts/thesis_F10_nofix_s0/evader"
+        cfg = dict(self._yaml("config_pursuit_evasion"),
+                   opponent={"mode": "policy", "artifact_dir": f8, "switch": {"artifact_dir": f10, "after_s": 1.0}})
+        cfg["flight"] = dict(cfg["flight"], command_rate_lpf_tau=0.03)
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", dir=DEPLOY, delete=False) as f:
+            yaml.safe_dump(cfg, f)
+        cwd = os.getcwd()
+        os.chdir(DEPLOY)
+        try:
+            c = pe_ctrl.PursuitEvasionController(argparse.Namespace(config=f.name))
+        finally:
+            os.chdir(cwd)
+            os.unlink(f.name)
+        first, second = c.opponent_agent, c._next_opponent_agent
+        self.assertIn("F8_roncero", first.metadata.notes["checkpoint"].replace("-", "_"))
+        self.assertIn("F10-nofix", second.metadata.notes["checkpoint"])
+        first.previous_action = torch.tensor([0.1, -0.2, 0.3, 0.4])
+        first._filtered_rates = torch.tensor([5.0, -6.0, 7.0])
+        c._motion_start_time = 100.0
+        c._maybe_switch_opponent(100.99)
+        self.assertIs(c.opponent_agent, first)                       # not yet
+        c._maybe_switch_opponent(101.0)
+        self.assertIs(c.opponent_agent, second)                      # switched at after_s
+        self.assertIsNone(c._next_opponent_agent)
+        self.assertTrue(torch.equal(second.previous_action, torch.tensor([0.1, -0.2, 0.3, 0.4])))
+        self.assertTrue(torch.equal(second._filtered_rates, torch.tensor([5.0, -6.0, 7.0])))
+        c._maybe_switch_opponent(105.0)
+        self.assertIs(c.opponent_agent, second)                      # only once
+
+
+
+class ApfEvaderTest(unittest.TestCase):
+    """pursuit_evasion_controller.apf_evader_velocity (arena half-width 2 m, speed 1 m/s, influence 2 m, walls 1 m)."""
+
+    def v(self, evader, pursuer):
+        return pe_ctrl.apf_evader_velocity(evader, pursuer, 2.0, 1.0, 2.0, 1.0, 2.0)
+
+    def test_flees_from_a_close_pursuer_in_the_middle(self):
+        v = self.v([0.0, 0.0], [-0.5, 0.0])
+        self.assertGreater(v[0], 0.0)
+        self.assertAlmostEqual(v[1], 0.0)
+        self.assertAlmostEqual(v[0], 0.75)                       # (2 - 0.5) / 2
+
+    def test_ignores_a_distant_pursuer(self):
+        np.testing.assert_allclose(self.v([0.0, 0.0], [-2.5, 0.0]), [0.0, 0.0])
+
+    def test_walls_push_inward_and_speed_is_capped(self):
+        v = self.v([1.8, 0.0], [5.0, 5.0])                     # near +x wall, pursuer out of range
+        self.assertLess(v[0], 0.0)
+        v = self.v([1.8, 1.8], [1.0, 1.0])                     # corner, pursuer pushing it in
+        self.assertLessEqual(float(np.linalg.norm(v)), 1.0 + 1e-9)
+        self.assertLess(v[0], 0.0)                             # walls win near the corner
 
 
 if __name__ == "__main__":

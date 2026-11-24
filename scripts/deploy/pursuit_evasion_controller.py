@@ -45,6 +45,7 @@ from typing import Optional
 import numpy as np
 import torch
 
+import flight_log
 import pursuit_evasion_common as pec
 from drone import CrazyflieDrone, ScriptedDrone, DronePosePublisher
 from mocap import MocapReceiver, MocapTfPublisher
@@ -74,7 +75,7 @@ DEFAULT_CONFIG_PATH = os.path.join(
 )
 
 OPPONENT_MODES = ('policy', 'cf', 'scripted')
-SCRIPTED_MOTIONS = ('hover', 'linear', 'circular', 'pure_pursuit', 'flee')
+SCRIPTED_MOTIONS = ('hover', 'linear', 'circular', 'pure_pursuit', 'flee', 'apf')
 # Legacy heuristic names (as in PursuitEvasion.HEURISTIC_ALIASES).
 MOTION_ALIASES = {'pursue': 'pure_pursuit'}
 
@@ -132,7 +133,7 @@ class PolicyConfig:
 class ScriptedMotionConfig:
     """`opponent.scripted`: position setpoints for a scripted opponent."""
 
-    type: str = 'hover'          # hover | linear | circular | pure_pursuit | flee
+    type: str = 'hover'          # hover | linear | circular | pure_pursuit | flee | apf
     yaw_deg: float = 0.0         # yaw of every setpoint (deg)
     # false: the opponent Crazyflie takes off and flies the setpoints.
     # true: no opponent drone; the agent chases a virtual point that jumps to each setpoint.
@@ -140,11 +141,16 @@ class ScriptedMotionConfig:
     # Start / hover point [x, y, z] in mocap world coordinates (m); flee holds its z.
     # Omitted: where the opponent is after take-off (virtual: [2, 0, flight.takeoff_height]).
     anchor: Optional[list] = None
-    speed: float = 1.0           # linear and flee speed (m/s)
+    speed: float = 1.0           # linear / flee speed, apf maximum speed (m/s)
     direction: list = field(default_factory=lambda: [1.0, 0.0, 0.0])   # linear, world frame
     radius: float = 1.5          # circular orbit radius (m)
     omega: float = 1.0           # circular angular rate (rad/s)
-    lookahead: float = 0.5       # flee setpoint lead time (s)
+    lookahead: float = 0.5       # flee / apf setpoint lead time (s)
+    # apf (artificial potential field evader): quadratic repulsion from the agent within apf_influence (m) and
+    # from the arena walls within apf_wall_margin (m, x apf_wall_gain), horizontal at the anchor altitude.
+    apf_influence: float = 2.0
+    apf_wall_margin: float = 1.0
+    apf_wall_gain: float = 2.0
 
     def __post_init__(self) -> None:
         self.type = MOTION_ALIASES.get(self.type.lower(), self.type.lower())
@@ -162,12 +168,28 @@ class ScriptedMotionConfig:
 
 
 @dataclass
+class OpponentSwitchConfig:
+    """`opponent.switch`: hand the opponent drone to a second policy during the run (the thesis F14 / F15
+    switching evaders). The new policy takes over the drone's previous action, as in training."""
+
+    artifact_dir: str = ''       # second policy, same role as opponent.artifact_dir
+    after_s: float = 1.0         # s after the chase starts (thesis: 0.5, 1.0 or 1.5)
+
+    def __post_init__(self) -> None:
+        if not self.artifact_dir:
+            raise ValueError("Config key 'opponent.switch.artifact_dir' is required (or set opponent.switch: null).")
+        if self.after_s <= 0.0:
+            raise ValueError("Config key 'opponent.switch.after_s' must be positive.")
+
+
+@dataclass
 class OpponentConfig:
     """`opponent`: how the other drone is driven."""
 
     mode: str = 'scripted'       # policy | cf | scripted
     artifact_dir: str = ''       # mode=policy: artifact of the OPPOSING role
     scripted: ScriptedMotionConfig = field(default_factory=ScriptedMotionConfig)
+    switch: Optional[OpponentSwitchConfig] = None   # mode=policy: switch to a second policy; null = no switch
 
     def __post_init__(self) -> None:
         self.mode = self.mode.lower()
@@ -178,6 +200,10 @@ class OpponentConfig:
             raise ValueError("Config key 'opponent.artifact_dir' is required when opponent.mode is 'policy'.")
         if isinstance(self.scripted, dict) or self.scripted is None:
             self.scripted = _section(ScriptedMotionConfig, self.scripted, 'opponent.scripted')
+        if isinstance(self.switch, dict):
+            self.switch = _section(OpponentSwitchConfig, self.switch, 'opponent.switch')
+        if self.switch is not None and self.mode != 'policy':
+            raise ValueError("Config key 'opponent.switch' needs opponent.mode: policy.")
 
 
 @dataclass
@@ -237,6 +263,8 @@ class LoggingConfig:
     debug_period_s: float = 0.5
     # Publish mocap poses on /tf (parent frame: mocap.world_frame).
     publish_tf: bool = False
+    # Folder for one CSV (one row per control tick) + JSON sidecar per flight (flight_log.py); null = off.
+    csv_dir: Optional[str] = None
 
 
 @dataclass
@@ -317,6 +345,7 @@ class PolicyAgent:
     def __init__(self, artifact_dir: str, rate_lpf_tau: float = 0.0,
                  control_dt: Optional[float] = None) -> None:
         artifact_dir = os.path.abspath(os.path.expanduser(artifact_dir))
+        self.artifact_dir = artifact_dir
         self.metadata, self.policy, self.device = _load_policy(artifact_dir)
         self.role = self.metadata.role
         # Deploy control period; defaults to the training one.
@@ -525,6 +554,30 @@ class _FixedRateClock:
             )
 
 
+def apf_evader_velocity(evader_xy, pursuer_xy, half_xy: float, speed: float, influence: float,
+                        wall_margin: float, wall_gain: float) -> np.ndarray:
+    """Horizontal artificial-potential-field evasion velocity (m/s), arena-centred coordinates.
+
+    Gradient of quadratic repulsive potentials: from the pursuer, (influence - d) / influence along the line away from
+    it when it is closer than ``influence``; from each wall, wall_gain * (wall_margin - s) / wall_margin inward when
+    the wall is closer than ``wall_margin``. Scaled by ``speed`` and capped at ``speed``. Like any APF it has local
+    minima (a corner with the pursuer in front), where the evader stops.
+    """
+    evader_xy, pursuer_xy = np.asarray(evader_xy, float), np.asarray(pursuer_xy, float)
+    rel = evader_xy - pursuer_xy
+    d = float(np.linalg.norm(rel))
+    away = rel / d if d > 1e-6 else np.array([1.0, 0.0])
+    v = away * float(np.clip((influence - d) / influence, 0.0, 1.0))
+    for axis in (0, 1):
+        for side in (1.0, -1.0):
+            s = half_xy - side * evader_xy[axis]          # distance to the wall at side * half_xy
+            if s < wall_margin:
+                v[axis] -= side * wall_gain * (wall_margin - s) / wall_margin
+    v = v * speed
+    n = float(np.linalg.norm(v))
+    return v * (speed / n) if n > speed else v
+
+
 # ===========================================================================
 # Controller
 # ===========================================================================
@@ -550,6 +603,15 @@ class PursuitEvasionController:
                 raise ValueError(
                     f"Opponent artifact declares role '{self.opponent_agent.role}' but the agent is "
                     f"'{self.role}', so the opponent must be '{self.opponent_role}'.")
+        # Second opponent policy (opponent.switch), loaded up front and taken over at switch.after_s.
+        self.opponent_switch = cfg.opponent.switch
+        self._next_opponent_agent: Optional[PolicyAgent] = None
+        if self.opponent_switch is not None:
+            self._next_opponent_agent = PolicyAgent(self.opponent_switch.artifact_dir, lpf_tau, self.control_dt)
+            if self._next_opponent_agent.role != self.opponent_role:
+                raise ValueError(
+                    f"opponent.switch artifact declares role '{self._next_opponent_agent.role}'; "
+                    f"it must be '{self.opponent_role}'.")
 
         # -- episode / arena ---------------------------------------------------
         self.arena_origin = cfg.arena.origin
@@ -593,6 +655,10 @@ class PursuitEvasionController:
         self._motion_start_time = 0.0
         self._position_setpoint = self.motion_anchor.copy()
         self._last_debug_time = 0.0
+        self._raw_config = config
+        self._flight_log: Optional[flight_log.FlightLog] = None
+        self._outcome: Optional[str] = None      # how the flight ended (flight_log.OUTCOMES); first one wins
+        self._outcome_detail = ''
 
     # -- main loop ----------------------------------------------------------
     def run(self) -> None:
@@ -607,6 +673,7 @@ class PursuitEvasionController:
             self._motion_start_time = time.time()
             self._position_setpoint = self.motion_anchor.copy()
             self._log_run_start()
+            self._start_flight_log()
 
             clock = _FixedRateClock(self.control_dt)
             while self.own.connected and self.opponent.connected:
@@ -624,15 +691,65 @@ class PursuitEvasionController:
                     break
                 if not self._step_policies(own_state, opponent_state, now):
                     break
+                self._log_flight_row(own_state, opponent_state, now)
 
                 self.own.publish_pose()
                 if self.opponent_flies:
                     self.opponent.publish_pose()
                 clock.wait()
+            self._set_outcome('link_lost', 'a drone link closed')      # no-op if an ending was recorded
         except KeyboardInterrupt:
+            self._set_outcome('operator_abort', 'Ctrl+C')    # first: a second Ctrl+C can interrupt this handler
             logger.info('[pe] Stopping.')
+        except Exception as exc:
+            self._set_outcome('error', repr(exc))
+            raise
         finally:
             self.shutdown()
+            self._finish_flight_log()
+
+    # -- flight log (logging.csv_dir) ------------------------------------------
+    def _set_outcome(self, outcome: str, detail: str = '') -> None:
+        if self._outcome is None:
+            self._outcome, self._outcome_detail = outcome, detail
+
+    def _policy_label(self, role: str) -> str:
+        """Label of whatever flies ``role``: an artifact, or the scripted motion."""
+        if role == self.role:
+            return flight_log.artifact_label(self.agent.artifact_dir)
+        if self.opponent_agent is not None:
+            return flight_log.artifact_label(self.opponent_agent.artifact_dir)
+        if self.opponent_mode == 'scripted':
+            return f'scripted-{self.motion.type}' + ('-virtual' if self.motion.virtual else '')
+        return 'cf'
+
+    def _start_flight_log(self) -> None:
+        if not self.cfg.logging.csv_dir:
+            return
+        evader = self._policy_label('evader')
+        if self.opponent_role == 'evader' and self.opponent_switch is not None:
+            evader = (f'{evader}-to-{flight_log.artifact_label(self.opponent_switch.artifact_dir)}'
+                      f'@{self.opponent_switch.after_s:g}s')
+        agents = [self.agent] + [a for a in (self.opponent_agent, self._next_opponent_agent) if a is not None]
+        self._flight_log = flight_log.FlightLog(
+            self.cfg.logging.csv_dir, self._policy_label('pursuer'), evader, self._motion_start_time,
+            metadata={'config_path': self.config_path, 'config': self._raw_config,
+                      'checkpoints': {a.artifact_dir: a.metadata.notes.get('checkpoint') for a in agents},
+                      'capture_radius': self.capture_radius, 'control_dt': self.control_dt,
+                      'arena_origin': list(map(float, self.arena_origin))})
+        logger.info('[pe] Logging this flight to %s', self._flight_log.path)
+
+    def _log_flight_row(self, own_state, opponent_state, now: float) -> None:
+        if self._flight_log is None:
+            return
+        pursuer, evader = (own_state, opponent_state) if self.role == 'pursuer' else (opponent_state, own_state)
+        self._flight_log.row(now, pursuer, evader, self._policy_label('evader'))
+
+    def _finish_flight_log(self) -> None:
+        if self._flight_log is None:
+            return
+        path = self._flight_log.finish(self._outcome or 'error', self._outcome_detail)
+        logger.info('[pe] Flight log: %s (%d rows, outcome %s)', path, self._flight_log.rows, self._outcome)
 
     def _log_run_start(self) -> None:
         logger.info(
@@ -640,6 +757,9 @@ class PursuitEvasionController:
             self.role, 1.0 / self.control_dt, self.opponent_role,
             self.opponent_mode if self.opponent_mode != 'scripted' else f'scripted:{self.motion.type}',
         )
+        if self.opponent_switch is not None:
+            logger.info('[pe] %s policy %s, switching to %s after %.2f s.', self.opponent_role,
+                        self.cfg.opponent.artifact_dir, self.opponent_switch.artifact_dir, self.opponent_switch.after_s)
         if self.agent.rate_lpf_alpha < 1.0:
             logger.info(
                 '[pe] Body-rate command low-pass ON (tau=%.3fs, alpha=%.2f at %.1f Hz): smoothing the '
@@ -656,27 +776,32 @@ class PursuitEvasionController:
                                        (self.opponent_role, opponent_state, real_opponent)):
             if monitored and now - state.stamp > ep.state_timeout:
                 logger.warning('[pe] %s state timed out (%.2f s); stopping.', role, now - state.stamp)
+                self._set_outcome('state_timeout', f'{role} state stale {now - state.stamp:.2f} s')
                 return True
         for role, state, monitored in ((self.role, own_state, True),
                                        (self.opponent_role, opponent_state, real_opponent)):
             if monitored and state.pos[2] < ep.min_altitude:
                 logger.warning('[pe] %s below min altitude (%.2f m); stopping.', role, state.pos[2])
+                self._set_outcome(f'{role}_crash', f'{role} below min altitude ({state.pos[2]:.2f} m)')
                 return True
         evader_state = own_state if self.role == 'evader' else opponent_state
         if ep.stop_on_evader_exit and self._outside_arena(evader_state.pos):
             logger.warning(
                 '[pe] evader left the trained arena at [%.2f, %.2f, %.2f]; '
                 'stopping (episode end in training).', *evader_state.pos)
+            self._set_outcome('evader_oob', 'evader left the arena at ' + str(np.round(evader_state.pos, 2).tolist()))
             return True
         if (ep.stop_on_timeout and self.episode_duration > 0.0
                 and now - self._motion_start_time >= self.episode_duration):
             logger.info('[pe] Training episode length reached (%.1f s): evader survived; stopping.',
                         self.episode_duration)
+            self._set_outcome('timeout', f'{self.episode_duration:.1f} s')
             return True
         distance = float(np.linalg.norm(opponent_state.pos - own_state.pos))
         if ep.stop_on_capture and distance <= self.capture_radius:
             logger.info('[pe] Capture radius reached (%.2f m <= %.2f m); stopping.',
                         distance, self.capture_radius)
+            self._set_outcome('capture', f'{distance:.3f} m <= {self.capture_radius:.2f} m')
             return True
         return False
 
@@ -686,6 +811,7 @@ class PursuitEvasionController:
         if self._inject_kind == 'nan_action' and self._inject_active(now):
             action = action * float('nan')
         opp_action = opp_command = None
+        self._maybe_switch_opponent(now)
         if self.opponent_agent is not None:
             opp_action, opp_command, _ = self.opponent_agent.act(
                 opponent_state, own_state, self.arena_origin)
@@ -698,6 +824,7 @@ class PursuitEvasionController:
         if verdict.level >= Level.HOLD:
             self._fault = verdict
             logger.error('[pe] SAFETY %s: %s', verdict.level.name, ' | '.join(verdict.reasons))
+            self._set_outcome(*flight_log.outcome_from_safety(verdict.reasons))
             return False
 
         command = self.agent.send(self.own, action, command)
@@ -715,6 +842,21 @@ class PursuitEvasionController:
                 rates[0], rates[1], rates[2], float(command.thrust_pwm.item()),
             )
         return True
+
+    def _maybe_switch_opponent(self, now: float) -> None:
+        """Hand the opponent drone to the second policy once opponent.switch.after_s has passed.
+
+        As in training, the drone's previous action carries over (it is the drone's, not the policy's); so does
+        the body-rate command filter, which also belongs to the drone.
+        """
+        nxt = self._next_opponent_agent
+        if nxt is None or now - self._motion_start_time < self.opponent_switch.after_s:
+            return
+        nxt.previous_action = self.opponent_agent.previous_action
+        nxt._filtered_rates = self.opponent_agent._filtered_rates
+        self.opponent_agent, self._next_opponent_agent = nxt, None
+        logger.info('[pe] %s policy switched to %s at %.2f s', self.opponent_role,
+                    self.opponent_switch.artifact_dir, now - self._motion_start_time)
 
     # -- scripted opponent motion ------------------------------------------
     def _send_scripted_setpoint(self, own_state: Optional[pec.DroneState]) -> None:
@@ -741,6 +883,18 @@ class PursuitEvasionController:
             # Fly at the agent's current position (no lead).
             target = (own_state.pos.copy() if own_state is not None
                       else self._position_setpoint.copy())
+        elif m.type == 'apf':
+            # Field evaluated at the evader's measured position (the setpoint for a virtual opponent).
+            opp = self.opponent.get_state()
+            here = np.array(opp.pos if opp is not None else self._position_setpoint, dtype=np.float64)
+            if own_state is None:
+                target = here
+            else:
+                v = apf_evader_velocity(here[:2] - self.arena_origin[:2], own_state.pos[:2] - self.arena_origin[:2],
+                                        self.metadata.arena_half_xy, m.speed, m.apf_influence,
+                                        m.apf_wall_margin, m.apf_wall_gain)
+                target = here + np.array([v[0], v[1], 0.0]) * m.lookahead
+            target[2] = anchor[2]
         else:  # flee
             # Horizontal escape at the held anchor altitude, as in training:
             # a 3D flee dives whenever the pursuer is above.

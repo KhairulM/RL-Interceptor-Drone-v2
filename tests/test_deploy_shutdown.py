@@ -32,9 +32,10 @@ class _Any:
 
 
 for name in ("rclpy", "geometry_msgs", "geometry_msgs.msg", "tf2_msgs", "tf2_msgs.msg", "cflib", "cflib.crazyflie",
-             "cflib.crazyflie.log", "cflib.crazyflie.syncLogger", "NatNetClient"):
+             "cflib.crazyflie.log", "cflib.crazyflie.syncLogger", "cflib.crtp", "cflib.crtp.crtpstack", "NatNetClient"):
     _stub(name, ok=lambda: True, init=lambda: None, create_node=_Any, TransformStamped=_Any, PoseStamped=_Any,
-          TFMessage=_Any, Crazyflie=_Any, LogConfig=_Any, SyncLogger=_Any, NatNetClient=_Any, publisher=_Any())
+          TFMessage=_Any, Crazyflie=_Any, LogConfig=_Any, SyncLogger=_Any, NatNetClient=_Any, publisher=_Any(),
+          CRTPPacket=_Any, CRTPPort=_Any)
 sys.path.insert(0, str(DEPLOY))
 import pursuit_evasion_controller as pec_ctrl  # noqa: E402
 from safety import Level, SafetyConfig, Verdict  # noqa: E402
@@ -126,6 +127,30 @@ class TakeoffTest(unittest.TestCase):
         self.assertEqual([n for n, _ in takeoffs], ["pursuer", "evader"])
         self.assertLess(abs(takeoffs[1][1] - takeoffs[0][1]), 0.05)
         self.assertGreaterEqual(time.time() - start, 1.1)  # waits once for the take-off to finish
+
+
+class CppmSetpointTest(unittest.TestCase):
+    """The cppmEmu packet must give the firmware the setpoint the legacy send_setpoint gave, without its thrust cap."""
+
+    @staticmethod
+    def firmware_decode(data):
+        """crtp_commander_generic.c cppmEmuDecoder (rate mode) -> (attitudeRate roll, pitch, yaw, thrust)."""
+        import struct
+        kind, hdr, r, p, y, t, aux0 = struct.unpack('<BBHHHHH', data)
+        assert (kind, hdr & 0x0F, aux0 < 1500) == (3, 1, True)
+        unit = lambda ch, mid, rng: (ch - mid) / rng  # noqa: E731
+        return (-unit(r, 1500, 500) * 720.0, -unit(p, 1500, 500) * 720.0, -unit(y, 1500, 500) * 400.0,
+                max(0.0, unit(t, 1000, 1000) * 65535.0))
+
+    def test_matches_legacy_setpoint_without_thrust_cap(self):
+        import drone
+        for roll, pitch, yaw, thrust in ((0, 0, 0, 0), (40, -25, 90, 30000), (-180, 180, -180, 65535), (12.3, -7.7, 3.3, 62000)):
+            r, p, y, t = self.firmware_decode(drone.cppm_rate_setpoint(roll, pitch, yaw, thrust))
+            # legacy path (send_setpoint + crtp_commander_rpyt.c, rate mode): roll, -pitch, -yaw, min(thrust, 60000)
+            self.assertAlmostEqual(r, roll, delta=0.8)
+            self.assertAlmostEqual(p, -pitch, delta=0.8)
+            self.assertAlmostEqual(y, -yaw, delta=0.5)
+            self.assertAlmostEqual(t, thrust, delta=40.0)                 # full range: 65535 stays 65535
 
 
 if __name__ == "__main__":

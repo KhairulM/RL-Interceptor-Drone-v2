@@ -1,4 +1,5 @@
 import logging
+import struct
 import threading
 import time
 import numpy as np
@@ -13,10 +14,37 @@ from geometry_msgs.msg import TransformStamped, PoseStamped
 from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.log import LogConfig
 from cflib.crazyflie.syncLogger import SyncLogger
+from cflib.crtp.crtpstack import CRTPPacket, CRTPPort
 
 import intercept_common as ic
 
 logger = logging.getLogger(__name__)
+
+# CTBR setpoints go out as the generic commander's cppmEmu packet in rate mode. The legacy RPYT packet
+# (cflib commander.send_setpoint) is capped at thrust 60000 of 65535 in the firmware (crtp_commander_rpyt.c
+# MAX_THRUST), about 8 % below the full-range thrust the policies are trained with; cppmEmu maps 0-65535.
+CPPM_SETPOINT_TYPE = 3
+CPPM_RATE_RP_DPS = 720.0     # cppm.rateRoll / cppm.ratePitch, set in _setup_params (persistent params)
+CPPM_RATE_YAW_DPS = 400.0    # cppm.rateYaw
+
+
+def cppm_rate_setpoint(roll_rate: float, pitch_rate: float, yaw_rate: float, thrust_pwm: float) -> bytes:
+    """cppmEmu payload (rate mode) giving the firmware the same setpoint as send_setpoint(roll, pitch, yaw, thrust)
+    in rate mode, without its thrust cap: attitudeRate = (roll, -pitch, -yaw) deg/s, thrust = thrust_pwm.
+
+    Channels are 1000-2000 (firmware: rate = -(ch - 1500) / 500 * max_rate, thrust = (ch - 1000) / 1000 * 65535);
+    aux channel 0 below 1500 turns self-levelling off (rate mode). Resolution: 1.4 deg/s roll/pitch, 0.8 deg/s yaw,
+    66 PWM thrust.
+    """
+    def channel(value: float) -> int:
+        return int(round(min(2000.0, max(1000.0, value))))
+    return struct.pack(
+        '<BBHHHHH', CPPM_SETPOINT_TYPE, 1,                         # type, header: one aux channel
+        channel(1500.0 - 500.0 * roll_rate / CPPM_RATE_RP_DPS),
+        channel(1500.0 + 500.0 * pitch_rate / CPPM_RATE_RP_DPS),
+        channel(1500.0 + 500.0 * yaw_rate / CPPM_RATE_YAW_DPS),
+        channel(1000.0 + 1000.0 * thrust_pwm / 65535.0),
+        1000)                                                      # aux 0: self-levelling off
 
 STAB_MODE_ROLL_PARAM = 'flightmode.stabModeRoll'
 STAB_MODE_PITCH_PARAM = 'flightmode.stabModePitch'
@@ -364,7 +392,11 @@ class CrazyflieDrone(Drone):
         thrust = int(np.clip(
             float(command.thrust_pwm.detach().cpu().item()),
             0.0, self.max_thrust_pwm))
-        self.cf.commander.send_setpoint(roll_rate, pitch_rate, yaw_rate, thrust)
+        pk = CRTPPacket()
+        pk.port = CRTPPort.COMMANDER_GENERIC
+        pk.channel = 0
+        pk.data = cppm_rate_setpoint(roll_rate, pitch_rate, yaw_rate, thrust)
+        self.cf.send_packet(pk)
 
     def send_position_setpoint(self, x: float, y: float, z: float,
                                yaw_deg: float = 0.0):
@@ -397,6 +429,10 @@ class CrazyflieDrone(Drone):
         self.cf.param.set_value(STAB_MODE_PITCH_PARAM, STAB_MODE_RATE)
         # Set the stabilizer estimator to Kalman filter
         self.cf.param.set_value(STAB_ESTIMATOR_PARAM, STAB_ESTIMATOR_KALMAN)
+        # cppmEmu rate scaling used by send_ctbr (persistent params: set explicitly, never assume the defaults)
+        self.cf.param.set_value('cppm.rateRoll', CPPM_RATE_RP_DPS)
+        self.cf.param.set_value('cppm.ratePitch', CPPM_RATE_RP_DPS)
+        self.cf.param.set_value('cppm.rateYaw', CPPM_RATE_YAW_DPS)
 
     def _setup_loggers(self):
         # stateEstimate.v{x,y,z} is the EKF velocity in the WORLD frame

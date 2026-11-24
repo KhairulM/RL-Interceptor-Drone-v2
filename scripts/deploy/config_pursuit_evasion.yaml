@@ -30,11 +30,18 @@ opponent:
   mode: policy                 # policy | cf | scripted
   # mode: policy  -> artifact of the OPPOSING role (here the same campaign's
   # final evader, stage 25).
-  artifact_dir: artifacts/thesis_F14_rls_s200/evader
+  artifact_dir: artifacts/thesis_F8b_roncero_s0/evader
+  # mode: policy only: hand the opponent drone to a second policy during the run (the thesis
+  # switching evaders). The new policy keeps the drone's previous action. null = no switch.
+  # F8 -> F10: artifact_dir = artifacts/thesis_F8_roncero_s0/evader and
+  #   switch: {artifact_dir: artifacts/thesis_F10_nofix_s0/evader, after_s: 1.0}
+  # (after_s: s after the chase starts; thesis 0.5, 1.0 or 1.5). Swap the two for F10 -> F8.
+  switch: {artifact_dir: artifacts/thesis_F10_nofix_s0/evader, after_s: 2.0}
+  # switch: null
   # mode: cf  -> a real Crazyflie tracked by mocap but flown by something else.
   # mode: scripted  -> the opponent Crazyflie takes off and flies position setpoints:
   scripted:
-    type: hover                # hover | linear | circular | pure_pursuit | flee
+    type: hover                # hover | linear | circular | pure_pursuit | flee | apf
     virtual: false             # true: no opponent drone; the agent chases a virtual point.
     yaw_deg: 0.0               # Yaw of every setpoint (deg).
     anchor: [0.5, 0.0, 1.0]    # Start / hover point [x, y, z] (m, mocap world); flee holds this z.
@@ -42,7 +49,10 @@ opponent:
     direction: [1.0, 0.0, 0.0] # linear: world-frame travel direction (normalised at load).
     radius: 1.0                # circular: orbit radius (m).
     omega: 1.0                 # circular: angular rate (rad/s).
-    lookahead: 0.5             # flee: setpoint lead time (s).
+    lookahead: 0.5             # flee / apf: setpoint lead time (s).
+    apf_influence: 2.0         # apf: repulsion from the agent within this distance (m).
+    apf_wall_margin: 1.0       # apf: repulsion from the walls within this distance (m).
+    apf_wall_gain: 2.0         # apf: wall repulsion strength relative to the agent's.
 
 # -- Arena --------------------------------------------------------------------
 # Size comes from the policy metadata (arena_half_xy, arena_z_min/max).
@@ -71,7 +81,7 @@ flight:
   # Low-pass time constant (s) on the commanded body rates; 0 = off. The firmware
   # rate loop is ~10x faster than the 50 Hz training loop and can turn aggressive
   # rate commands into roll oscillation; try 0.02-0.05 if you see it.
-  command_rate_lpf_tau: 0.0
+  command_rate_lpf_tau: 0.03
 
 # -- Logging ------------------------------------------------------------------
 logging:
@@ -80,6 +90,7 @@ logging:
                                # (incl. the estimator output) to compare deploy vs sim.
   debug_period_s: 0.5          # Min seconds between debug_obs dumps.
   publish_tf: true             # Publish mocap poses on /tf (parent: mocap.world_frame).
+  csv_dir: null                # Folder for one CSV (row per tick) + JSON sidecar per flight; null = off.
 
 # -- Pursuer drone config ----------------------------------------------------
 pursuer:
@@ -109,7 +120,7 @@ evader:
 
 # -- Motion capture (OptiTrack / NatNet) -------------------------------------
 mocap:
-  enabled: true
+  enabled: false
   server_ip: 192.168.0.210
   local_ip: ""
   multicast_address: 239.255.42.99
@@ -127,7 +138,7 @@ mocap:
 # LAND (both drones land at the same time), EMERGENCY (motors off on the affected drone, the other lands).
 safety:
   enabled: true
-  strict_preflight: true        # refuse to take off if mocap is not aligned / the estimator has not converged /
+  strict_preflight: false        # refuse to take off if mocap is not aligned / the estimator has not converged /
                                 # a drone starts outside the arena, not level or with a stale / non-finite state
   evader_geofence_margin: 0.3   # evader's hard fence = arena + margin (incl. ceiling) -> LAND
   pursuer_geofence_margin: 0.3  # pursuer's fence; null = none (training lets the pursuer leave the arena).
