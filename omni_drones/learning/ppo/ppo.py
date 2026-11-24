@@ -200,6 +200,12 @@ class PPOPolicy(TensorDictModuleBase):
         if getattr(self, "div_refs", None):
             div_reward = self._intrinsic_reward(tensordict)
             rewards = rewards + div_reward
+        hull_info = {}
+        if getattr(self, "hull", None) is not None:      # thesis F16 PSD-PSRO own-policy-hull distance
+            hull_reward, hull_info = self.hull.prepare(tensordict, self.actor)
+            hull_info["hull_extrinsic_reward"] = float(rewards.mean())
+            rewards = rewards + hull_reward
+            self._hull_grad_probe = True
         dones = einops.repeat(
             tensordict[("next", "terminated")],
             "t e 1 -> t e a 1",
@@ -233,6 +239,11 @@ class PPOPolicy(TensorDictModuleBase):
         out = {k: v.item() for k, v in infos.items()}
         if div_reward is not None:
             out["div_reward"] = div_reward.mean().item()
+        if hull_info:
+            out.update(hull_info)
+            out.update(getattr(self, "_hull_grad_norms", {}))
+            head = next(m for m in self.actor.modules() if isinstance(m, Actor))
+            out["policy_std"] = float(torch.exp(head.actor_std).mean())
         return out
 
     def _update(self, tensordict: TensorDict):
@@ -267,6 +278,20 @@ class PPOPolicy(TensorDictModuleBase):
             div_info = {"div_loss": div_loss.detach(), "div_distance": div.detach().mean()}
             if self.div_mode == "action":
                 div_info.update(div_bonus=bonus.detach().mean(), div_sat=(bonus.detach() > 0.9).float().mean())
+        if getattr(self, "hull", None) is not None:      # thesis F16: direct (pathwise) KL gradient
+            hull_kl = self.hull.direct_kl(tensordict, dist)
+            hull_loss = - self.hull.lam * hull_kl.mean()
+            if getattr(self, "_hull_grad_probe", False):   # separate gradient norms, first minibatch of each update
+                self._hull_grad_probe = False
+                params = [q for q in self.actor.parameters() if q.requires_grad]
+                norm = lambda g: float(torch.sqrt(sum((x.detach() ** 2).sum() for x in g if x is not None)))
+                self._hull_grad_norms = {
+                    "hull_pg_grad_norm": norm(torch.autograd.grad(policy_loss, params, retain_graph=True,
+                                                                  allow_unused=True)),
+                    "hull_kl_grad_norm": norm(torch.autograd.grad(hull_loss, params, retain_graph=True,
+                                                                  allow_unused=True))}
+            loss = loss + hull_loss
+            div_info.update(hull_loss=hull_loss.detach(), hull_kl_minibatch=hull_kl.detach().mean())
         self.actor_opt.zero_grad()
         self.critic_opt.zero_grad()
         loss.backward()
@@ -284,6 +309,25 @@ class PPOPolicy(TensorDictModuleBase):
             "explained_var": explained_var,
             **div_info,
         }, [])
+
+    def set_hull_kl(self, ckpt_paths, lam: float, n_interior: int = 16, n_check: int = 64, seed: int = 0,
+                    mc_samples: int = 8):
+        """Thesis F16 PSD-PSRO: own-policy-hull KL objective vs the earlier same-role policies in ``ckpt_paths``
+        (hull_kl.HullKL). lam = 0 leaves every update identical to plain PPO (its noise uses a private generator)."""
+        import copy
+        from .hull_kl import HullKL
+        refs = []
+        for path in ckpt_paths:
+            state = torch.load(path, map_location=self.device)
+            if isinstance(state, dict) and "state_dict" in state:
+                state = state["state_dict"]
+            ref = copy.deepcopy(self.actor)
+            ref.load_state_dict({k[len("actor."):]: v for k, v in state.items() if k.startswith("actor.")})
+            ref.requires_grad_(False)
+            ref.eval()
+            refs.append(ref)
+        self.hull = HullKL(refs, lam, n_interior=n_interior, n_check=n_check, seed=seed, mc_samples=mc_samples,
+                           device=self.device)
 
     def set_diversity(self, ckpt_paths, beta: float, cap: float, mode: str = "kl", tau: float = 1.0,
                       centre: bool = False):

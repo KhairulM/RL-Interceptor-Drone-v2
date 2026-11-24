@@ -1,0 +1,32 @@
+{
+  "policies": [
+    {
+      "id": "thesis-F16-smoke-psro/pursuer:s0",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F16-smoke-psro/checkpoints/pursuer_stage0.pt",
+      "metadata": {
+        "campaign": "thesis-F16-smoke-psro",
+        "stage": 0,
+        "db_id": "pursuer:s2"
+      }
+    },
+    {
+      "id": "thesis-F16-smoke-psro/pursuer:s2",
+      "kind": "rl",
+      "checkpoint_path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F16-smoke-psro/checkpoints/pursuer_stage2.pt",
+      "metadata": {
+        "campaign": "thesis-F16-smoke-psro",
+        "stage": 2,
+        "db_id": "pursuer:s3"
+      }
+    }
+  ],
+  "probs": {
+    "thesis-F16-smoke-psro/pursuer:s0": 0.5,
+    "thesis-F16-smoke-psro/pursuer:s2": 0.5
+  },
+  "stochastic": true,
+  "resample": {
+    "seed": 904
+  }
+}

@@ -1,0 +1,19 @@
+=== start F16 (--exp F16)
+[skip: campaign thesis-F16-smoke-qd_dpp run by another lane]
+campaign thesis-F16-smoke-psro start: f16_psro.py run_name=thesis-F16-smoke-psro arm=psro seed=0 generations=1 frames_per_stage=2000000 hull.lam=0.0 payoff_min_episodes=256 task_overrides=[task.reward_mode=roncero,algo.gae_cut_at_truncation=true] num_envs=256 payoff_num_envs=256
+campaign thesis-F16-smoke-psro exit 0
+[skip: campaign thesis-F16-smoke-psd run by another lane]
+Traceback (most recent call last):
+  File "/home/user/Projects/RLInterceptorDrone/scripts/experiments/thesis/run.py", line 115, in <module>
+    main()
+  File "/home/user/Projects/RLInterceptorDrone/scripts/experiments/thesis/run.py", line 107, in main
+    getattr(importlib.import_module(mod), fn or "run")(args)
+  File "/home/user/Projects/RLInterceptorDrone/scripts/experiments/thesis/exps/f16_roncero_population.py", line 694, in run_f16
+    run_smoke()
+  File "/home/user/Projects/RLInterceptorDrone/scripts/experiments/thesis/exps/f16_roncero_population.py", line 595, in run_smoke
+    _ensure(marker, checks, "smoke gates")
+  File "/home/user/Projects/RLInterceptorDrone/scripts/experiments/thesis/exps/f16_roncero_population.py", line 111, in _ensure
+    _wait(path, what)
+  File "/home/user/Projects/RLInterceptorDrone/scripts/experiments/thesis/exps/f16_roncero_population.py", line 90, in _wait
+    raise RuntimeError(f"F16: {what} failed or not started: {path}")
+RuntimeError: F16: smoke gates failed or not started: /home/user/Projects/RLInterceptorDrone/experiments/thesis/F16_roncero_population/smoke/SMOKE_DONE.json

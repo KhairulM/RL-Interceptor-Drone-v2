@@ -48,6 +48,18 @@ diversity:
   centre: false   # F6b: zero-mean intrinsic reward (batch mean subtracted)
   measure: false  # F6b pilot: load the references and log div_distance even when beta = 0
 
+# Thesis F16 PSD-PSRO: own-policy-hull KL objective (omni_drones/learning/ppo/hull_kl.py) vs earlier same-role
+# checkpoints. Off when ckpts is empty.
+hull_kl:
+  ckpts: []
+  lam: 0.0
+  n_interior: 16     # Dirichlet(1) interior candidates (+ all pure vertices)
+  n_check: 64        # larger candidate set, held-out approximation check only
+  seed: 0
+  mc_samples: 8
+  log_path: null     # JSONL of per-iteration hull diagnostics
+eval_stochastic: false   # thesis F16: sample the evaluated agent's actions (mode=eval, multi-episode path)
+
 # Opponent re-sampling inside one training run (thesis D1): every `every_frames`, recompute the opponent
 # probabilities from the episodes played since the last refresh and reassign envs. 0 = fixed probabilities.
 refresh:

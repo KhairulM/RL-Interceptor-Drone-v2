@@ -1906,3 +1906,42 @@
 2026-11-22 12:07:12 F14: prerequisite ready: Stage A rule selection
 2026-11-22 12:07:13 F21 analysis complete; update RESULTS/PROGRESS before declaring the study complete
 2026-11-22 12:07:13 === done F21c
+2026-11-22 15:28:19 F21 all four arm smokes passed (both roles, live/frozen evaluations)
+2026-11-22 15:28:19 F21 analysis complete; update RESULTS/PROGRESS before declaring the study complete
+2026-11-22 15:30:01 === start F16 (--exp F16)
+2026-11-22 15:30:02 F16 audit manifest frozen
+2026-11-22 15:30:02 campaign thesis-F16-smoke-qd_dpp start: train_selfplay.py n_stages=4 max_total_stages=4 frames_per_stage=2000000 uniform_mix=1.0 seed=0 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] pursuer_sampler=qd_dpp evader_sampler=qd_dpp run_name=thesis-F16-smoke-qd_dpp sampler_diagnostics=true num_envs=256 task_overrides=[task.reward_mode=roncero,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500]
+2026-11-22 15:30:10 === start F16 (--exp F16)
+2026-11-22 15:30:10 [skip: campaign thesis-F16-smoke-qd_dpp run by another lane]
+2026-11-22 15:30:10 campaign thesis-F16-smoke-psro start: f16_psro.py run_name=thesis-F16-smoke-psro arm=psro seed=0 generations=1 frames_per_stage=2000000 hull.lam=0.0 payoff_min_episodes=256 task_overrides=[task.reward_mode=roncero,algo.gae_cut_at_truncation=true] num_envs=256 payoff_num_envs=256
+2026-11-22 15:45:59 campaign thesis-F16-smoke-qd_dpp exit 0
+2026-11-22 15:45:59 [skip: campaign thesis-F16-smoke-psro run by another lane]
+2026-11-22 15:45:59 campaign thesis-F16-smoke-psd start: f16_psro.py run_name=thesis-F16-smoke-psd arm=psd seed=0 generations=1 frames_per_stage=2000000 hull.lam=0.1 payoff_min_episodes=256 task_overrides=[task.reward_mode=roncero,algo.gae_cut_at_truncation=true] num_envs=256 payoff_num_envs=256
+2026-11-22 15:48:28 campaign thesis-F16-smoke-psro exit 0
+2026-11-22 15:48:28 [skip: campaign thesis-F16-smoke-psd run by another lane]
+2026-11-22 15:58:35 campaign thesis-F16-smoke-psd exit 0
+2026-11-23 11:23:30 F21 all four arm smokes passed (both roles, live/frozen evaluations)
+2026-11-23 11:23:30 F21 analysis complete; update RESULTS/PROGRESS before declaring the study complete
+2026-11-23 11:24:04 === start F16 (--exp F16)
+2026-11-23 11:24:04 campaign thesis-F16-smoke-psro start: f16_psro.py run_name=thesis-F16-smoke-psro arm=psro seed=0 generations=1 frames_per_stage=2000000 hull.lam=0.0 payoff_min_episodes=256 task_overrides=[task.reward_mode=roncero,algo.gae_cut_at_truncation=true] num_envs=256 payoff_num_envs=256
+2026-11-23 11:24:34 === start F16 (--exp F16)
+2026-11-23 11:24:34 [skip: campaign thesis-F16-smoke-psro run by another lane]
+2026-11-23 11:35:45 campaign thesis-F16-smoke-psro exit 0
+2026-11-23 11:43:24 F16 smoke gates passed
+2026-11-23 11:43:24 F16 evaluation manifest frozen
+2026-11-23 11:43:24 campaign thesis-F16-psro-s0 start: f16_psro.py run_name=thesis-F16-psro-s0 arm=psro seed=0 generations=12 frames_per_stage=50000000 hull.lam=0.0 payoff_min_episodes=2048 task_overrides=[task.reward_mode=roncero,algo.gae_cut_at_truncation=true]
+2026-11-23 11:43:34 [skip: campaign thesis-F16-psro-s0 run by another lane]
+2026-11-23 11:43:34 campaign thesis-F16-qd_dpp-s0 start: train_selfplay.py n_stages=26 max_total_stages=26 frames_per_stage=50000000 uniform_mix=1.0 seed=0 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] pursuer_sampler=qd_dpp evader_sampler=qd_dpp run_name=thesis-F16-qd_dpp-s0 sampler_diagnostics=true task_overrides=[task.reward_mode=roncero,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500]
+2026-11-23 18:59:50 campaign thesis-F16-qd_dpp-s0 exit 0
+2026-11-23 18:59:50 campaign thesis-F16-psro-s100 start: f16_psro.py run_name=thesis-F16-psro-s100 arm=psro seed=100 generations=12 frames_per_stage=50000000 hull.lam=0.0 payoff_min_episodes=2048 task_overrides=[task.reward_mode=roncero,algo.gae_cut_at_truncation=true]
+2026-11-23 19:55:55 campaign thesis-F16-psro-s0 exit 0
+2026-11-23 19:55:55 [skip: campaign thesis-F16-psro-s100 run by another lane]
+2026-11-23 19:55:55 campaign thesis-F16-qd_dpp-s100 start: train_selfplay.py n_stages=26 max_total_stages=26 frames_per_stage=50000000 uniform_mix=1.0 seed=100 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] pursuer_sampler=qd_dpp evader_sampler=qd_dpp run_name=thesis-F16-qd_dpp-s100 sampler_diagnostics=true task_overrides=[task.reward_mode=roncero,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500]
+2026-11-24 03:08:03 campaign thesis-F16-qd_dpp-s100 exit 0
+2026-11-24 03:08:03 campaign thesis-F16-psro-s200 start: f16_psro.py run_name=thesis-F16-psro-s200 arm=psro seed=200 generations=12 frames_per_stage=50000000 hull.lam=0.0 payoff_min_episodes=2048 task_overrides=[task.reward_mode=roncero,algo.gae_cut_at_truncation=true]
+2026-11-24 03:26:37 campaign thesis-F16-psro-s100 exit 0
+2026-11-24 03:26:37 [skip: campaign thesis-F16-psro-s200 run by another lane]
+2026-11-24 03:26:37 campaign thesis-F16-qd_dpp-s200 start: train_selfplay.py n_stages=26 max_total_stages=26 frames_per_stage=50000000 uniform_mix=1.0 seed=200 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] pursuer_sampler=qd_dpp evader_sampler=qd_dpp run_name=thesis-F16-qd_dpp-s200 sampler_diagnostics=true task_overrides=[task.reward_mode=roncero,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500]
+2026-11-24 10:32:46 campaign thesis-F16-qd_dpp-s200 exit 0
+2026-11-24 10:32:46 F16: this lane has no unclaimed main campaign left
+2026-11-24 10:32:46 === done F16

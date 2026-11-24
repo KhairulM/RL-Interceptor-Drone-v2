@@ -33,6 +33,7 @@ Usage (from the repository root, with the Isaac ``.venv`` active)::
 
 import logging
 import os
+import shutil
 import sys
 
 import hydra
@@ -78,11 +79,14 @@ def build_metadata(cfg, base_env, obs_dim: int, action_dim: int) -> pec.PursuitE
     if role not in pec.ROLES:
         raise ValueError(f"task.role must be one of {list(pec.ROLES)}; got '{role}'.")
 
+    use_adapter = bool(getattr(base_env, "use_adapt", False))
     obs_cfg = pec.PursuitEvasionObsConfig(
         use_previous_action=bool(task_obs_cfg.get("use_previous_action", True)),
         use_rel_dist=bool(task_obs_cfg.get("use_rel_dist", True)),
         rot_repr=str(task_obs_cfg.get("rot_repr", "matrix")),
         use_esn=bool(getattr(base_env, "use_esn", False)),
+        use_adapter=use_adapter,
+        adapter_dim=int(getattr(base_env, "adapt_out_dim", 0)) if use_adapter else 3,
         obs_dim=obs_dim,
         action_dim=action_dim,
     )
@@ -109,6 +113,23 @@ def build_metadata(cfg, base_env, obs_dim: int, action_dim: int) -> pec.PursuitE
         str(p.get("id", "")) for p in (cfg.task.opponent.get("policies", None) or [])
     ]
 
+    adapter = None
+    if use_adapter:
+        a = cfg.task.adapt
+        adapter = pec.OpponentAdapterConfig(
+            kind=str(a.get("kind", "nf")),
+            target=str(a.get("target", "disp")),
+            z_mode=str(a.get("z_mode", "vel")),
+            history=int(a.get("history", 10)),
+            horizon=int(a.get("horizon", 15)),
+            forgetting=float(a.get("forgetting", 0.98)),
+            delta=float(a.get("delta", 10.0)),
+            p_max_ratio=float(a.get("p_max_ratio", 1.0)),
+            freeze=bool(a.get("freeze", False)),
+            reset_on_episode=bool(a.get("reset_on_episode", True)),
+        )
+        adapter.validate()
+
     return pec.PursuitEvasionMetadata(
         artifact_version=pec.PE_ARTIFACT_VERSION,
         algo=str(cfg.algo.name).lower(),
@@ -129,6 +150,7 @@ def build_metadata(cfg, base_env, obs_dim: int, action_dim: int) -> pec.PursuitE
             "action_transform": str(cfg.task.get("action_transform", "")),
             "trained_against": ",".join(opponent_ids),
         },
+        adapter=adapter,
     )
 
 
@@ -240,6 +262,10 @@ def main(cfg):
             esn_path = os.path.join(export_dir, pec.ESN_FILENAME)
             torch.save(base_env.esn.export(), esn_path)
             logging.info("Exported ESN reservoir     -> %s", esn_path)
+        if metadata.adapter is not None:
+            basis_path = os.path.join(export_dir, pec.ADAPTER_BASIS_FILENAME)
+            shutil.copyfile(str(cfg.task.adapt.model_path), basis_path)
+            logging.info("Exported adapter basis     -> %s", basis_path)
 
         logging.info("Exported TorchScript policy -> %s", ts_path)
         logging.info("Exported metadata          -> %s", meta_path)

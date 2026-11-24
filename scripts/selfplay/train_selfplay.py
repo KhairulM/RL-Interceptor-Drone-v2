@@ -126,7 +126,7 @@ def _seed_pool(db, role, heuristics):
         print(f"[seed] {role} heuristic '{name}'")
 
 
-def _opponent_probs(db, role, reference_id, cfg):
+def _opponent_probs(db, role, reference_id, cfg, diag=None):
     """Thesis F3 samplers for the RL opponents of ``role`` (``pursuer_sampler`` / ``evader_sampler``).
 
     hedge:  Roncero et al. 2026 eq. (12), challenge c_j = 1 - win rate of the reference (latest) learner vs opponent
@@ -150,6 +150,8 @@ def _opponent_probs(db, role, reference_id, cfg):
         j = m.get("neutralization_rate", m.get("win_rate"))
         challenge[o] = 1.0 if j is None else (1.0 - float(j) if role == PURSUER else float(j))
     gamma, eta = float(cfg.hedge_gamma), float(cfg.hedge_eta)
+    if diag is not None:
+        diag.update(challenge=challenge, hedge_probs=_samplers.hedge_probs(challenge, gamma, eta))
     if sampler == "hedge" or len(opps) < 2:
         return _samplers.hedge_probs(challenge, gamma, eta)
     if sampler != "qd_dpp":
@@ -169,7 +171,35 @@ def _opponent_probs(db, role, reference_id, cfg):
     mu = [sum(desc[k][i] for k in keys) / len(keys) for i in range(len(desc[keys[0]]))]
     sd = [max((sum((desc[k][i] - mu[i]) ** 2 for k in keys) / len(keys)) ** 0.5, 1e-6) for i in range(len(mu))]
     desc = {k: [(v - m) / d for v, m, d in zip(desc[k], mu, sd)] for k in keys}
-    return _samplers.qd_dpp_probs(_samplers.hedge_scores(challenge, eta), desc, 1.0, gamma)
+    probs = _samplers.qd_dpp_probs(_samplers.hedge_scores(challenge, eta), desc, 1.0, gamma)
+    if diag is not None:
+        diag.update(_qd_dpp_diagnostics(challenge, desc, eta, gamma, probs, diag["hedge_probs"]))
+    return probs
+
+
+def _qd_dpp_diagnostics(challenge, desc, eta, gamma, probs, hedge):
+    """Thesis F16 B: recompute the QD-DPP internals (same formulas as samplers.qd_dpp_probs) for logging, and fail
+    explicitly on non-finite / degenerate values instead of the sampler's silent uniform fallback."""
+    import numpy as np
+    ids = list(challenge)
+    q = np.sqrt(np.array([v for v in _samplers.softmax_probs(_samplers.hedge_scores(challenge, eta), 1.0, 0.0)
+                          .values()]))
+    B = np.array([desc[i] for i in ids], dtype=float)
+    D2 = ((B[:, None, :] - B[None, :, :]) ** 2).sum(-1)
+    d = np.sqrt(D2[np.triu_indices(len(ids), 1)])
+    d = d[d > 1e-9]
+    sigma = float(np.median(d)) if len(d) else 1.0
+    S = np.exp(-D2 / (2 * sigma ** 2))
+    k = _samplers.dpp_marginals(q, S, scale=float(len(ids)))
+    p = np.array([probs[i] for i in ids])
+    h = np.array([hedge[i] for i in ids])
+    if not (np.isfinite(B).all() and np.isfinite(S).all() and np.isfinite(k).all() and np.isfinite(p).all()) \
+            or k.sum() <= 0:
+        raise FloatingPointError(f"qd_dpp: non-finite or degenerate descriptors / marginals for {ids}")
+    ent = float(-(p[p > 0] * np.log(p[p > 0])).sum())
+    return {"ids": ids, "descriptors": B.tolist(), "bandwidth": sigma, "kernel": S.tolist(),
+            "quality_sqrt": q.tolist(), "marginals": k.tolist(), "probs": p.tolist(), "entropy": ent,
+            "effective_support": float(np.exp(ent)), "tv_from_hedge": float(0.5 * np.abs(p - h).sum())}
 
 
 def _diversity_overrides(db, role, retry_id, cfg):
@@ -288,7 +318,12 @@ def main():
         retry_id = incomplete_policy["id"] if incomplete_policy else None
         reference = _previous_rl_policy(db, role, retry_id)
         if reference and str(cfg.get(f"{role}_sampler", "default")) != "default":
-            probs = _opponent_probs(db, role, reference["id"], cfg)
+            diag = {} if bool(cfg.get("sampler_diagnostics", False)) else None
+            probs = _opponent_probs(db, role, reference["id"], cfg, diag)
+            if diag is not None:      # thesis F16: per-generation sampler record
+                with open(os.path.join(work_dir, "sampler_diagnostics.jsonl"), "a") as f:
+                    f.write(json.dumps({"stage": current_stage, "role": role, "reference": reference["id"],
+                                        "sampler": str(cfg.get(f"{role}_sampler")), **diag}) + "\n")
         elif reference:
             probs = db.compute_sampling_probs(
                 role, temperature=temperature, metric_weights=metric_weights,

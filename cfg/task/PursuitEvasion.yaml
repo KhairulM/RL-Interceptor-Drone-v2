@@ -58,6 +58,9 @@ reward_step: 0.1                   # evader per-step survival reward; must excee
 # Pair with algo.gae_cut_at_truncation=true. Coefficients from the paper (Sec. III-A c); see roncero_reward.py.
 reward_mode: thesis
 roncero: {k_br: 0.001, k_sm: 0.002, k_b: 10.0, k_c: 10.0, k_app: 0.25, k_s: 0.0025, v_safe: 2.0, alpha_close: 3.0}
+# Thesis F16 (eval only, needs reward_mode=roncero): accumulate both roles' discounted Roncero returns in stats.
+payoff_returns: false
+payoff_gamma: 0.99
 # Thesis F9: one Roncero component at a time on top of the thesis rules (roncero_reward.ablate); all off = thesis.
 ablation: {no_timeout: false, closing_discount: false, truncate_failures: false, no_timeout_evader: false}
 # Optional dense distance penalty (pursuer only), matching Intercept's

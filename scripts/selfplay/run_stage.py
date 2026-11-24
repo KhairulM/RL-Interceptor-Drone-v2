@@ -82,6 +82,10 @@ def _load_opponent_spec(cfg):
     cfg.task.opponent.probs = spec.get("probs", None)
     if spec.get("switch") is not None:
         OmegaConf.update(cfg.task.opponent, "switch", spec["switch"], force_add=True)
+    if spec.get("resample") is not None:          # thesis F16: opponent redrawn at every episode reset
+        OmegaConf.update(cfg.task.opponent, "resample", spec["resample"], force_add=True)
+    if spec.get("stochastic"):                    # thesis F16: frozen opponents sample their actions
+        OmegaConf.update(cfg.task.opponent, "stochastic", True, force_add=True)
     # Frozen RL opponents are PPO policies; hand them this run's algo config.
     if cfg.algo.name == "ppo":
         cfg.task.opponent.algo_cfg = cfg.algo
@@ -224,6 +228,14 @@ def _run_train(cfg, env, base_env, policy):
         logging.info(f"diversity term: beta={dcfg.beta} cap={dcfg.cap} mode={mode} tau={tau} centre={centre} "
                      f"vs {list(dcfg.ckpts)}")
 
+    hcfg = cfg.get("hull_kl", None)
+    hull_log = None
+    if hcfg is not None and hcfg.get("ckpts", None):     # thesis F16 PSD-PSRO own-policy-hull objective
+        policy.set_hull_kl(list(hcfg.ckpts), float(hcfg.lam), n_interior=int(hcfg.n_interior),
+                           n_check=int(hcfg.n_check), seed=int(hcfg.seed), mc_samples=int(hcfg.mc_samples))
+        hull_log = hcfg.get("log_path", None)
+        logging.info(f"hull KL: lam={hcfg.lam} vs {list(hcfg.ckpts)}")
+
     use_wandb = (
         wandb is not None and init_wandb is not None
         and str(cfg.wandb.mode).lower() != "disabled"
@@ -266,6 +278,12 @@ def _run_train(cfg, env, base_env, policy):
             info.update(stats)
         info.update(policy.train_op(data.to_tensordict()))
         run.log(info)
+        if hull_log:
+            os.makedirs(os.path.dirname(os.path.abspath(hull_log)), exist_ok=True)
+            with open(hull_log, "a") as f:
+                f.write(json.dumps({k: v for k, v in info.items()
+                                    if k.startswith(("hull_", "policy_", "env_frames", "entropy"))
+                                    or k == "train/return"}) + "\n")
         # Console: show only episode stats (the "train/" keys); the learner
         # metrics (policy_loss, value_loss, grad norms, ...) still go to run.log.
         stats_only = {k: v for k, v in info.items()
@@ -283,7 +301,11 @@ def _run_train(cfg, env, base_env, policy):
     logging.info(f"saved checkpoint to {ckpt_path}")
     run.finish()
 
-    _write_stage_out(cfg, {"checkpoint_path": ckpt_path})
+    out = {"checkpoint_path": ckpt_path}
+    if getattr(base_env.opponent_bank, "resample", None) is not None:      # thesis F16: realised episode counts
+        out["opponent_probs"] = base_env.opponent_bank._resample_probs
+        out["opponent_episode_counts"] = dict(base_env.opponent_bank.resample_counts)
+    _write_stage_out(cfg, out)
 
 
 @torch.no_grad()
@@ -422,7 +444,9 @@ def _run_eval_multi(cfg, env, base_env, policy):
         z_rec, d_rec = [base_env.opponent_z()[rec].float().cpu()], []
         pos_rec = [pursuer.pos[rec, 0].float().cpu()]
     steps = 0
-    with set_exploration_type(ExplorationType.MODE):
+    # Thesis F16: eval_stochastic samples the evaluated agent's actions (the meta-game's stochastic policies).
+    explore = ExplorationType.RANDOM if bool(cfg.get("eval_stochastic", False)) else ExplorationType.MODE
+    with set_exploration_type(explore):
         for t in range(cutoff + max_len):
             td = policy(td)
             td, td_next = env.step_and_maybe_reset(td)
@@ -469,6 +493,8 @@ def _run_eval_multi(cfg, env, base_env, policy):
         "matchups": matchups,
         "eval": {"cutoff_steps": cutoff, "steps_run": steps, "step_dt": step_dt,
                  "num_envs": int(base_env.num_envs), "switch": switch,
+                 "stochastic_agent": bool(cfg.get("eval_stochastic", False)),
+                 "stochastic_opponents": bool(getattr(base_env.opponent_bank, "stochastic", False)),
                  "episodes": int(episodes["env"].numel()) if episodes else 0},
     })
 

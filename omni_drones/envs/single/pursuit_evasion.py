@@ -146,6 +146,12 @@ class PursuitEvasion(IsaacEnv):
         self.reward_mode = str(task_cfg.get("reward_mode", "thesis"))
         assert self.reward_mode in ("thesis", "roncero"), self.reward_mode
         self.roncero_k = dict(roncero_reward.DEFAULTS, **dict(task_cfg.get("roncero", {}) or {}))
+        # Thesis F16 (eval only): also accumulate both roles' discounted Roncero returns (the meta-game payoffs) in
+        # stats; the opponent's reward uses its own body rate, commanded-rate jerk and out-of-bounds flag. Off: unchanged.
+        self.payoff_returns = bool(task_cfg.get("payoff_returns", False))
+        self.payoff_gamma = float(task_cfg.get("payoff_gamma", 0.99))
+        if self.payoff_returns and self.reward_mode != "roncero":
+            raise ValueError("payoff_returns needs reward_mode=roncero")
         # Thesis F9: single Roncero components on top of the thesis rules (roncero_reward.ablate); all off by default.
         abl = dict(task_cfg.get("ablation", {}) or {})
         self.abl_no_timeout = bool(abl.get("no_timeout", False))
@@ -328,6 +334,8 @@ class PursuitEvasion(IsaacEnv):
             self.num_envs, 1, self.agent_drone.action_spec.shape[-1], device=self.device)
         self.action_error_order1 = torch.zeros(self.num_envs, 1, device=self.device)
         self._prev_rate_action = torch.zeros(self.num_envs, 3, device=self.device)   # F8 (roncero) smoothness term
+        self._opp_prev_rate_action = torch.zeros(self.num_envs, 3, device=self.device)   # F16 payoff returns
+        self._payoff_disc = torch.ones(self.num_envs, 1, device=self.device)
         self._rate_jerk_sq = torch.zeros(self.num_envs, 1, device=self.device)
         self.agent_effort = torch.zeros(self.num_envs, 1, device=self.device)
         self._opp_obs = torch.zeros(
@@ -341,6 +349,7 @@ class PursuitEvasion(IsaacEnv):
                 self.num_envs, dtype=torch.bool, device=self.device)
 
         # Frozen opponent bank built from cfg (driver injects the pool/probs).
+        self._opp_rl_raw = None    # F16: one stochastic opponent action per control step (cleared with the obs)
         self._build_opponent_bank(task_cfg)
         if self._any_esn:
             self._load_esn_readouts()
@@ -511,7 +520,12 @@ class PursuitEvasion(IsaacEnv):
             self.device,
             switch=OmegaConf.to_container(opp_cfg.get("switch"), resolve=True)
             if opp_cfg.get("switch", None) is not None else None,
+            resample=OmegaConf.to_container(opp_cfg.get("resample"), resolve=True)
+            if opp_cfg.get("resample", None) is not None else None,
+            stochastic=bool(opp_cfg.get("stochastic", False)),
         )
+        if self.opponent_bank.resample is not None and self.oracle_desc_table is not None:
+            raise ValueError("episode-reset opponent resampling is incompatible with the per-env oracle descriptor")
         self.opponent_bank.assign(probs, self.num_envs)
 
     def _init_arena_draw(self):
@@ -692,6 +706,9 @@ class PursuitEvasion(IsaacEnv):
             "esn_pred_err": UnboundedContinuous(torch.Size([1]), device=self.device),
             "adapt_pred_err": UnboundedContinuous(torch.Size([1]), device=self.device),
         }).expand(self.num_envs).to(self.device)
+        if self.payoff_returns:
+            for k in ("payoff_return_pursuer", "payoff_return_evader"):
+                self.stats_spec[k] = UnboundedContinuous(torch.Size([self.num_envs, 1]), device=self.device)
 
         self.info_spec = Composite({
             "drone_state": UnboundedContinuous(torch.Size([1, 13]), device=self.device),
@@ -707,6 +724,8 @@ class PursuitEvasion(IsaacEnv):
     # --------------------------------------------------------------- reset
     def _reset_idx(self, env_ids: torch.Tensor):
         self.stats[env_ids] = 0.0
+        if getattr(self, "opponent_bank", None) is not None:
+            self.opponent_bank.on_reset(env_ids)   # thesis F16 episode-level opponent sampling (no-op otherwise)
         num_env = len(env_ids)
         self.pursuer._reset_idx(env_ids, self.training)
         self.evader._reset_idx(env_ids, self.training)
@@ -753,6 +772,8 @@ class PursuitEvasion(IsaacEnv):
         self.stats["min_distance"][env_ids] = self.prev_distance[env_ids]
         self.opp_prev_action[env_ids] = 0.0
         self._prev_rate_action[env_ids] = 0.0
+        self._opp_prev_rate_action[env_ids] = 0.0
+        self._payoff_disc[env_ids] = 1.0
         self._just_reset[env_ids] = True
         self._oracle_vel_prev[env_ids] = 0.0
         self._oracle_vel_curr[env_ids] = 0.0
@@ -808,7 +829,14 @@ class PursuitEvasion(IsaacEnv):
         self.opponent_bank.update_switch(self.progress_buf, self.dt * self.substeps)
         rl_mask = self.opponent_bank.rl_mask
         if bool(rl_mask.any()):
-            rl_raw = self.opponent_bank.rl_raw_actions(self._opp_obs)
+            if self.opponent_bank.stochastic:
+                # _pre_sim_step runs once per physics substep: sample a stochastic opponent once per control step,
+                # as the agent's action is (thesis F16); the cache is cleared when the observation is recomputed.
+                if self._opp_rl_raw is None:
+                    self._opp_rl_raw = self.opponent_bank.rl_raw_actions(self._opp_obs)
+                rl_raw = self._opp_rl_raw
+            else:
+                rl_raw = self.opponent_bank.rl_raw_actions(self._opp_obs)
             raw = torch.where(rl_mask.reshape(-1, 1, 1), rl_raw, raw)
 
         masks = self.opponent_bank.heuristic_masks()
@@ -1232,6 +1260,7 @@ class PursuitEvasion(IsaacEnv):
             esn_fit=self.training and self.esn is not None and self.esn.readout != "per_env",
             drop_rel_vel=not self.agent_rel_vel, rel_vel_w=rel_vel_w)
         # Opponent observation for the frozen policy on the next pre-sim step.
+        self._opp_rl_raw = None
         self._opp_obs = self._agent_observation(
             self.opp_drone, self.agent_drone, self.opp_prev_action, self.obs_cfg,
             self.opp_esn, esn_mask, drop_rel_vel=self.opp_drop_rel_vel, rel_vel_w=opp_rel_vel_w)
@@ -1420,6 +1449,15 @@ class PursuitEvasion(IsaacEnv):
             self._rate_jerk_sq, self._prev_rate_action = roncero_reward.rate_jerk(rate, self._prev_rate_action)
             reward = roncero_reward.reward(pursuer, self._captured, delta, body_rate, self._rate_jerk_sq,
                                            self._agent_crash | self._agent_oob, v_close, self.roncero_k)
+            if self.payoff_returns:
+                opp_rate = self.opp_prev_action[..., :3].reshape(self.num_envs, 3)
+                opp_jerk, self._opp_prev_rate_action = roncero_reward.rate_jerk(opp_rate, self._opp_prev_rate_action)
+                opp_reward = roncero_reward.reward(not pursuer, self._captured, delta, self.opp_drone.vel_b[..., 3:6],
+                                                   opp_jerk, self._opp_crash | self._opp_oob, v_close, self.roncero_k)
+                r_p, r_e = (reward, opp_reward) if pursuer else (opp_reward, reward)
+                self.stats["payoff_return_pursuer"] += self._payoff_disc * r_p
+                self.stats["payoff_return_evader"] += self._payoff_disc * r_e
+                self._payoff_disc *= self.payoff_gamma
             zero = torch.zeros_like(reward)
             self.stats["reward_approach"].lerp_(self.roncero_k["k_app"] * delta if pursuer else zero, 1 - self.alpha)
             self.stats["reward_precision"].lerp_(zero, 1 - self.alpha)

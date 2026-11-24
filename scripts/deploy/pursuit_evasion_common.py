@@ -33,7 +33,9 @@ a single arena, so the mocap world origin must coincide with the arena centre
 from __future__ import annotations
 
 import dataclasses
+import importlib.util
 import json
+import os
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -69,7 +71,20 @@ from intercept_common import (  # noqa: F401  (re-exported for controllers)
 # v1: pos(3) rot(9|4|3) body lin vel(3) body ang vel(3) rel dist|hdg(3) rel vel(3)
 #     [act(4)] [esn(6)]. The opponent slot is the raw body-frame relative position
 #     when obs.use_rel_dist (env default) else its unit heading.
-PE_ARTIFACT_VERSION = 1
+# v2: v1 + optional [opponent adapter(3)] (learned acceleration estimate + RLS)
+#     and the top-level ``adapter`` block. v1 artifacts still load unchanged.
+PE_ARTIFACT_VERSION = 2
+SUPPORTED_ARTIFACT_VERSIONS = (1, 2)
+
+# Learned basis phi + input normalisation of the opponent adapter, copied into
+# the artifact folder by the exporter.
+ADAPTER_BASIS_FILENAME = 'adapter_basis.pt'
+# Loaded by file path (like the ESN): importing the omni_drones package would
+# pull in Isaac Sim. Using the training module keeps the RLS bit-identical.
+_ADAPTER_MODULE_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    'omni_drones', 'utils', 'opponent_adapt.py',
+)
 
 ROLES = ('pursuer', 'evader')
 
@@ -86,10 +101,11 @@ class PursuitEvasionObsConfig:
     opponent. That is what lets one frozen policy be replayed as either side's
     opponent during self-play, and it lets a single controller fly either role.
 
-    Component order is fixed by ``PursuitEvasion._agent_observation``:
-    position, rotation (matrix / quat / log), body linear velocity, body angular
-    velocity, opponent relative position or heading (body frame), opponent
-    relative velocity (body frame), [previous action], [ESN prediction].
+    Component order is fixed by ``PursuitEvasion._agent_observation`` and
+    ``PursuitEvasion._compute_state_and_obs``: position, rotation (matrix /
+    quat / log), body linear velocity, body angular velocity, opponent relative
+    position or heading (body frame), opponent relative velocity (body frame),
+    [previous action], [ESN prediction], [opponent adapter output].
     """
 
     use_previous_action: bool = True
@@ -100,12 +116,16 @@ class PursuitEvasionObsConfig:
     # ESN-OA: 6-D prediction (rel distance + rel lin vel) appended after the base obs.
     use_esn: bool = False
     esn_dim: int = 6
+    # Opponent adapter (metadata.adapter): 3-D body-frame estimate appended last.
+    use_adapter: bool = False
+    adapter_dim: int = 3
     obs_dim: int = 28
     action_dim: int = 4
 
     def base_obs_dim(self) -> int:
-        """Observation dimension before the ESN prediction is appended."""
-        return self.obs_dim - (self.esn_dim if self.use_esn else 0)
+        """Observation dimension before the ESN / adapter outputs are appended."""
+        return (self.obs_dim - (self.esn_dim if self.use_esn else 0)
+                - (self.adapter_dim if self.use_adapter else 0))
 
     def expected_obs_dim(self) -> int:
         """Recompute the observation dimension from the layout flags."""
@@ -116,7 +136,41 @@ class PursuitEvasionObsConfig:
             result += self.action_dim
         if self.use_esn:
             result += self.esn_dim
+        if self.use_adapter:
+            result += self.adapter_dim
         return result
+
+
+@dataclass
+class OpponentAdapterConfig:
+    """Learned opponent-acceleration estimator with an online RLS readout.
+
+    Mirrors ``task.adapt`` in ``cfg/task/PursuitEvasion.yaml`` (thesis A2 / F5 /
+    F14); the estimator itself is ``OpponentAdapter`` in
+    ``omni_drones/utils/opponent_adapt.py``. Only the configuration the thesis
+    pursuers were trained with is deployable: a learned basis (``kind='nf'``)
+    fed with the true relative velocity (``z_mode='vel'``).
+    """
+
+    kind: str = 'nf'
+    # 'dvel': predicts the evader's velocity change over `horizon` steps, fed to
+    # the policy as 0.1 x its mean acceleration; 'disp': relative displacement.
+    target: str = 'dvel'
+    z_mode: str = 'vel'
+    history: int = 10          # input window, control steps
+    horizon: int = 10          # prediction horizon, control steps
+    forgetting: float = 0.999  # RLS lambda
+    delta: float = 0.01        # RLS initial covariance scale
+    p_max_ratio: float = 1.0   # covariance-trace cap relative to its initial value
+    freeze: bool = False       # True: no online RLS update
+    reset_on_episode: bool = True
+
+    def validate(self) -> None:
+        if self.kind != 'nf' or self.z_mode != 'vel' or self.target not in ('dvel', 'disp'):
+            raise ValueError(
+                f'Unsupported opponent adapter (kind={self.kind!r}, z_mode={self.z_mode!r}, '
+                f'target={self.target!r}); deploy supports kind=nf, z_mode=vel, target=dvel|disp.'
+            )
 
 
 @dataclass
@@ -138,6 +192,8 @@ class PursuitEvasionMetadata:
     max_episode_length: int = 0
     # Free-form provenance (checkpoint path, task name, opponent pool, ...).
     notes: dict = field(default_factory=dict)
+    # Opponent adapter settings when obs.use_adapter (else None).
+    adapter: Optional[OpponentAdapterConfig] = None
 
     # -- (de)serialisation ---------------------------------------------------
     def to_dict(self) -> dict:
@@ -154,6 +210,7 @@ class PursuitEvasionMetadata:
             'capture_radius': self.capture_radius,
             'max_episode_length': self.max_episode_length,
             'notes': self.notes,
+            'adapter': dataclasses.asdict(self.adapter) if self.adapter is not None else None,
         }
 
     @classmethod
@@ -171,6 +228,8 @@ class PursuitEvasionMetadata:
             capture_radius=float(data.get('capture_radius', 0.1)),
             max_episode_length=int(data.get('max_episode_length', 0)),
             notes=dict(data.get('notes', {})),
+            adapter=(OpponentAdapterConfig(**data['adapter'])
+                     if data.get('adapter') else None),
         )
 
 
@@ -185,10 +244,10 @@ def load_metadata(path: str) -> PursuitEvasionMetadata:
     with open(path, 'r', encoding='utf-8') as handle:
         data = json.load(handle)
     version = int(data.get('artifact_version', -1))
-    if version != PE_ARTIFACT_VERSION:
+    if version not in SUPPORTED_ARTIFACT_VERSIONS:
         raise ValueError(
             f'Incompatible PursuitEvasion artifact version {version} '
-            f'(expected {PE_ARTIFACT_VERSION}). Re-run '
+            f'(expected one of {SUPPORTED_ARTIFACT_VERSIONS}). Re-run '
             f'export_pursuit_evasion_policy.py.'
         )
     role = str(data.get('role', '')).lower()
@@ -197,7 +256,14 @@ def load_metadata(path: str) -> PursuitEvasionMetadata:
             f"Artifact declares role '{role}'; expected one of {list(ROLES)}."
         )
     data['role'] = role
-    return PursuitEvasionMetadata.from_dict(data)
+    metadata = PursuitEvasionMetadata.from_dict(data)
+    if metadata.obs.use_adapter:
+        if metadata.adapter is None:
+            raise ValueError('obs.use_adapter is set but metadata has no adapter block.')
+        if metadata.role != 'pursuer':
+            raise ValueError('The opponent adapter is defined for the pursuer only.')
+        metadata.adapter.validate()
+    return metadata
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +351,57 @@ def build_esn_target(
     rel_vel_body = quat_rotate_inverse(
         self_quat_wxyz, opponent_lin_vel_world - self_lin_vel_world)
     return torch.cat([rel_pos_body, rel_vel_body], dim=-1)
+
+
+# ---------------------------------------------------------------------------
+# Opponent adapter (learned acceleration estimate + online RLS)
+# ---------------------------------------------------------------------------
+def load_opponent_adapter(artifact_dir: str, cfg: OpponentAdapterConfig,
+                          device: torch.device = torch.device('cpu')):
+    """Fresh single-env ``OpponentAdapter`` (readout at its learned mean, P = delta*I)."""
+    cfg.validate()
+    spec = importlib.util.spec_from_file_location('_omni_drones_opponent_adapt', _ADAPTER_MODULE_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.OpponentAdapter(
+        1, kind=cfg.kind, history=cfg.history, horizon=cfg.horizon,
+        forgetting=cfg.forgetting, delta=cfg.delta,
+        model_path=os.path.join(artifact_dir, ADAPTER_BASIS_FILENAME),
+        freeze=cfg.freeze, reset_on_episode=cfg.reset_on_episode,
+        p_max_ratio=cfg.p_max_ratio, target=cfg.target, device=device,
+    )
+
+
+def build_adapter_input(
+    pursuer_pos: torch.Tensor,
+    pursuer_lin_vel_world: torch.Tensor,
+    evader_pos: torch.Tensor,
+    evader_lin_vel_world: torch.Tensor,
+) -> torch.Tensor:
+    """Adapter input z = [rel_pos, rel_vel, pursuer_vel] (world frame, rel = evader - pursuer).
+
+    Reproduces ``PursuitEvasion.opponent_z(mode='vel')``.
+    """
+    return torch.cat([
+        evader_pos - pursuer_pos,
+        evader_lin_vel_world - pursuer_lin_vel_world,
+        pursuer_lin_vel_world,
+    ], dim=-1)
+
+
+def adapter_step(adapter, cfg: OpponentAdapterConfig, z: torch.Tensor,
+                 self_quat_wxyz: torch.Tensor, control_dt: float) -> torch.Tensor:
+    """Advance the adapter by one control step; returns its 3-D body-frame observation slot.
+
+    Reproduces ``PursuitEvasion._adapt_features``: for ``target='dvel'`` the
+    predicted velocity change over the horizon becomes 0.1 x the predicted mean
+    acceleration. Call exactly once per control tick, as in training (the RLS
+    labels are ``horizon`` ticks delayed).
+    """
+    out = adapter.step(z.reshape(1, -1)).reshape(-1)
+    if cfg.target == 'dvel':
+        out = out * (0.1 / (cfg.horizon * control_dt))
+    return quat_rotate_inverse(self_quat_wxyz, out)
 
 
 def opponent_role(role: str) -> str:

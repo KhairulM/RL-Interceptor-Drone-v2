@@ -1,68 +1,84 @@
-# PursuitEvasion controller configuration.
+# PursuitEvasion controller configuration (pursuit_evasion_controller.py).
 #
-# All runtime settings for pursuit_evasion_controller.py live here (no CLI flags).
 # Run with:  python pursuit_evasion_controller.py [--config config_pursuit_evasion.yaml]
-# Any key omitted below falls back to the documented default.
+# Paths are relative to the working directory (run from scripts/deploy).
+# Any key omitted falls back to the default shown in the controller's config
+# dataclasses; unknown keys are an error.
 #
-# The artifact's `role` (pursuer | evader) decides which drone the policy flies;
-# the drone sections below are keyed by role, so the same file serves both.
+# Sections
+#   policy    the learned drone this controller flies
+#   opponent  how the other drone is driven
+#   arena     where the trained arena sits in the mocap world
+#   episode   when a run ends (mirrors the training episode endings)
+#   flight    take-off, landing and the control loop
+#   logging   console output and ROS 2 TF
+#   pursuer / evader   per-drone radio settings, keyed by role
+#   mocap     OptiTrack / NatNet
+#   safety    the safety layer (safety.py; SAFETY_PLAN.md)
 
-artifact_dir: artifacts/thesis_F8b_roncero_s0/pursuer   # Folder with policy_ts.pt + metadata.json (required).
-# ^ v3: retrained from scratch with anti-tumble smoothness reward (body-rate +
-#   action-jerk penalties, lower approach weight). On-trajectory commanded body
-#   rates dropped ~61% (mean 96->37 deg/s, 0% saturation) vs the aggressive
-#   pursuer_evader_ppo_v2_hdg pursuer that tumbled; capture rate vs a hovering
-#   evader stays 1.0 in sim.
+# -- Policy -------------------------------------------------------------------
+policy:
+  # Folder with policy_ts.pt + metadata.json (+ esn.pt / adapter_basis.pt when the
+  # policy observes an estimator). Its metadata role (pursuer | evader) picks
+  # which drone section below is "self".
+  # F14 Stage E RLS, seed 200, stage 24: learned evader-acceleration estimate +
+  # online RLS (obs 31). See artifacts/thesis_F14_rls_s200/README.md.
+  artifact_dir: artifacts/thesis_F14_rls_s200/pursuer
 
-# -- Controller runtime -----------------------------------------------------
-controller:
-  control_dt: 0.0              # 0 = use the policy's training dt (metadata.ctbr.dt).
-  # First-order low-pass on the commanded body rates (roll/pitch/yaw) before
-  # they are sent to the firmware. The policy is trained with the on-board rate
-  # loop stepped at the 50 Hz control period; the CrazySim / real firmware rate
-  # loop runs ~10x faster and tracks the raw setpoints far more crisply, which
-  # turns the policy's aggressive rate commands into visible roll oscillation.
-  # Smoothing the setpoint narrows the effective closed-loop rate bandwidth back
-  # toward the (unchanged) 50 Hz training response. Time constant in seconds;
-  # 0 = disabled (raw passthrough). Try 0.02-0.05 and increase until the roll
-  # oscillation stops; decrease if the chase becomes sluggish.
-  command_rate_lpf_tau: 0.00
-  takeoff_height: 1.0          # Takeoff height for both drones (m).
-  takeoff_duration: 3.0        # Takeoff duration for both drones (s).
-  state_timeout: 0.5           # Stop if the agent's state is stale this long (s).
-  min_altitude: 0.10           # Safety cutoff altitude (m).
-  log_commands: true           # Print decoded CTBR commands.
-  debug_obs: false             # Dump raw states + named observation components
-                               # each step (throttled) to compare deploy vs sim.
-  debug_period_s: 0.5          # Min seconds between debug_obs dumps.
-  publish_tf: true             # Also publish mocap poses on the ROS 2 /tf tree.
-  mocap_world_frame: world     # Parent frame id for published TF transforms.
+# -- Opponent -----------------------------------------------------------------
+opponent:
+  mode: policy                 # policy | cf | scripted
+  # mode: policy  -> artifact of the OPPOSING role (here the same campaign's
+  # final evader, stage 25).
+  artifact_dir: artifacts/thesis_F14_rls_s200/evader
+  # mode: cf  -> a real Crazyflie tracked by mocap but flown by something else.
+  # mode: scripted  -> position setpoints:
+  scripted:
+    type: hover                # hover | linear | circular | pure_pursuit | flee
+    yaw_deg: 0.0               # Yaw of every setpoint (deg).
+    anchor: [0.5, 0.0, 1.0]    # Start / hover point [x, y, z] (m, mocap world); flee holds this z.
+    speed: 1.0                 # linear / flee speed (m/s).
+    direction: [1.0, 0.0, 0.0] # linear: world-frame travel direction (normalised at load).
+    radius: 1.0                # circular: orbit radius (m).
+    omega: 1.0                 # circular: angular rate (rad/s).
+    lookahead: 0.5             # flee: setpoint lead time (s).
 
-  # The policy observes positions relative to the arena centre. Set this to the
-  # arena centre expressed in mocap world coordinates.
-  arena_origin: [0.0, 0.0, 0.0]
-  enforce_arena: true          # Stop if the EVADER leaves the arena (episode end in
-                               # training); the pursuer may leave freely.
-  arena_margin: 0.3            # Keep scripted setpoints this far inside the walls (m).
+# -- Arena --------------------------------------------------------------------
+# Size comes from the policy metadata (arena_half_xy, arena_z_min/max).
+arena:
+  origin: [0.0, 0.0, 0.0]      # Arena centre in mocap world coordinates; the policy
+                               # observes positions relative to it.
+  scripted_margin: 0.3         # Keep scripted setpoints this far inside the walls (m).
 
+# -- Episode ------------------------------------------------------------------
+episode:
   stop_on_capture: true        # Stop once the drones are within capture_radius.
-  capture_radius: 0.0          # 0 = use the trained eval radius from metadata.
-  stop_on_timeout: false        # Stop after the training episode length
+  capture_radius: 0.0          # m; 0 = the trained radius from the metadata.
+  stop_on_evader_exit: true    # Stop if the EVADER leaves the arena (episode end in
+                               # training); the pursuer may leave freely.
+  stop_on_timeout: false       # Stop after the training episode length
                                # (metadata.max_episode_length * ctbr.dt; evader win).
+  state_timeout: 0.5           # s; stop if a drone's state is this stale.
+  min_altitude: 0.10           # m; stop if a drone is lower.
 
-  opponent:
-    mode: policy             # policy | cf | scripted.
-    # Required when mode == policy: artifact of the OPPOSING role.
-    artifact_dir: artifacts/thesis_F8b_roncero_s0/evader
-    motion:                    # Used only when mode == scripted.
-      type: hover           # hover | linear | circular | pure_pursuit | flee.
-      yaw_deg: 0.0             # Yaw command for opponent position setpoints (deg).
-      anchor: [0.5, 0.0, 1.0]  # Initial position / hover point [x, y, z] (m); flee holds this z.
-      speed: 1.0               # Linear / flee speed (m/s).
-      direction: [1.0, 0.0, 0.0]  # World-frame travel direction; normalized at load.
-      radius: 1.0              # Circular orbit radius (m).
-      omega: 1.0               # Circular angular rate (rad/s).
-      lookahead: 0.5           # Flee setpoint lead time (s).
+# -- Flight -------------------------------------------------------------------
+flight:
+  takeoff_height: 1.0          # m, both drones.
+  takeoff_duration: 3.0        # s.
+  land_duration: 3.0           # s.
+  control_dt: 0.0              # s; 0 = the policy's training period (metadata.ctbr.dt).
+  # Low-pass time constant (s) on the commanded body rates; 0 = off. The firmware
+  # rate loop is ~10x faster than the 50 Hz training loop and can turn aggressive
+  # rate commands into roll oscillation; try 0.02-0.05 if you see it.
+  command_rate_lpf_tau: 0.0
+
+# -- Logging ------------------------------------------------------------------
+logging:
+  log_commands: true           # One line per tick: altitude, distance, CTBR command.
+  debug_obs: false             # Dump raw states + named observation components
+                               # (incl. the estimator output) to compare deploy vs sim.
+  debug_period_s: 0.5          # Min seconds between debug_obs dumps.
+  publish_tf: true             # Publish mocap poses on /tf (parent: mocap.world_frame).
 
 # -- Pursuer drone config ----------------------------------------------------
 pursuer:
@@ -89,12 +105,6 @@ evader:
   rate_sign: [1.0, 1.0, 1.0]
   state_timeout: 0.1
   min_altitude: 0.1
-
-# -- Trajectory logging ------------------------------------------------------
-trajectory:
-  save: false
-  dir: ./trajectory_logs
-  prefix: pursuit_evasion
 
 # -- Motion capture (OptiTrack / NatNet) -------------------------------------
 mocap:

@@ -1,0 +1,24 @@
+=== start F16 (--exp F16)
+F16 audit manifest frozen
+campaign thesis-F16-smoke-qd_dpp start: train_selfplay.py n_stages=4 max_total_stages=4 frames_per_stage=2000000 uniform_mix=1.0 seed=0 start_role=pursuer warm_start=true wandb_mode=disabled seed_heuristics.pursuer=[pure_pursuit,apf] seed_heuristics.evader=[hover,circular,flee,weave] pursuer_sampler=qd_dpp evader_sampler=qd_dpp run_name=thesis-F16-smoke-qd_dpp sampler_diagnostics=true num_envs=256 task_overrides=[task.reward_mode=roncero,algo.gae_cut_at_truncation=true] eval_extra_overrides=[eval_cutoff_steps=1500]
+campaign thesis-F16-smoke-qd_dpp exit 0
+[skip: campaign thesis-F16-smoke-psro run by another lane]
+campaign thesis-F16-smoke-psd start: f16_psro.py run_name=thesis-F16-smoke-psd arm=psd seed=0 generations=1 frames_per_stage=2000000 hull.lam=0.1 payoff_min_episodes=256 task_overrides=[task.reward_mode=roncero,algo.gae_cut_at_truncation=true] num_envs=256 payoff_num_envs=256
+campaign thesis-F16-smoke-psd exit 0
+Traceback (most recent call last):
+  File "/home/user/Projects/RLInterceptorDrone/scripts/experiments/thesis/run.py", line 115, in <module>
+    main()
+  File "/home/user/Projects/RLInterceptorDrone/scripts/experiments/thesis/run.py", line 107, in main
+    getattr(importlib.import_module(mod), fn or "run")(args)
+  File "/home/user/Projects/RLInterceptorDrone/scripts/experiments/thesis/exps/f16_roncero_population.py", line 694, in run_f16
+    run_smoke()
+  File "/home/user/Projects/RLInterceptorDrone/scripts/experiments/thesis/exps/f16_roncero_population.py", line 595, in run_smoke
+    _ensure(marker, checks, "smoke gates")
+  File "/home/user/Projects/RLInterceptorDrone/scripts/experiments/thesis/exps/f16_roncero_population.py", line 110, in _ensure
+    if not _locked(path, fn):
+           ^^^^^^^^^^^^^^^^^
+  File "/home/user/Projects/RLInterceptorDrone/scripts/experiments/thesis/exps/f16_roncero_population.py", line 102, in _locked
+    fn()
+  File "/home/user/Projects/RLInterceptorDrone/scripts/experiments/thesis/exps/f16_roncero_population.py", line 591, in checks
+    raise RuntimeError(f"F16 smoke gate failed: see {F16}/smoke/checks.json")
+RuntimeError: F16 smoke gate failed: see /home/user/Projects/RLInterceptorDrone/experiments/thesis/F16_roncero_population/smoke/checks.json

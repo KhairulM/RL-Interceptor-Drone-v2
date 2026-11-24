@@ -1,0 +1,528 @@
+{
+  "seeds": [
+    0,
+    100,
+    200
+  ],
+  "rules": [
+    "task.reward_mode=roncero",
+    "algo.gae_cut_at_truncation=true"
+  ],
+  "frames_per_stage": 50000000,
+  "stages": 26,
+  "campaigns": {
+    "0": {
+      "campaign": "thesis-F8b-roncero-s0",
+      "start": "2026-11-10 19:40:13",
+      "cli": {
+        "n_stages": "26",
+        "max_total_stages": "26",
+        "frames_per_stage": "50000000",
+        "uniform_mix": "1.0",
+        "seed": "0",
+        "start_role": "pursuer",
+        "warm_start": "true",
+        "wandb_mode": "disabled",
+        "seed_heuristics.pursuer": "[pure_pursuit,apf]",
+        "seed_heuristics.evader": "[hover,circular,flee,weave]",
+        "run_name": "thesis-F8b-roncero-s0",
+        "pursuer_sampler": "hedge",
+        "evader_sampler": "hedge",
+        "task_overrides": "[task.reward_mode=roncero,algo.gae_cut_at_truncation=true]",
+        "eval_extra_overrides": "[eval_cutoff_steps=1500]"
+      },
+      "start_commit": "67481db44be376d6e38a67d0dbc5aa9e03cea393",
+      "stages": {
+        "pursuer:0": {
+          "id": "pursuer:s2",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage0.pt",
+          "sha256": "ee6c4fc8cecaf2f6f422c2fa632db8d23d5db90a2c96c4a8c33724b3fc787fe5"
+        },
+        "pursuer:2": {
+          "id": "pursuer:s3",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage2.pt",
+          "sha256": "466bfa3d83f3013d03b315fa13c32a201fd12f521de29e0066077d8c3ed7a1f9"
+        },
+        "pursuer:4": {
+          "id": "pursuer:s4",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage4.pt",
+          "sha256": "9f816da6f001f85b92c22efb6ded7427dfc38313724b5f7bee8ea8d0d0ba7e45"
+        },
+        "pursuer:6": {
+          "id": "pursuer:s5",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage6.pt",
+          "sha256": "dcb559e84dd67be2ac0e5307cf5c63305cb812b371bb7ef3662547123aaf13d1"
+        },
+        "pursuer:8": {
+          "id": "pursuer:s6",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage8.pt",
+          "sha256": "3b5b396b8b264b58efaa48ad0476aeacdea8115e971d820e2d41205828e5b24f"
+        },
+        "pursuer:10": {
+          "id": "pursuer:s7",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage10.pt",
+          "sha256": "b892da3fe27a7539887d7d9632833370c870e813ec50b34a266385a65457b1e3"
+        },
+        "pursuer:12": {
+          "id": "pursuer:s8",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage12.pt",
+          "sha256": "298798922399e798b88a1fe407c44b5413aa745807abd5bed3875ef65ca3f5ea"
+        },
+        "pursuer:14": {
+          "id": "pursuer:s9",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage14.pt",
+          "sha256": "07593dff8f8f1f2c1c16f159354dfd7554042aeae7310f3eafb3a03a184ff348"
+        },
+        "pursuer:16": {
+          "id": "pursuer:s10",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage16.pt",
+          "sha256": "4c61596e3080d6d305f9da2338a4c1eee0c974ed0ad38c4ef28de5d42a79c5f6"
+        },
+        "pursuer:18": {
+          "id": "pursuer:s11",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage18.pt",
+          "sha256": "74cafda6cbd13280ebfb7589eef8da9ae94f5723159ccb0b56edce31133b7dee"
+        },
+        "pursuer:20": {
+          "id": "pursuer:s12",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage20.pt",
+          "sha256": "92be5b7abd883b256b3a8d4e72481f1cb27463b1aa37d366236978275269ec62"
+        },
+        "pursuer:22": {
+          "id": "pursuer:s13",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage22.pt",
+          "sha256": "d8201160fb414774ad703ff130bfaef804995a4e91522f5ad238272a3e37b2bd"
+        },
+        "pursuer:24": {
+          "id": "pursuer:s14",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/pursuer_stage24.pt",
+          "sha256": "6a434e1bd515b21550c428fb5192ad379643bc3e4d285ccd929ccd2c989874c1"
+        },
+        "evader:1": {
+          "id": "evader:s4",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage1.pt",
+          "sha256": "04de3872c5ca8532183941ccc1f591d2eec4a70145b63e6ff2feb09002b5f1a8"
+        },
+        "evader:3": {
+          "id": "evader:s5",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage3.pt",
+          "sha256": "6ce7d559ae117a05481dbbe96281a257d43cc14c2b80e0ba1cb1e7f3da9fdf66"
+        },
+        "evader:5": {
+          "id": "evader:s6",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage5.pt",
+          "sha256": "14b46baca3550c9541758c6883432bf2446207b78cbf443aa20490302852bf06"
+        },
+        "evader:7": {
+          "id": "evader:s7",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage7.pt",
+          "sha256": "1cd68ed07bcdfa1ab4e1b1f4c22ffadabec8c5fd1182c5b264c4d50881d01645"
+        },
+        "evader:9": {
+          "id": "evader:s8",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage9.pt",
+          "sha256": "64fb73359f304cd5481d5d9ca48d853f27c31ecad0eb7c0371d0b5cffd6c7e0e"
+        },
+        "evader:11": {
+          "id": "evader:s9",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage11.pt",
+          "sha256": "e0978fb75ee1e6f2575de80a5dbde2a35762748b16f1454cbf82dec6e2e9f2a7"
+        },
+        "evader:13": {
+          "id": "evader:s10",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage13.pt",
+          "sha256": "5112dda4630635c60dd8a46a16cd6e51254f2fded038304066ca20942d70ebc0"
+        },
+        "evader:15": {
+          "id": "evader:s11",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage15.pt",
+          "sha256": "3b68a80a3f2acf998938192189175bb17db20386a744e2f579be3419a362f465"
+        },
+        "evader:17": {
+          "id": "evader:s12",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage17.pt",
+          "sha256": "030c027ebe23fb30630feaf285d375758c5c12657ef23253d276e7d0b1e86e17"
+        },
+        "evader:19": {
+          "id": "evader:s13",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage19.pt",
+          "sha256": "b99d9befce930747272f45d35be828e75cc7daa0edb6bc09edcd6d5b8a4867d4"
+        },
+        "evader:21": {
+          "id": "evader:s14",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage21.pt",
+          "sha256": "910a9a4273b713f1e6c7724ea0beb87607824ff6fa9406fe32d10cb09e0e7e91"
+        },
+        "evader:23": {
+          "id": "evader:s15",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage23.pt",
+          "sha256": "a505dd14cfb626bc98bed4b4593c860aeab1ac2f4630ae34f9e35830b1850387"
+        },
+        "evader:25": {
+          "id": "evader:s16",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage25.pt",
+          "sha256": "4c6a37afdd53714ec4aca548ff6ce13506bf096e69cbef2788aa799c3d9c2aa4"
+        }
+      },
+      "code_changes_since_start": [
+        "79aca86 2026-11-13 16:53:08 +0900 thesis: F10sc finished",
+        "81da5f9 2026-11-12 20:06:32 +0900 thesis: F11 finished"
+      ],
+      "working_tree_diff_vs_start": [
+        "cfg/task/PursuitEvasion.yaml               |  6 +-",
+        " omni_drones/envs/single/pursuit_evasion.py | 61 +++++++++++++++++---",
+        " omni_drones/envs/single/roncero_reward.py  |  5 +-",
+        " omni_drones/learning/ppo/ppo.py            | 51 +++++++++++++++-",
+        " omni_drones/utils/selfplay/opponents.py    | 93 +++++++++++++++++++++++++++++-",
+        " scripts/selfplay/run_stage.py              | 40 +++++++++++--",
+        " scripts/selfplay/train_selfplay.py         | 41 ++++++++++++-",
+        " 7 files changed, 273 insertions(+), 24 deletions(-)"
+      ],
+      "f16_code_note": "F16 additions (payoff returns, episode-reset resampling, stochastic opponents/agent, hull KL, sampler diagnostics) are flag-gated and off by default",
+      "problems": [],
+      "warm_start": "module weights only (actor, critic, value norm); fresh Adam optimiser each stage",
+      "excluded": "withdrawn thesis-F8-roncero-* (pre k_sm fix) campaigns are not used"
+    },
+    "100": {
+      "campaign": "thesis-F8b-roncero-s100",
+      "start": "2026-11-10 19:40:24",
+      "cli": {
+        "n_stages": "26",
+        "max_total_stages": "26",
+        "frames_per_stage": "50000000",
+        "uniform_mix": "1.0",
+        "seed": "100",
+        "start_role": "pursuer",
+        "warm_start": "true",
+        "wandb_mode": "disabled",
+        "seed_heuristics.pursuer": "[pure_pursuit,apf]",
+        "seed_heuristics.evader": "[hover,circular,flee,weave]",
+        "run_name": "thesis-F8b-roncero-s100",
+        "pursuer_sampler": "hedge",
+        "evader_sampler": "hedge",
+        "task_overrides": "[task.reward_mode=roncero,algo.gae_cut_at_truncation=true]",
+        "eval_extra_overrides": "[eval_cutoff_steps=1500]"
+      },
+      "start_commit": "67481db44be376d6e38a67d0dbc5aa9e03cea393",
+      "stages": {
+        "pursuer:0": {
+          "id": "pursuer:s2",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage0.pt",
+          "sha256": "de8f482c37c319ac8e8a623aa3ea8f33a91a2bac92cc27ca0ce6419c1949e458"
+        },
+        "pursuer:2": {
+          "id": "pursuer:s3",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage2.pt",
+          "sha256": "fd6494056ad62b9ad4fa7bcc4644fa9a96626a566e7349f6bf8cb3d67a112867"
+        },
+        "pursuer:4": {
+          "id": "pursuer:s4",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage4.pt",
+          "sha256": "e2dc6ca198bf2818b494b3bda5023e7accbcd1ae3c81a1db6cb4d71ca3b6b873"
+        },
+        "pursuer:6": {
+          "id": "pursuer:s5",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage6.pt",
+          "sha256": "e6a338a85a0e5b1dfafc6ffe5fd0a0f2fe5b3cf2a4c825e0327a4ff8beda31f0"
+        },
+        "pursuer:8": {
+          "id": "pursuer:s6",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage8.pt",
+          "sha256": "bcc21005d975c972ea013b94dc1b59b0b387f9c145377d6a334077543c52b54b"
+        },
+        "pursuer:10": {
+          "id": "pursuer:s7",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage10.pt",
+          "sha256": "24312a4be4911880210e70a55b0f66e2a6bed361f81c27f85b532bcc79ffc98c"
+        },
+        "pursuer:12": {
+          "id": "pursuer:s8",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage12.pt",
+          "sha256": "f70326f585836ed4ab1699c635b93e2e86f851cfe47f31e70f6bf6e8ff8cba20"
+        },
+        "pursuer:14": {
+          "id": "pursuer:s9",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage14.pt",
+          "sha256": "2a79ca039ec6b8e3ff16bc0e48fa599311c3cd2568d7393e2d93ebdab4e66aa0"
+        },
+        "pursuer:16": {
+          "id": "pursuer:s10",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage16.pt",
+          "sha256": "4f7228f0d22278ae8d73da25e7ccda6224d1c215884807078094351a89ffbc21"
+        },
+        "pursuer:18": {
+          "id": "pursuer:s11",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage18.pt",
+          "sha256": "1e1ebaa6e0d30f17b05f0482aab2583c4d1b64402697e2def9ed884ecb861bde"
+        },
+        "pursuer:20": {
+          "id": "pursuer:s12",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage20.pt",
+          "sha256": "e9040b75cf62a2eff53d9de0041e033e79924c17e0c8a5073a45e8f3faed6625"
+        },
+        "pursuer:22": {
+          "id": "pursuer:s13",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage22.pt",
+          "sha256": "16f8e36979413f29e1d6c842ecf9d4cd0e90a4e05b7a5ae153c822f2fcfd12bb"
+        },
+        "pursuer:24": {
+          "id": "pursuer:s14",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/pursuer_stage24.pt",
+          "sha256": "78f4ea6d6f38ea773a651f3cf890883be67ef10052c50eb4496cb28d7e60565e"
+        },
+        "evader:1": {
+          "id": "evader:s4",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage1.pt",
+          "sha256": "f174f6c33db6aa85119c78c7eed5551df537e49b91305aec5c5fe31eb21ac630"
+        },
+        "evader:3": {
+          "id": "evader:s5",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage3.pt",
+          "sha256": "70ec2c5659d8f11f9dbd6e54a66ca3448602bbb4f46ff15873da43ca93707e8d"
+        },
+        "evader:5": {
+          "id": "evader:s6",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage5.pt",
+          "sha256": "5d58cf741219c38f811503033391102681ff31b750fa7122ed858835bc95b327"
+        },
+        "evader:7": {
+          "id": "evader:s7",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage7.pt",
+          "sha256": "b94600694c0c27044c53759949b0f1ffb7cd5d16e8066be0b8b60dcf8096b9d7"
+        },
+        "evader:9": {
+          "id": "evader:s8",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage9.pt",
+          "sha256": "9828a1fcda540d186c73ef27756292ed5a0ab6f6d3dad5bea339ba23b6bc79fc"
+        },
+        "evader:11": {
+          "id": "evader:s9",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage11.pt",
+          "sha256": "959f8d98cc690220fb4d41dad3b152d78e89576928669ffe90010d16de2dc291"
+        },
+        "evader:13": {
+          "id": "evader:s10",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage13.pt",
+          "sha256": "dd73bc46933a887487f1c4fbe18a8fa0b79828df5a538f184b064f4c99bb97eb"
+        },
+        "evader:15": {
+          "id": "evader:s11",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage15.pt",
+          "sha256": "1bfe58081368b73698bbb1e2f472d4044d1e5af377901ac4221ad6868e43c854"
+        },
+        "evader:17": {
+          "id": "evader:s12",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage17.pt",
+          "sha256": "bcc207cb7c39482a375fd0436dfe949b4ba380f408a29fcca5d30571e9580122"
+        },
+        "evader:19": {
+          "id": "evader:s13",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage19.pt",
+          "sha256": "dd422e9804146f22bb0b369b11f37653472ba12b7583e206c91f532806a62b30"
+        },
+        "evader:21": {
+          "id": "evader:s14",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage21.pt",
+          "sha256": "c88be6450a2c00b8c969629ac550d1739ae6e724d3cb805e7eafc786972e3747"
+        },
+        "evader:23": {
+          "id": "evader:s15",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage23.pt",
+          "sha256": "844ac98f842aec5a5ddf589eb23aa0275517e34fe4ee5e0763c6d25d2b27384a"
+        },
+        "evader:25": {
+          "id": "evader:s16",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s100/checkpoints/evader_stage25.pt",
+          "sha256": "533ebdc9155973ca912fd73a3130fd02de46597bb0abfff09d4d594049f7fc51"
+        }
+      },
+      "code_changes_since_start": [
+        "79aca86 2026-11-13 16:53:08 +0900 thesis: F10sc finished",
+        "81da5f9 2026-11-12 20:06:32 +0900 thesis: F11 finished"
+      ],
+      "working_tree_diff_vs_start": [
+        "cfg/task/PursuitEvasion.yaml               |  6 +-",
+        " omni_drones/envs/single/pursuit_evasion.py | 61 +++++++++++++++++---",
+        " omni_drones/envs/single/roncero_reward.py  |  5 +-",
+        " omni_drones/learning/ppo/ppo.py            | 51 +++++++++++++++-",
+        " omni_drones/utils/selfplay/opponents.py    | 93 +++++++++++++++++++++++++++++-",
+        " scripts/selfplay/run_stage.py              | 40 +++++++++++--",
+        " scripts/selfplay/train_selfplay.py         | 41 ++++++++++++-",
+        " 7 files changed, 273 insertions(+), 24 deletions(-)"
+      ],
+      "f16_code_note": "F16 additions (payoff returns, episode-reset resampling, stochastic opponents/agent, hull KL, sampler diagnostics) are flag-gated and off by default",
+      "problems": [],
+      "warm_start": "module weights only (actor, critic, value norm); fresh Adam optimiser each stage",
+      "excluded": "withdrawn thesis-F8-roncero-* (pre k_sm fix) campaigns are not used"
+    },
+    "200": {
+      "campaign": "thesis-F8b-roncero-s200",
+      "start": "2026-11-13 16:53:56",
+      "cli": {
+        "n_stages": "26",
+        "max_total_stages": "26",
+        "frames_per_stage": "50000000",
+        "uniform_mix": "1.0",
+        "seed": "200",
+        "start_role": "pursuer",
+        "warm_start": "true",
+        "wandb_mode": "disabled",
+        "seed_heuristics.pursuer": "[pure_pursuit,apf]",
+        "seed_heuristics.evader": "[hover,circular,flee,weave]",
+        "run_name": "thesis-F8b-roncero-s200",
+        "pursuer_sampler": "hedge",
+        "evader_sampler": "hedge",
+        "task_overrides": "[task.reward_mode=roncero,algo.gae_cut_at_truncation=true]",
+        "eval_extra_overrides": "[eval_cutoff_steps=1500]"
+      },
+      "start_commit": "6e3e2350f57303b96f3d8a337cf9f71bf1c533b4",
+      "stages": {
+        "pursuer:0": {
+          "id": "pursuer:s2",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage0.pt",
+          "sha256": "aa4e842ce8ad1d0597672f087d3a59063caa2e1d70fc14299a026aeed2299312"
+        },
+        "pursuer:2": {
+          "id": "pursuer:s3",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage2.pt",
+          "sha256": "8cbdbba266af729274fbe40a7b6f20cfda23981e988ab3431193521c13f5d65d"
+        },
+        "pursuer:4": {
+          "id": "pursuer:s4",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage4.pt",
+          "sha256": "4d956be9784abdaaf04a75a2d7008e79f0af3854d53894fba4e7a46014f50aab"
+        },
+        "pursuer:6": {
+          "id": "pursuer:s5",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage6.pt",
+          "sha256": "32b5fe68336be608264c97095c770bc4785f31504caa177dfa0e04a98fa1c75b"
+        },
+        "pursuer:8": {
+          "id": "pursuer:s6",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage8.pt",
+          "sha256": "e4714a9d3dc43b59ec349716ef250f5739f68d07ea9a171ca13a7c36d568ae2b"
+        },
+        "pursuer:10": {
+          "id": "pursuer:s7",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage10.pt",
+          "sha256": "7ee8685ce12109ca6b2beda05472fd93028fecb7d68ed29327862d798a332da8"
+        },
+        "pursuer:12": {
+          "id": "pursuer:s8",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage12.pt",
+          "sha256": "9297f79cbb6a0dec22439bb189e4bb70079dd97ae6ff09c68549a903b80a0fbc"
+        },
+        "pursuer:14": {
+          "id": "pursuer:s9",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage14.pt",
+          "sha256": "d5154354d5bf091941a75ee69b3c21cd33240559585a6fa8052a0f95348ad0e0"
+        },
+        "pursuer:16": {
+          "id": "pursuer:s10",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage16.pt",
+          "sha256": "4113ba000c5a75af1ee2430f1eb479c515fa3fb2e88c3983a60cc8b00d94ae90"
+        },
+        "pursuer:18": {
+          "id": "pursuer:s11",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage18.pt",
+          "sha256": "8c1f1223d1ddb6c796e8500d8ef78345898af0e1e107198e7c25acf202fca5e2"
+        },
+        "pursuer:20": {
+          "id": "pursuer:s12",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage20.pt",
+          "sha256": "963939420e89302701027c0c1aeb70e54df54fc5323d20098e5bfaed7bc3e55c"
+        },
+        "pursuer:22": {
+          "id": "pursuer:s13",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage22.pt",
+          "sha256": "89326d87590b5ce09cfc136334b6a98f3b0faa704a2599af71ce82965d7d04cb"
+        },
+        "pursuer:24": {
+          "id": "pursuer:s14",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/pursuer_stage24.pt",
+          "sha256": "5c5ede9bd97014b31c75e7fcb7f9fb62fe12426a800b409c6584abfcc3211168"
+        },
+        "evader:1": {
+          "id": "evader:s4",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/evader_stage1.pt",
+          "sha256": "0df796736c402df994d41df02acd75122597df8791696c9839c84cff1d319c02"
+        },
+        "evader:3": {
+          "id": "evader:s5",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/evader_stage3.pt",
+          "sha256": "36267db8165c079f6441ff5163a5a68b296cfbb32dbba045c7190d64fb58e2ff"
+        },
+        "evader:5": {
+          "id": "evader:s6",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/evader_stage5.pt",
+          "sha256": "23d31cca261e138f97a94a8406c2d65df901182c5b1d0a32250209cc431241e4"
+        },
+        "evader:7": {
+          "id": "evader:s7",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/evader_stage7.pt",
+          "sha256": "168913430e8029545e2996181be14517841e4b45d119be903d4b439bff7d431c"
+        },
+        "evader:9": {
+          "id": "evader:s8",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/evader_stage9.pt",
+          "sha256": "d38a31e997c146d25dfe2b86bfa40d35354cef4249a4a7f99ac19d28e3655796"
+        },
+        "evader:11": {
+          "id": "evader:s9",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/evader_stage11.pt",
+          "sha256": "955d3f3f99c2689e6d90602574462e62a1745bb975b78690b1c8559dbad98274"
+        },
+        "evader:13": {
+          "id": "evader:s10",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/evader_stage13.pt",
+          "sha256": "c4aca4eb0855b9fa469238ff0ac20293adda4cd610172a5a4ad59b0e7545faca"
+        },
+        "evader:15": {
+          "id": "evader:s11",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/evader_stage15.pt",
+          "sha256": "6cd4ec537b592534721f04fe35d6434e84570df4f5a70db4f9cf82f6881c08f1"
+        },
+        "evader:17": {
+          "id": "evader:s12",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/evader_stage17.pt",
+          "sha256": "5d8e79fe87440d4f0823ec7615fabe5dc0e2d4a6733874a7267e2222aa84b752"
+        },
+        "evader:19": {
+          "id": "evader:s13",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/evader_stage19.pt",
+          "sha256": "7d9ba6f143f54186850390f1b03cddac0a64cc44bb84168c83d3c4ffe6330123"
+        },
+        "evader:21": {
+          "id": "evader:s14",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/evader_stage21.pt",
+          "sha256": "98b491982cda67e4c51c2f157927f4f06c3b28de1c6e457f43b30fb7916ea8a4"
+        },
+        "evader:23": {
+          "id": "evader:s15",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/evader_stage23.pt",
+          "sha256": "2fb35917386f31111777d9ff34cc8b0499522e73042476a11b2a66e64cbcbaa6"
+        },
+        "evader:25": {
+          "id": "evader:s16",
+          "path": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s200/checkpoints/evader_stage25.pt",
+          "sha256": "3c11a7e7d035925b82ab41f988a45a1edca26f321fb82402694531c8165cbde7"
+        }
+      },
+      "code_changes_since_start": [],
+      "working_tree_diff_vs_start": [
+        "cfg/task/PursuitEvasion.yaml               |  3 ++",
+        " omni_drones/envs/single/pursuit_evasion.py | 29 ++++++++++++++++",
+        " omni_drones/learning/ppo/ppo.py            | 44 ++++++++++++++++++++++++",
+        " omni_drones/utils/selfplay/opponents.py    | 54 +++++++++++++++++++++++++++++-",
+        " scripts/selfplay/run_stage.py              | 30 +++++++++++++++--",
+        " scripts/selfplay/train_selfplay.py         | 41 +++++++++++++++++++++--",
+        " 6 files changed, 195 insertions(+), 6 deletions(-)"
+      ],
+      "f16_code_note": "F16 additions (payoff returns, episode-reset resampling, stochastic opponents/agent, hull KL, sampler diagnostics) are flag-gated and off by default",
+      "problems": [],
+      "warm_start": "module weights only (actor, critic, value norm); fresh Adam optimiser each stage",
+      "excluded": "withdrawn thesis-F8-roncero-* (pre k_sm fix) campaigns are not used"
+    }
+  },
+  "frozen": "2026-11-22 15:30:02"
+}

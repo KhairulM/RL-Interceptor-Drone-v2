@@ -32,6 +32,7 @@ BEHAVIOUR_FEATURES = (
 EPISODE_STATS = (
     "capture", "crash", "opp_crash", "out_of_bounds", "opp_out_of_bounds", "timeout",
     "episode_len", "min_distance", "motor_effort",
+    "payoff_return_pursuer", "payoff_return_evader",     # thesis F16 (task.payoff_returns), copied when present
 )
 
 
@@ -170,6 +171,10 @@ def summarize_matchups(episodes: Dict[str, torch.Tensor], assignment: Dict[str, 
             "outcomes": {"capture": float(cap.float().mean()),
                          **{k: float(f.float().mean()) for k, f in flag.items()}},
         }
+        if "payoff_return_pursuer" in episodes:      # thesis F16: both roles' discounted Roncero returns
+            rp, re = episodes["payoff_return_pursuer"][sel].double(), episodes["payoff_return_evader"][sel].double()
+            record["payoff"] = {"n": n, "mean_pursuer": float(rp.mean()), "std_pursuer": float(rp.std(unbiased=False)),
+                                "mean_evader": float(re.mean()), "std_evader": float(re.std(unbiased=False))}
         nf = len(BEHAVIOUR_FEATURES)
         mean, std = episodes["feat_mean"][sel].mean(0), episodes["feat_std"][sel].mean(0)
         blocks = [("behaviour", 0)] + ([("behaviour_pursuer", nf)] if mean.numel() == 2 * nf else [])

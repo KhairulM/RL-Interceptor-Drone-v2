@@ -52,9 +52,17 @@ class FrozenPolicyBank:
         algo_cfg,
         device,
         switch: Optional[dict] = None,
+        resample: Optional[dict] = None,
+        stochastic: bool = False,
     ):
         self.device = device
         self.switch = switch
+        # Thesis F16: ``resample`` = {"seed": int} redraws each env's opponent from ``probs`` at every episode reset
+        # (on_reset) and holds it for the episode; ``stochastic`` samples the frozen RL policies' actions instead of
+        # taking the mean. Both off by default (fixed per-run assignment, deterministic opponents).
+        self.resample = resample
+        self.stochastic = bool(stochastic)
+        self.resample_counts: Dict[str, int] = {}
         self.policies = list(policies)
         self.ids: List[str] = [p["id"] for p in self.policies]
         self.kind: Dict[str, str] = {p["id"]: p["kind"] for p in self.policies}
@@ -121,6 +129,8 @@ class FrozenPolicyBank:
         probs = {k: v for k, v in probs.items() if k in self.ids and v > 0}
         if not probs:
             raise ValueError("no valid opponent probabilities for this bank")
+        if self.resample is not None:
+            return self._assign_resample(probs, num_envs)
         mapping = policy_sampling(probs, num_envs)
 
         self.assignment = {}
@@ -142,6 +152,47 @@ class FrozenPolicyBank:
                     mask[self.assignment[pid]] = True
             self._heuristic_masks[name] = mask
         return self.assignment
+
+    def _assign_resample(self, probs: Dict[str, float], num_envs: int):
+        if self.switch is not None:
+            raise ValueError("episode-reset resampling and within-episode switching are exclusive")
+        ids = [pid for pid in self.ids if pid in probs]
+        if any(self.kind[pid] != "rl" for pid in ids):
+            raise ValueError("episode-reset resampling supports RL opponents only")
+        p = torch.tensor([float(probs[pid]) for pid in ids], dtype=torch.float64)
+        if not bool(torch.isfinite(p).all()) or float(p.sum()) <= 0:
+            raise ValueError(f"invalid resampling probabilities {probs}")
+        self._resample_probs = {pid: float(v) for pid, v in zip(ids, (p / p.sum()).tolist())}
+        self._resample_index = torch.tensor([self.ids.index(pid) for pid in ids], dtype=torch.long)
+        self._resample_cdf = torch.cumsum(p / p.sum(), 0)
+        self._resample_cdf[-1] = 1.0
+        self._resample_gen = torch.Generator(device="cpu").manual_seed(int(self.resample.get("seed", 0)))
+        self.resample_counts = {pid: 0 for pid in ids}
+        self.env_policy = self._resample_index[self._draw(num_envs)].to(self.device)
+        self._rebuild_assignment()
+        self._heuristic_masks = {}
+        return self.assignment
+
+    def _draw(self, n: int) -> torch.Tensor:
+        u = torch.rand(n, generator=self._resample_gen, dtype=torch.float64)
+        return torch.searchsorted(self._resample_cdf, u, right=True).clamp(max=len(self._resample_cdf) - 1)
+
+    def _rebuild_assignment(self):
+        self.assignment = {}
+        for i, pid in enumerate(self.ids):
+            idx = (self.env_policy == i).nonzero().squeeze(-1)
+            if idx.numel():
+                self.assignment[pid] = idx
+
+    def on_reset(self, env_ids: torch.Tensor):
+        """Thesis F16: draw a new opponent for every env in ``env_ids`` (called at each episode reset)."""
+        if self.resample is None or env_ids.numel() == 0:
+            return
+        k = self._draw(int(env_ids.numel()))
+        self.env_policy[env_ids] = self._resample_index[k].to(self.device)
+        for j, c in enumerate(torch.bincount(k, minlength=len(self._resample_index)).tolist()):
+            self.resample_counts[self.ids[int(self._resample_index[j])]] += int(c)
+        self._rebuild_assignment()
 
     def heuristic_masks(self) -> Dict[str, torch.Tensor]:
         """Bool mask [num_envs] of envs assigned to each heuristic name."""
@@ -181,7 +232,8 @@ class FrozenPolicyBank:
         )
         if not self._rl:
             return raw
-        with set_exploration_type(ExplorationType.MODE):
+        mode = ExplorationType.RANDOM if getattr(self, "stochastic", False) else ExplorationType.MODE
+        with set_exploration_type(mode):
             for pid, policy in self._rl.items():
                 if self.switch is None:
                     idx = self.assignment.get(pid)

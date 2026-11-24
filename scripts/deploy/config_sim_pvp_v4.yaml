@@ -1,65 +1,45 @@
-# PursuitEvasion controller configuration.
-#
-# All runtime settings for pursuit_evasion_controller.py live here (no CLI flags).
-# Run with:  python pursuit_evasion_controller.py [--config config_pursuit_evasion.yaml]
-# Any key omitted below falls back to the documented default.
-#
-# The artifact's `role` (pursuer | evader) decides which drone the policy flies;
-# the drone sections below are keyed by role, so the same file serves both.
+# PursuitEvasion controller configuration (pursuit_evasion_controller.py).
+# CrazySim variant; config_pursuit_evasion.yaml documents every key.
+# Run with:  python pursuit_evasion_controller.py --config config_sim_pvp_v4.yaml
 
-artifact_dir: artifacts/pe_pursuer_v   # v4 pursuer (anti-tumble cmd-rate penalty)
-# ^ v3: retrained from scratch with anti-tumble smoothness reward (body-rate +
-#   action-jerk penalties, lower approach weight). On-trajectory commanded body
-#   rates dropped ~61% (mean 96->37 deg/s, 0% saturation) vs the aggressive
-#   pursuer_evader_ppo_v2_hdg pursuer that tumbled; capture rate vs a hovering
-#   evader stays 1.0 in sim.
+policy:
+  artifact_dir: artifacts/pe_pursuer_v   # v4 pursuer (anti-tumble cmd-rate penalty)
 
-# -- Controller runtime -----------------------------------------------------
-controller:
-  control_dt: 0.0              # 0 = use the policy's training dt (metadata.ctbr.dt).
-  # First-order low-pass on the commanded body rates (roll/pitch/yaw) before
-  # they are sent to the firmware. The policy is trained with the on-board rate
-  # loop stepped at the 50 Hz control period; the CrazySim / real firmware rate
-  # loop runs ~10x faster and tracks the raw setpoints far more crisply, which
-  # turns the policy's aggressive rate commands into visible roll oscillation.
-  # Smoothing the setpoint narrows the effective closed-loop rate bandwidth back
-  # toward the (unchanged) 50 Hz training response. Time constant in seconds;
-  # 0 = disabled (raw passthrough). Try 0.02-0.05 and increase until the roll
-  # oscillation stops; decrease if the chase becomes sluggish.
+opponent:
+  mode: policy                 # policy | cf | scripted
+  artifact_dir: artifacts/pe_evader_v2_stage11   # trained evader (co-evolved)
+  scripted:
+    type: hover
+    yaw_deg: 0.0
+    anchor: [2.0, 0.0, 1.0]
+    speed: 1.0
+    direction: [1.0, 0.0, 0.0]
+    radius: 1.5
+    omega: 1.0
+    lookahead: 0.5
+
+arena:
+  origin: [0.0, 0.0, 0.0]
+  scripted_margin: 0.3
+
+episode:
+  stop_on_capture: true
+  capture_radius: 0.2          # looser than the trained 0.1 for a sim capture event
+  stop_on_evader_exit: true
+  state_timeout: 0.5
+  min_altitude: 0.15
+
+flight:
+  takeoff_height: 1.0
+  takeoff_duration: 3.0
+  control_dt: 0.0
   command_rate_lpf_tau: 0.0
-  takeoff_height: 1.0          # Takeoff height for both drones (m).
-  takeoff_duration: 3.0        # Takeoff duration for both drones (s).
-  state_timeout: 0.5           # Stop if the agent's state is stale this long (s).
-  min_altitude: 0.15           # Safety cutoff altitude (m).
-  log_commands: true           # Print decoded CTBR commands.
-  debug_obs: false             # Dump raw states + named observation components
-                               # each step (throttled) to compare deploy vs sim.
-  debug_period_s: 0.5          # Min seconds between debug_obs dumps.
-  publish_tf: true             # Also publish mocap poses on the ROS 2 /tf tree.
-  mocap_world_frame: world     # Parent frame id for published TF transforms.
 
-  # The policy observes positions relative to the arena centre. Set this to the
-  # arena centre expressed in mocap world coordinates.
-  arena_origin: [0.0, 0.0, 0.0]
-  enforce_arena: true          # Stop if the agent leaves the trained arena volume.
-  arena_margin: 0.3            # Keep scripted setpoints this far inside the walls (m).
-
-  stop_on_capture: true        # Stop once the drones are within capture_radius.
-  capture_radius: 0.2          # looser than trained 0.1 for a sim capture event
-
-  opponent:
-    mode: policy         # policy | cf | scripted.
-    # Required when mode == policy: artifact of the OPPOSING role.
-    artifact_dir: artifacts/pe_evader_v2_stage11   # trained evader (co-evolved)
-    motion:                    # Used only when mode == scripted.
-      type: hover           # hover | linear | circular | flee.
-      yaw_deg: 0.0             # Yaw command for opponent position setpoints (deg).
-      anchor: [2.0, 0.0, 1.0]  # matches intercept.txt evader spawn (2,0)
-      speed: 1.0               # Linear / flee speed (m/s).
-      direction: [1.0, 0.0, 0.0]  # World-frame travel direction; normalized at load.
-      radius: 1.5              # Circular orbit radius (m).
-      omega: 1.0               # Circular angular rate (rad/s).
-      lookahead: 0.5           # Flee setpoint lead time (s).
+logging:
+  log_commands: true
+  debug_obs: false
+  debug_period_s: 0.5
+  publish_tf: true
 
 # -- Pursuer drone config ----------------------------------------------------
 pursuer:
@@ -86,12 +66,6 @@ evader:
   rate_sign: [1.0, 1.0, 1.0]
   state_timeout: 0.1
   min_altitude: 0.1
-
-# -- Trajectory logging ------------------------------------------------------
-trajectory:
-  save: true
-  dir: ./trajectory_logs
-  prefix: pursuit_evasion
 
 # -- Motion capture (OptiTrack / NatNet) -------------------------------------
 mocap:

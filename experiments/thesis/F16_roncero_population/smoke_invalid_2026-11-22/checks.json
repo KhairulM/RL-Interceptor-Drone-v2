@@ -1,0 +1,83 @@
+{
+  "orientation": {
+    "pursuer": {
+      "as_pursuer": -0.05383481725957351,
+      "as_evader": -0.02272727059213869,
+      "diff": -0.03110754666743482,
+      "se": 0.010412692389996422,
+      "ok": true
+    },
+    "evader": {
+      "as_pursuer": -0.17189280673458443,
+      "as_evader": -0.2293793906312665,
+      "diff": 0.05748658389668207,
+      "se": 0.010794888720082888,
+      "ok": false
+    }
+  },
+  "qd_dpp": [
+    {
+      "stage": 2,
+      "role": "pursuer",
+      "tv": null
+    },
+    {
+      "stage": 3,
+      "role": "evader",
+      "tv": 0.00855631657085354
+    }
+  ],
+  "psd_activity": {
+    "2": {
+      "iterations": 244,
+      "finite": true,
+      "kl_grad_norm_mean": 9555673.22549611,
+      "kl_mean": 5138185481.324228,
+      "intrinsic_mean": 513818556.80881524,
+      "heldout_gap_16_vs_64": 0.0,
+      "active": true
+    },
+    "3": {
+      "iterations": 244,
+      "finite": true,
+      "kl_grad_norm_mean": 5871075.156441638,
+      "kl_mean": 3446694202.2854085,
+      "intrinsic_mean": 344669425.25821435,
+      "heldout_gap_16_vs_64": 0.0,
+      "active": true
+    }
+  },
+  "psro_final_meta": {
+    "x": {
+      "pursuer:s2": 0.0,
+      "pursuer:s3": 1.0
+    },
+    "y": {
+      "evader:s4": 1.0,
+      "evader:s5": 0.0
+    },
+    "regrets": [
+      0.0,
+      0.0
+    ]
+  },
+  "psd_final_meta": {
+    "x": {
+      "pursuer:s2": 1.0,
+      "pursuer:s3": 0.0
+    },
+    "y": {
+      "evader:s4": 1.0,
+      "evader:s5": 0.0
+    },
+    "regrets": [
+      0.0,
+      0.0
+    ]
+  },
+  "attacker_resample_counts": {
+    "thesis-F16-smoke-psro/pursuer:s0": 6307,
+    "thesis-F16-smoke-psro/pursuer:s2": 6398
+  },
+  "passed": false
+}

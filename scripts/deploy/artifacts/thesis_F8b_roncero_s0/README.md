@@ -16,8 +16,8 @@ and traces it; `metadata.json` comes from `../thesis_F8_roncero_s0/` (official I
 observation layout, arena and CTBR parameters did not change). Validation: re-exporting the old F8 checkpoints this way
 reproduces the Isaac-exported `thesis_F8_roncero_s0` policies exactly (max difference 0 on 512 random observations).
 
-Run: set `artifact_dir: artifacts/thesis_F8b_roncero_s0/pursuer` (or `evader`) in `config_pursuit_evasion.yaml`, and the
-opponent drone's `artifact_dir` to the other folder for policy-vs-policy.
+Run: set `policy.artifact_dir: artifacts/thesis_F8b_roncero_s0/pursuer` (or `evader`) in `config_pursuit_evasion.yaml`, and the
+`opponent.artifact_dir` (with `opponent.mode: policy`) to the other folder for policy-vs-policy.
 
 In simulation (RESULTS.md, F8 and F8d): this pursuer neutralises held-out RL evaders (v10) in 0.948 of episodes and the
 strong held-out set (final evaders of 16 other campaigns) in 0.858; it is not lurable (pursuer crash 0.010 vs an exploiter
@@ -26,6 +26,6 @@ This evader beats every pursuer of its own campaign (it was trained last).
 
 Caveats for flight tests:
 - Roncero's regularisation is light (body rate k_br 0.001, smoothness k_sm 0.002), so commands may still be aggressive:
-  start with `controller.command_rate_lpf_tau` 0.02-0.05.
+  start with `flight.command_rate_lpf_tau` 0.02-0.05.
 - No domain randomisation or sensor noise in training.
 - `notes.trained_against` in metadata.json shows the YAML default opponent, not the self-play pool.

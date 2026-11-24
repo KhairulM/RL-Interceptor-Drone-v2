@@ -1,0 +1,49 @@
+{
+  "orientation": {
+    "pursuer": {
+      "as_pursuer": -0.05243050854485599,
+      "as_evader": -0.05040070748967636,
+      "diff": -0.0020298010551796294,
+      "se": 0.007683807211541369,
+      "ok": true
+    },
+    "evader": {
+      "as_pursuer": -0.2292439334945021,
+      "as_evader": -0.22268601553620965,
+      "diff": -0.006557917958292442,
+      "se": 0.008574017359848913,
+      "ok": true
+    }
+  },
+  "qd_dpp": [
+    {
+      "stage": 2,
+      "role": "pursuer",
+      "tv": null
+    },
+    {
+      "stage": 3,
+      "role": "evader",
+      "tv": 0.00855631657085354
+    }
+  ],
+  "psro_final_meta": {
+    "x": {
+      "pursuer:s2": 1.0,
+      "pursuer:s3": 0.0
+    },
+    "y": {
+      "evader:s4": 1.0,
+      "evader:s5": 0.0
+    },
+    "regrets": [
+      0.0,
+      0.0
+    ]
+  },
+  "attacker_resample_counts": {
+    "thesis-F16-smoke-psro/pursuer:s0": 5624,
+    "thesis-F16-smoke-psro/pursuer:s2": 5741
+  },
+  "passed": true
+}
