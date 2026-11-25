@@ -151,9 +151,12 @@ class ScriptedMotionConfig:
     lookahead: float = 0.5       # flee / apf setpoint lead time (s)
     # apf (artificial potential field evader): quadratic repulsion from the agent within apf_influence (m) and
     # from the arena walls within apf_wall_margin (m, x apf_wall_gain), horizontal at the anchor altitude.
-    apf_influence: float = 2.0
+    apf_influence: float = 3.0
     apf_wall_margin: float = 1.0
     apf_wall_gain: float = 2.0
+    # Vortex term: this fraction of the pursuer push is also applied 90 deg counter-clockwise around the pursuer, so
+    # the evader circles away instead of stalling where the pursuer and a wall push against each other. 0 = plain APF.
+    apf_vortex_gain: float = 1.0
 
     def __post_init__(self) -> None:
         self.type = MOTION_ALIASES.get(self.type.lower(), self.type.lower())
@@ -569,19 +572,21 @@ class _FixedRateClock:
 
 
 def apf_evader_velocity(evader_xy, pursuer_xy, half_xy: float, speed: float, influence: float,
-                        wall_margin: float, wall_gain: float) -> np.ndarray:
+                        wall_margin: float, wall_gain: float, vortex_gain: float = 0.0) -> np.ndarray:
     """Horizontal artificial-potential-field evasion velocity (m/s), arena-centred coordinates.
 
     Gradient of quadratic repulsive potentials: from the pursuer, (influence - d) / influence along the line away from
     it when it is closer than ``influence``; from each wall, wall_gain * (wall_margin - s) / wall_margin inward when
     the wall is closer than ``wall_margin``. Scaled by ``speed`` and capped at ``speed``. Like any APF it has local
-    minima (a corner with the pursuer in front), where the evader stops.
+    minima (a corner with the pursuer in front), where the evader stops; ``vortex_gain`` adds the pursuer push rotated
+    90 deg counter-clockwise (a vortex field), which moves the evader out of them.
     """
     evader_xy, pursuer_xy = np.asarray(evader_xy, float), np.asarray(pursuer_xy, float)
     rel = evader_xy - pursuer_xy
     d = float(np.linalg.norm(rel))
     away = rel / d if d > 1e-6 else np.array([1.0, 0.0])
-    v = away * float(np.clip((influence - d) / influence, 0.0, 1.0))
+    push = float(np.clip((influence - d) / influence, 0.0, 1.0))
+    v = push * (away + vortex_gain * np.array([-away[1], away[0]]))
     for axis in (0, 1):
         for side in (1.0, -1.0):
             s = half_xy - side * evader_xy[axis]          # distance to the wall at side * half_xy
@@ -877,11 +882,33 @@ class PursuitEvasionController:
 
     # -- scripted opponent motion ------------------------------------------
     def _send_scripted_setpoint(self, own_state: Optional[pec.DroneState]) -> None:
+        if self.motion.type == 'apf' and self.opponent_flies:
+            self._send_apf_velocity(own_state)
+            return
         self._position_setpoint = self._scripted_setpoint(own_state)
         self.opponent.send_position_setpoint(
             self._position_setpoint[0], self._position_setpoint[1], self._position_setpoint[2],
             yaw_deg=self.motion.yaw_deg,
         )
+
+    def _send_apf_velocity(self, own_state: Optional[pec.DroneState]) -> None:
+        """Fly a real APF evader with world-frame velocity setpoints (the field is a velocity law; position setpoints
+        are capped at the firmware's posCtlPid.xVelMax / yVelMax, 1 m/s): the field velocity in xy, outward motion
+        dropped within arena.scripted_margin of a wall, and a P-hold (1 /s, at most 0.5 m/s) to the anchor height."""
+        opp = self.opponent.get_state()
+        if opp is None or own_state is None:
+            self.opponent.send_velocity_world_setpoint(0.0, 0.0, 0.0, 0.0)
+            return
+        m = self.motion
+        local = np.asarray(opp.pos, dtype=np.float64) - self.arena_origin
+        v = apf_evader_velocity(local[:2], own_state.pos[:2] - self.arena_origin[:2], self.metadata.arena_half_xy,
+                                m.speed, m.apf_influence, m.apf_wall_margin, m.apf_wall_gain, m.apf_vortex_gain)
+        edge = self.metadata.arena_half_xy - self.cfg.arena.scripted_margin
+        for axis in (0, 1):
+            if abs(local[axis]) > edge and v[axis] * local[axis] > 0.0:
+                v[axis] = 0.0
+        vz = float(np.clip(self.motion_anchor[2] - opp.pos[2], -0.5, 0.5))
+        self.opponent.send_velocity_world_setpoint(v[0], v[1], vz, 0.0)
 
     def _scripted_setpoint(self, own_state: Optional[pec.DroneState]) -> np.ndarray:
         """Position setpoint for the scripted opponent, clamped to the arena."""
@@ -909,7 +936,7 @@ class PursuitEvasionController:
             else:
                 v = apf_evader_velocity(here[:2] - self.arena_origin[:2], own_state.pos[:2] - self.arena_origin[:2],
                                         self.metadata.arena_half_xy, m.speed, m.apf_influence,
-                                        m.apf_wall_margin, m.apf_wall_gain)
+                                        m.apf_wall_margin, m.apf_wall_gain, m.apf_vortex_gain)
                 target = here + np.array([v[0], v[1], 0.0]) * m.lookahead
             target[2] = anchor[2]
         else:  # flee

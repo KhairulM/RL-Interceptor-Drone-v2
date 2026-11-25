@@ -39,6 +39,7 @@ APF = """opponent:
     apf_influence: 3.0         # m, repulsion from the pursuer within this distance (start separation: 2 m)
     apf_wall_margin: 1.0       # m, repulsion from the walls within this distance
     apf_wall_gain: 2.0
+    apf_vortex_gain: 1.0       # sideways push around the pursuer (escapes the wall stall)
 """
 
 CONDITIONS = [

@@ -300,6 +300,14 @@ class ApfEvaderTest(unittest.TestCase):
         self.assertLessEqual(float(np.linalg.norm(v)), 1.0 + 1e-9)
         self.assertLess(v[0], 0.0)                             # walls win near the corner
 
+    def test_vortex_term_escapes_the_wall_stall(self):
+        # Start layout: pursuer, evader and the +x wall in line. Plain APF: pursuer push (1/3) and wall push (0.4)
+        # nearly cancel, so the evader stalls; the vortex term slides it sideways (counter-clockwise).
+        plain = pe_ctrl.apf_evader_velocity([1.2, 0.0], [-0.8, 0.0], 2.0, 2.0, 3.0, 1.0, 2.0, 0.0)
+        vortex = pe_ctrl.apf_evader_velocity([1.2, 0.0], [-0.8, 0.0], 2.0, 2.0, 3.0, 1.0, 2.0, 1.0)
+        self.assertLess(float(np.linalg.norm(plain)), 0.15)
+        self.assertGreater(vortex[1], 0.6)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -27,7 +27,7 @@ policy:
 
 # -- Opponent -----------------------------------------------------------------
 opponent:
-  mode: policy                 # policy | cf | scripted
+  mode: scripted                 # policy | cf | scripted
   # mode: policy  -> artifact of the OPPOSING role (here the same campaign's
   # final evader, stage 25).
   artifact_dir: artifacts/thesis_F14_rls_s200/evader_stage23
@@ -41,18 +41,19 @@ opponent:
   # mode: cf  -> a real Crazyflie tracked by mocap but flown by something else.
   # mode: scripted  -> the opponent Crazyflie takes off and flies position setpoints:
   scripted:
-    type: hover                # hover | linear | circular | pure_pursuit | flee | apf
+    type: circular               # hover | linear | circular | pure_pursuit | flee | apf
     virtual: false             # true: no opponent drone; the agent chases a virtual point.
     yaw_deg: 0.0               # Yaw of every setpoint (deg).
     anchor: [0.5, 0.0, 1.0]    # Start / hover point [x, y, z] (m, mocap world); flee holds this z.
-    speed: 1.0                 # linear / flee speed (m/s).
+    speed: 2.0                 # linear / flee speed, apf maximum speed (m/s).
     direction: [1.0, 0.0, 0.0] # linear: world-frame travel direction (normalised at load).
     radius: 1.0                # circular: orbit radius (m).
     omega: 1.0                 # circular: angular rate (rad/s).
     lookahead: 0.5             # flee / apf: setpoint lead time (s).
-    apf_influence: 2.0         # apf: repulsion from the agent within this distance (m).
+    apf_influence: 3.0         # apf: repulsion from the agent within this distance (m; start separation 2 m).
     apf_wall_margin: 1.0       # apf: repulsion from the walls within this distance (m).
     apf_wall_gain: 2.0         # apf: wall repulsion strength relative to the agent's.
+    apf_vortex_gain: 1.0       # apf: sideways (counter-clockwise) share of the agent push; 0 = plain APF.
 
 # -- Arena --------------------------------------------------------------------
 # Size comes from the policy metadata (arena_half_xy, arena_z_min/max).
