@@ -6,9 +6,11 @@ Measured results only. Each section is filled when the experiment finishes, with
 - J = neutralisation rate (capture, evader crash or evader out of bounds), mean over seeds; [ ] = 95 % bootstrap CI over seeds (with 2 seeds, the range of the two values); "supported" = paired CI excludes 0 (coarse with 3-5 seeds). M0 = plain pursuer (observes evader position + velocity, no acceleration).
 - Training radius and primary results: 0.10 m. **0.15 m values are eval-only exact re-scores** of the same episodes ([R15_rescore/](R15_rescore/), `rescore.py`). Every policy and exploiter was trained for 0.10 m, so **J at 0.15 m is an upper bound and exploitability a lower bound for a 0.15 m game**. Sections below write "(0.15 m convention)" for this. Exception: F7 trained its pursuers and exploiters at 0.15 m.
 
-## Summary (updated 2026-11-22 KST; details in the sections below)
+## Summary (updated 2026-11-26 KST; details in the sections below)
 
 One finding per bullet, 0.10 m unless marked; numbers are copied from the linked sections.
+
+- **F16 (population methods under Roncero's rules, 3 seeds; PSD dropped):** neither QD-DPP nor general-sum PSRO beats Roncero's Hedge. QD-DPP - Hedge final G1 is -0.013 (inconclusive; its sampling differs from Hedge's by only 2-5 % TV), but its attack-bank worst case is notably lower (final -0.250, mixture -0.235, thesis endings). PSRO is notably worse (final G1 -0.231, strong-16 -0.386) because its meta-game Nash is pure in 34 of 36 generations, so each oracle trains against one frozen opponent. Directions hold at 0.15 m and under Roncero endings, except that QD-DPP's final-pursuer attack deficit vanishes under Roncero endings ([F16](#f16)).
 
 - **F20 (single-rules exploiters swapped between F8 and RLS-26, 3 seeds):** each attacker exploits only the pursuer it was trained against. RLS-26 captures F8's hovering attackers in 93-98 % of episodes; F8 is crashed by RLS's diving attackers in only 1-21 % of episodes (RLS: 94-97 % on seeds 0 / 100) ([F20](#f20)).
 
@@ -37,7 +39,8 @@ One finding per bullet, 0.10 m unless marked; numbers are copied from the linked
 - No sampler lowers exploitability (0.44-0.69, [D2](#d2)); with the acceleration input the sampler has no effect ([F1](#f1)).
 - Self-play, samplers on both roles (2 seeds, descriptive): **Hedge (Roncero) is best** (held-out RL +0.10, worst held-out cluster +0.16 vs uniform, both seeds); QD-DPP is not better than uniform (-0.04 / -0.05); PFSP gives the most diverse evaders (Vendi 2.99 vs 2.46) but the most specialised pursuer (other campaigns' evaders -0.23); every pursuer stays ~fully exploitable (0.97-0.98) ([F3](#f3)).
 - A diversity term in evader training does not help: F6 makes the evaders more diverse (Vendi 3.25 vs Hedge 2.50) but the pursuer much weaker (held-out RL -0.262, other campaigns -0.471) ([F6](#f6)); the redesigned F6b restores luring but not diversity (Vendi 2.365 vs 2.499) and stays below Hedge (held-out RL -0.128, worst cluster -0.190) ([F6b](#f6b)).
-- **Answer to RQ1: not robustly. QD-DPP beats badly tuned hardness prioritisation on a fixed pool (D1), but is not better than uniform (D1, F3) and is below Roncero's Hedge in self-play (F3, 2 seeds).**
+- Under Roncero's rules (F16, 3 seeds): QD-DPP ties Hedge on G1 (-0.013, inconclusive) but is more exploitable by the common attack bank (bank-worst -0.250 final / -0.235 mixture, thesis endings); full general-sum PSRO is notably worse (G1 -0.231) ([F16](#f16)).
+- **Answer to RQ1: not robustly. QD-DPP beats badly tuned hardness prioritisation on a fixed pool (D1), but is not better than uniform (D1, F3), below Roncero's Hedge in self-play under the thesis rules (F3, 2 seeds), and not better than Hedge under Roncero's rules (F16, 3 seeds).**
 
 **RQ2: opponent model / online adaptation**
 - Noise-free: a learned acceleration estimate equals the finite difference (n.s.), and both beat M0 (+0.18 train, +0.23 held-out RL, +0.49 exploiters) ([A2b](#a2b)). Online RLS adds nothing; ESN and raw history are worse than none ([A1b](#a1b)).
@@ -68,9 +71,9 @@ One finding per bullet, 0.10 m unless marked; numbers are copied from the linked
 - Diagnostics and F2c: the adaptation gap rests on 2 exploiters (X3); gate G1 still passes (X4); the game is more transitive (X1). F2c acc exploitability 0.327 vs plain 0.746 (one exploiter each).
 - F14's conclusion is unchanged: RLS G1/G2 gaps are -0.023/+0.120 at 13 stages and -0.019/+0.107 at 26 stages; longer training does not make both positive ([F14](#f14)).
 
-**Completed / open (updated 2026-11-16 12:03 KST)**: F14 and the F15 switch-baseline evaluation are complete. F15 reused 36 audited F14 cells and added 12 F8 evaluations; all four arm smoke checks passed. Results are descriptive over three training seeds and do not establish a causal or seed-robust F8-vs-RLS difference. [F17](../../docs/research_plan.md#f17) (F8 rules + learned acceleration estimator/RLS on the pursuer; tests whether summary row 10's rule confound hides an estimator effect on G1/G2) is registered and running; no F17 results yet. F16 is queued after F17; no F16 runs have started. Default held-out test for new experiments: v10 + F8d's 16 strong finals. Other open items remain separate: opponent sensor noise (A3b-d, F4, F5; audit), seed-CI method, F5 Exp 2 (paused), exploiter-augmented pool, and the F16 sampler/diversity comparison.
+**Completed / open (updated 2026-11-16 12:03 KST)**: F14 and the F15 switch-baseline evaluation are complete. F15 reused 36 audited F14 cells and added 12 F8 evaluations; all four arm smoke checks passed. Results are descriptive over three training seeds and do not establish a causal or seed-robust F8-vs-RLS difference. [F17](../../docs/research_plan.md#f17) (F8 rules + learned acceleration estimator/RLS on the pursuer; tests whether summary row 10's rule confound hides an estimator effect on G1/G2) is registered and running; no F17 results yet. F16 has since completed (see the F16 paragraph below). Default held-out test for new experiments: v10 + F8d's 16 strong finals. Other open items remain separate: opponent sensor noise (A3b-d, F4, F5; audit), seed-CI method, F5 Exp 2 (paused), exploiter-augmented pool, and the F16 sampler/diversity comparison.
 
-**Next queued study:** [F16](../../docs/research_plan.md#f16) compares Hedge, QD-DPP, PSRO and a full-mechanism PSD-PSRO adaptation under unchanged Roncero rewards, with three paired seeds and audited reuse of F8 training. Roncero's rewards are general-sum, so the adaptation does not inherit PSD's zero-sum guarantees. F16 is not implemented or launched; earlier F3/F6/F6b results do not establish that full PSD-PSRO cannot beat Hedge.
+**F16 complete (2026-11-25):** Hedge vs QD-DPP vs PSRO under Roncero's rules, three paired seeds; PSD was dropped after its smoke (amendment 1). See [F16](#f16). **Running:** [F22](../../docs/research_plan.md#f22), a training-only F14-style RLS-26 campaign in a 2 m-ceiling arena (seed 0; deployment candidate, no predictions).
 
 ## Contents
 
@@ -79,7 +82,7 @@ One finding per bullet, 0.10 m unless marked; numbers are copied from the linked
 - RQ1 on a fixed pool: [D1 sampler](#d1) · [D1b duplicates](#d1b) · [D1c no floor](#d1c) · [D2 exploitability](#d2)
 - RQ2 opponent model: [A1a](#a1a) · [A1b](#a1b) · [A2a](#a2a) · [A2b](#a2b) · [A3a](#a3a) · [A3b](#a3b) · [A3c](#a3c) · [A3d](#a3d) · [A3e](#a3e) · [A3f](#a3f)
 - Final runs on a fixed pool: [F1](#f1) · [F2a](#f2a)
-- Self-play: [F2b / F2c](#f2) · [F3](#f3) ([transitivity](#f3-posthoc)) · [F4](#f4) · [F5](#f5) ([post-hoc](#f5-posthoc)) · [F6](#f6) · [F7](#f7) · [F6b](#f6b) · [F8](#f8) ([post-hoc](#f8-posthoc), [F8d](#f8d)) · [F9](#f9) · [F10](#f10) ([three seeds](#f10-seeds)) · [F11](#f11) · [F13](#f13) · [F14: generalization, exploitability and policy switches](#f14) · [F15: switch baseline](#f15-switch-baseline)
+- Self-play: [F2b / F2c](#f2) · [F3](#f3) ([transitivity](#f3-posthoc)) · [F4](#f4) · [F5](#f5) ([post-hoc](#f5-posthoc)) · [F6](#f6) · [F7](#f7) · [F6b](#f6b) · [F8](#f8) ([post-hoc](#f8-posthoc), [F8d](#f8d)) · [F9](#f9) · [F10](#f10) ([three seeds](#f10-seeds)) · [F11](#f11) · [F13](#f13) · [F14: generalization, exploitability and policy switches](#f14) · [F15: switch baseline](#f15-switch-baseline) · [F16: population methods under Roncero's rules](#f16) · [F17](#f17-roncero-acc) · [F18](#f18) · [F19](#f19) · [F20](#f20) · [F21](#f21)
 
 <a id="synthesis"></a>
 
@@ -158,6 +161,7 @@ All numbers in this table are at the 0.10 m training radius. At 0.15 m (see the 
 | 8 | Sensor noise: AgilePE reports robustness under real sensor noise (mocap + IMU); Roncero and Gavin assume perfect state. | With 2 cm / 8 cm/s noise (eval only, policies trained clean) the finite-difference acceleration input collapses (train 0.94 -> 0.33, below the plain pursuer 0.70); the learned estimator + RLS keeps 0.80 and beats it by +0.47 train / +0.38 held-out RL / +0.49 exploiters (A3c, 5 seeds). Without any evader velocity every pursuer is weak (~0.29) (A3b); an *estimated* velocity from noisy positions gives train 0.29 -> 0.38-0.40 (true velocity 0.62), no gain on held-out RL (A3d). Self-play with noise in training and evaluation (F4): learned estimators generalise better than the EMA filter (other campaigns' evaders +0.196, X3 exploiters +0.441) but make the pursuer more exploitable (+0.197). Self-play with noise at eval only (F5): the finite-difference pursuer falls below plain (other campaigns' evaders -0.472); the learned estimate is below plain against the self-play evaders (-0.140), through more pursuer crashes with RLS running. | **New:** opponent-acceleration inputs must be learned, not differenced, once sensing is noisy; the perfect-state results of Roncero and Gavin would not transfer to such inputs. Under co-evolution with noisy sensing the learned estimator trades better generalisation for higher exploitability. |
 | 9 | Real-world transfer (all three), multi-pursuer coordination (Gavin), FOV-limited sensing (AgilePE). | Not studied. | **Not tested.** |
 | 10 | Follow-up to population generalization and online adaptation (rows 4, 6, 7): does estimator + RLS under the selected rules improve on a Roncero-rule pursuer? | F14, 3 seeds, common thesis evaluation endings: at 26 stages, RLS G1 gap -0.035 (strong held-out -0.103, cross-campaign +0.034), G2 same-rules-exploiter J gap +0.323. Policy-switch J improves +0.009 over freezing the same RLS-trained pursuer at evaluation and +0.156 over no-RLS training. | **Mixed, exploratory:** better same-rules-exploiter resistance, not better combined generalization; small incremental test-time adaptation gain. This supersedes the blanket "never lowers exploitability" / "does not pay off in self-play" conclusions in rows 6/7, which describe F2c/F5 rather than F14. Different rules across F8 and v2d and separate exploiters prevent attributing G2 solely to the estimator. |
+| 11 | Roncero's Hedge population sampling (row 1) vs diversity-aware sampling and equilibrium-based populations (PSRO; PSD as in the literature notes), under Roncero's own rules. | F16, 3 seeds, common banks: QD-DPP - Hedge final G1 -0.013 (inconclusive), attack-bank worst case notably lower (final -0.250, mixture -0.235, thesis endings, 0.10 m); general-sum PSRO - Hedge G1 -0.231 (notable), because the empirical game's Nash is pure in 34 of 36 generations. PSD was not run (KL objective diverged in the smoke). | **Consistent with Roncero:** Hedge is not beaten by either alternative in his setting. **New, negative for RQ1:** the DPP's diversity term changes sampling by only 2-5 % TV under Hedge quality and does not help; PSRO on shaped general-sum returns collapses to single-opponent best responses. Not a test of PSD. |
 
 **Scope of the older comparisons above.** Rows 4, 6 and 7 retain the original experiment-specific evidence, not universal conclusions about all schedules. F10's three-seed expansion and F14 qualify the earlier seed-0 schedule explanation: short stages can remove luring, but not reliably across seeds; low same-rules exploitability can coexist with a strong-held-out deficit. Roncero-rule F8 here is our implementation in the thesis simulator, not a direct evaluation of the paper's released pursuer.
 
@@ -2223,3 +2227,81 @@ The registered rule labels a difference notable only if the absolute mean is at 
 **Reading / limitations.** Shortening lambda from 0.999 to 0.98 alone changed mean post-switch capture by only -0.002 and did not increase the live-update benefit. A looser cap and faster forgetting substantially increased readout drift, but not switch capture; increasing delta and its absolute cap further reduced capture versus fast+cap on all three seeds. More RLS movement is therefore not evidence of more useful adaptation. The own/lure attacker and G1 results vary materially by seed, all estimates use three training seeds, and the F14 baseline/frozen-trained arms are reused rather than rerun. No population-level significance or optimal-parameter claim is supported.
 
 **Execution.** Four new arms x three seeds = 12 campaigns (15.6B frames), plus 24 fresh 100M-frame attackers (2.4B frames); F14 baseline and frozen-trained campaigns/evaluations were reused. All four two-role smoke campaigns and live/frozen smoke evaluations passed; all 18 arm-seed evaluation entries and the combined analysis completed on 2026-11-22. No runs were excluded. F16 is next; no automatic commit/push was performed.
+
+
+<a id="f16"></a>
+
+## F16_roncero_population (complete 2026-11-25; exploratory, three paired training seeds; after amendment 1)
+
+**Question.** Under Roncero's reward and episode endings, does a different opponent-population method beat Roncero's Hedge sampler? Arms: **Hedge** (F8b's three campaigns, reused training, fresh common evaluation), **QD-DPP** (quality-diversity DPP sampler on both roles) and **PSRO** (general-sum Nash meta-strategy over both roles' discounted Roncero returns, best-response oracles). The two new arms start from clones of the same F8b stage-0 pursuer and stage-1 evader. All use 26 stages x 50M, seeds 0/100/200. PSD was dropped after its smoke, so its hypotheses are not tested ([plan](../../docs/research_plan.md#f16), amendment 1). The registered primary contrast is QD-DPP - Hedge on final-policy G1; PSRO - Hedge is reported descriptively.
+
+**Execution.** Six new campaigns (7.2B new self-play frames) and 18 attackers (100M each, 1.8B): 9.0B new learning frames (registered ceiling 13.5B), plus payoff-evaluation and evaluation rollouts. The smoke gates passed 2026-11-23 11:43. The main campaigns ran 11:43 to 11-24 11:12 on two lanes (QD-DPP about 7.3 h and PSRO about 8.2 h per campaign). F16c (mixtures, attackers, common evaluations, analysis) ran 11-24 10:32 to 11-25 08:43. No run was excluded or restarted after results were seen.
+
+**Evaluation.** Stage-24 pursuers, stochastic actor. G1 = 0.5 strong-16 J + 0.5 cross-campaign J; the cross bank holds the other two seeds' evaders from all three arms (stages 3-25, weighted arms -> campaigns -> stages), the same bank for every arm in a seed block. Attack bank per seed: six fresh Roncero-rule attackers, one trained against each arm's final pursuer and one against its frozen population mixture. "Own att." = J vs the attacker trained against that pursuer; "bank worst" = lowest J over the six. Coverage exploitability = 1 - max over mixtures of stored pursuers of the min J over the attack bank (restricted-bank proxy; lower is better). Primary convention: thesis endings (pursuer OOB nonterminal, not an evader win) at 0.10 m. Roncero endings and 0.15 m re-scores below. Per-seed tables for every convention: [summary.md](F16_roncero_population/summary.md); values: [results.json](F16_roncero_population/results.json).
+
+**Primary convention (thesis endings, 0.10 m), per seed (0 / 100 / 200) and mean:**
+
+| Arm | Final G1 | Strong-16 J | Cross J | v10 J | Own att. J | Bank-worst J | Mixture G1 | Mixture bank-worst J | Coverage exploitability |
+|---|---|---|---|---|---|---|---|---|---|
+| Hedge | 0.814 / 0.898 / 0.832 (**0.848**) | 0.799 / 0.852 / 0.747 (0.800) | 0.829 / 0.943 / 0.917 (0.896) | 0.907 | 0.581 | 0.507 | 0.697 | 0.461 | 0.290 / 0.471 / 0.173 |
+| QD-DPP | 0.869 / 0.773 / 0.861 (**0.835**) | 0.857 / 0.691 / 0.819 (0.789) | 0.881 / 0.856 / 0.904 (0.880) | 0.885 | 0.323 | 0.257 | 0.680 | 0.226 | 0.758 / 0.561 / 0.473 |
+| PSRO | 0.544 / 0.729 / 0.579 (**0.617**) | 0.332 / 0.576 / 0.331 (0.413) | 0.756 / 0.882 / 0.826 (0.822) | 0.527 | 0.384 | 0.287 | 0.531 | 0.092 | 0.333 / 0.349 / 0.569 |
+
+(v10 to coverage columns except the last: three-seed means.)
+
+**Paired contrasts (thesis endings, 0.10 m; notable = |mean| >= 0.05 with all three seeds the same sign):**
+
+| Contrast | Metric | Seed 0 | Seed 100 | Seed 200 | Mean | Decision |
+|---|---|---:|---:|---:|---:|---|
+| QD-DPP - Hedge (**primary**) | Final G1 | +0.055 | -0.124 | +0.030 | -0.013 | Inconclusive |
+| QD-DPP - Hedge | Strong-16 J | +0.058 | -0.161 | +0.072 | -0.011 | Inconclusive |
+| QD-DPP - Hedge | Cross J | +0.052 | -0.087 | -0.013 | -0.016 | Inconclusive |
+| QD-DPP - Hedge | Mixture G1 | +0.027 | -0.050 | -0.029 | -0.017 | Inconclusive |
+| QD-DPP - Hedge | Final bank-worst J | -0.095 | -0.197 | -0.458 | -0.250 | Notable decrease |
+| QD-DPP - Hedge | Mixture bank-worst J | -0.435 | -0.141 | -0.130 | -0.235 | Notable decrease |
+| PSRO - Hedge | Final G1 | -0.271 | -0.168 | -0.253 | -0.231 | Notable decrease |
+| PSRO - Hedge | Strong-16 J | -0.467 | -0.276 | -0.416 | -0.386 | Notable decrease |
+| PSRO - Hedge | Cross J | -0.074 | -0.060 | -0.090 | -0.075 | Notable decrease |
+| PSRO - Hedge | Mixture G1 | -0.454 | -0.006 | -0.041 | -0.167 | Notable decrease (mostly seed 0) |
+| PSRO - Hedge | Final bank-worst J | +0.227 | -0.360 | -0.525 | -0.219 | Inconclusive |
+| PSRO - Hedge | Mixture bank-worst J | -0.522 | -0.303 | -0.282 | -0.369 | Notable decrease |
+
+Coverage exploitability minus Hedge (computed from the table above, not a registered contrast): QD-DPP +0.468 / +0.089 / +0.300 (mean +0.286, higher = worse on every seed); PSRO +0.043 / -0.122 / +0.396 (mixed).
+
+**Other conventions (three-seed means; Hedge / QD-DPP / PSRO):**
+
+| Convention | Final G1 | Strong-16 J | Cross J | Own att. J | Bank-worst J | Mixture bank-worst J |
+|---|---|---|---|---|---|---|
+| Thesis endings, 0.10 m (primary) | 0.848 / 0.835 / 0.617 | 0.800 / 0.789 / 0.413 | 0.896 / 0.880 / 0.822 | 0.581 / 0.323 / 0.384 | 0.507 / 0.257 / 0.287 | 0.461 / 0.226 / 0.092 |
+| Roncero endings, 0.10 m | 0.795 / 0.801 / 0.522 | 0.752 / 0.772 / 0.363 | 0.838 / 0.831 / 0.680 | 0.243 / 0.272 / 0.205 | 0.208 / 0.210 / 0.180 | 0.295 / 0.157 / 0.078 |
+| Thesis endings, 0.15 m | 0.947 / 0.937 / 0.814 | 0.926 / 0.913 / 0.685 | 0.968 / 0.960 / 0.943 | 0.837 / 0.400 / 0.643 | 0.649 / 0.314 / 0.420 | 0.555 / 0.321 / 0.167 |
+| Roncero endings, 0.15 m | 0.925 / 0.916 / 0.753 | 0.903 / 0.895 / 0.652 | 0.946 / 0.936 / 0.854 | 0.492 / 0.355 / 0.509 | 0.300 / 0.275 / 0.288 | 0.416 / 0.251 / 0.143 |
+
+What changes across conventions:
+- **QD-DPP - Hedge final G1 stays inconclusive** everywhere: Roncero endings at 0.10 m +0.006, 0.15 m -0.010 (thesis) / -0.009 (Roncero).
+- **QD-DPP's lower attack resistance is convention-dependent.** The mixture bank-worst decrease holds in all four conventions (-0.235 / -0.138 / -0.234 / -0.165, all seeds negative). The final-pursuer bank-worst decrease holds only under thesis endings (-0.250 at 0.10 m, -0.335 at 0.15 m) and is inconclusive under Roncero endings (+0.003 at 0.10 m, -0.024 at 0.15 m).
+- **PSRO's deficit holds in all conventions:** final G1 -0.274 (Roncero endings, 0.10 m), -0.133 (thesis, 0.15 m) and -0.171 (Roncero, 0.15 m), all seeds negative. The cross component is inconclusive only at 0.15 m with thesis endings (-0.025).
+- At 0.15 m J values are upper bounds (all policies and attackers were trained for 0.10 m).
+
+**Deterministic-actor final pursuer vs strong-16 (secondary), 0.10 m (0.15 m):** Hedge 0.856 / 0.875 / 0.782 (0.956 / 0.957 / 0.934); QD-DPP 0.905 / 0.705 / 0.877 (0.968 / 0.893 / 0.952); PSRO 0.358 / 0.616 / 0.391 (0.647 / 0.874 / 0.659). The ranking matches the stochastic evaluation.
+
+**Why PSRO is weak: its meta-game equilibrium is almost always pure.** On 34 of 36 generation solves (12 generations x 3 seeds) plus all three final solves, the verified maximum-entropy Nash of the two-role payoff bimatrix has support 1 x 1. The exceptions are seed 100, generations 5 and 10 (2 x 2). The pair also stops moving:
+- Seed 0: from generation 5 on, the stage-2 pursuer vs the stage-9 evader.
+- Seed 200: from generation 4 on, the stage-6 pursuer vs the stage-5 evader.
+- Seed 100: the pair keeps changing; the final pair is stage 24 vs stage 23.
+
+Each oracle therefore trains against a single frozen opponent, the same one for 8-9 generations on seeds 0 and 200. The final PSRO pursuer has seen essentially one evader for the second half of training. Against strong-16 it crashes in 0.66 / 0.43 / 0.65 of episodes and leaves the arena in 0.15 / 0.12 / 0.22 (Hedge 0.21 / 0.17 / 0.29 and 0.04 / 0.06 / 0.06). Its deployment "mixture" is the single equilibrium pursuer: stage 2 / 24 / 6. Hence seed 0's mixture G1 is 0.213, and seed 100's equals its final G1. This is a property of the general-sum game under shaped discounted returns plus the registered max-entropy selection, not a solver failure: every equilibrium was verified (regret <= 1e-6).
+
+**Why QD-DPP stays close to Hedge: the intervention is small.** Its sampling distribution differs from Hedge's by a mean total-variation distance of 0.016 / 0.020 / 0.021 (pursuer) and 0.042 / 0.047 / 0.040 (evader). The registered weak-intervention flag (both roles < 0.02) is false only because the evader side exceeds 0.02. With a 2-4 % change in sampling mass, seed differences of -0.124 to +0.055 in G1 mostly reflect training variability rather than the sampler.
+
+**Hypotheses (registered, low confidence; after amendment 1):**
+- "QD-DPP stays close to Hedge because its floor limits distribution change": **held in direction**. Final G1 -0.013 (inconclusive), sampling TV 0.02-0.05. But its attack-bank worst case is notably lower: final -0.250 and mixture -0.235, thesis endings, 0.10 m, all seeds.
+- "Neither candidate reliably exceeds Hedge by +0.05 final G1 across all three seeds": **held**. QD-DPP -0.013, mixed signs; PSRO -0.231, notably lower.
+- PSD hypotheses and the PSD - PSRO attribution contrast: **not tested** (PSD dropped, amendment 1).
+
+**Reading / limitations.**
+- Under Roncero's rules, neither population method improves on Roncero's Hedge.
+- QD-DPP matches Hedge on generalization (G1) but its pursuers and population mixtures are more exploitable by the common attack bank under thesis endings. This is consistent with F3's thesis-rule finding that QD-DPP is not better than Hedge.
+- Full general-sum PSRO with max-entropy Nash selection is notably worse on every generalization measure. It degenerates into repeated best responses against one early opponent because the empirical game's equilibrium is pure.
+- These are three training seeds and descriptive. The attack bank is a finite, 100M-frame, budget-limited probe, not an exact best response. Coverage exploitability is a restricted-bank proxy.
+- PSRO's outcome is specific to this payoff definition (discounted shaped Roncero returns, 2048 episodes per cell) and selection rule. A zero-sum or win-rate payoff, or a different equilibrium selection, was not tested.

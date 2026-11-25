@@ -82,6 +82,7 @@ EXPERIMENTS = {
     "F20": "f20_cross_attack:run_f20",
     "F21": "f21_rls_ablation:run_f21",
     "F21c": "f21_rls_ablation:run_f21c",
+    "F22": "f22_z2_rls:run_f22",
     "F16": "f16_roncero_population:run_f16",
     "F16c": "f16_roncero_population:run_f16c",
 }
