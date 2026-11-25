@@ -75,6 +75,9 @@ DEFAULT_CONFIG_PATH = os.path.join(
 )
 
 OPPONENT_MODES = ('policy', 'cf', 'scripted')
+# Shutdown landing: descend (go_to) to this height (m), then a final landing of FINAL_LAND_S seconds.
+LAND_HOVER_Z = 0.3
+FINAL_LAND_S = 1.5
 SCRIPTED_MOTIONS = ('hover', 'linear', 'circular', 'pure_pursuit', 'flee', 'apf')
 # Legacy heuristic names (as in PursuitEvasion.HEURISTIC_ALIASES).
 MOTION_ALIASES = {'pursue': 'pure_pursuit'}
@@ -239,7 +242,18 @@ class FlightConfig:
 
     takeoff_height: float = 1.0          # m, both drones
     takeoff_duration: float = 3.0        # s
-    land_duration: float = 3.0           # s
+    land_duration: float = 3.0           # s, minimum landing time
+    # Average descent speed of a landing (m/s): a drone lands over max(land_duration, (z - 0.1) / land_speed).
+    # A fixed 3 s from 3 m outran the drone in CrazySim (2.5 m/s at touchdown); 0.5 m/s touched down at ~0.4 m/s.
+    land_speed: float = 0.5
+    # Before a safety hold or a landing, moving drones are first slowed to rest with a velocity ramp at this
+    # deceleration (m/s^2). A position or landing setpoint straight from speed asks the firmware for an instant
+    # stop: in CrazySim drones landing from 1.5-3 m/s oscillated, flipped (tilt 100-170 deg) and hit the floor.
+    brake_decel: float = 2.0
+    # Hover feed-forward of the firmware's position/velocity controller (posCtlPid.thrustBase, PWM), used by
+    # take-off, braking and landing; null = keep the firmware's value (36000, tuned for the stock Crazyflie).
+    # CrazySim's cf2x_L250 hovers at ~45000: with 36000 it sagged and flipped while braking / landing.
+    firmware_thrust_base: Optional[int] = None
     control_dt: float = 0.0              # s; 0 = the training control period (metadata.ctbr.dt)
     # First-order low-pass on the commanded body rates (time constant, s; 0 = off).
     # The policy was trained with the rate loop stepped at the 50 Hz control
@@ -619,6 +633,9 @@ class PursuitEvasionController:
         # Training truncates at max_episode_length steps (an evader win).
         self.episode_duration = self.metadata.max_episode_length * self.metadata.ctbr.dt
         self.land_duration = cfg.flight.land_duration
+        self.land_speed = cfg.flight.land_speed
+        self.brake_decel = cfg.flight.brake_decel
+        self.land_settle_timeout = 3.0     # s, see _wait_at_hover
         self.motion = cfg.opponent.scripted
         anchor = self.motion.anchor if self.motion.anchor is not None else [2.0, 0.0, cfg.flight.takeoff_height]
         self.motion_anchor = np.array(anchor, dtype=np.float64)
@@ -953,6 +970,12 @@ class PursuitEvasionController:
         self.own.setup()
         self.opponent.connect()
         self.opponent.setup()
+        thrust_base = self.cfg.flight.firmware_thrust_base
+        if thrust_base is not None:
+            for d in (self.own, self.opponent):
+                if isinstance(d, CrazyflieDrone):
+                    d.set_param('posCtlPid', 'thrustBase', int(thrust_base))
+            logger.info('[pe] Firmware posCtlPid.thrustBase set to %d.', int(thrust_base))
 
     def _monitored_states(self, own_state=None, opponent_state=None) -> dict:
         """States the safety layer checks: the agent, plus the opponent when it is a real drone."""
@@ -1049,6 +1072,54 @@ class PursuitEvasionController:
                     pass
             time.sleep(self.control_dt)
 
+    def _brake(self, drones) -> None:
+        """Slow every moving real drone to rest together: world-frame velocity setpoints ramping linearly from its
+        current velocity to zero at flight.brake_decel (|v| / brake_decel seconds), then 0.2 s at zero."""
+        plans = []
+        for d in drones:
+            s = d.get_state() if isinstance(d, CrazyflieDrone) else None
+            if s is None or not np.all(np.isfinite(s.lin_vel)):
+                continue
+            v0 = np.asarray(s.lin_vel, dtype=np.float64)
+            duration = float(np.linalg.norm(v0)) / self.brake_decel
+            if duration > 0.05:
+                plans.append((d, v0, duration))
+        if not plans:
+            return
+        logger.warning('[pe] Braking %s to rest (up to %.1f s) before stopping.',
+                       ', '.join(f'{d.name} from {np.linalg.norm(v):.1f} m/s' for d, v, _ in plans),
+                       max(p[2] for p in plans))
+        start = time.time()
+        while (elapsed := time.time() - start) < max(p[2] for p in plans) + 0.2:
+            for d, v0, duration in plans:
+                v = v0 * max(0.0, 1.0 - elapsed / duration)
+                try:
+                    d.send_velocity_world_setpoint(v[0], v[1], v[2], 0.0)
+                except Exception:
+                    pass
+            time.sleep(self.control_dt)
+
+    def _wait_at_hover(self, drones, planned_s: float) -> None:
+        """Wait the planned descent time, then until every drone is within 0.1 m of LAND_HOVER_Z and slower than
+        0.3 m/s, at most land_settle_timeout more seconds."""
+        time.sleep(planned_s)
+        deadline = time.time() + self.land_settle_timeout
+        while time.time() < deadline:
+            states = [d.get_state() for d in drones]
+            if all(s is not None and abs(s.pos[2] - LAND_HOVER_Z) < 0.1 and np.linalg.norm(s.lin_vel) < 0.3
+                   for s in states):
+                return
+            time.sleep(self.control_dt)
+        logger.warning('[pe] Not every drone settled at %.1f m within %.1f s; landing anyway.',
+                       LAND_HOVER_Z, self.land_settle_timeout)
+
+    def _landing_duration(self, drone) -> float:
+        """Landing time for ``drone``: at least land_duration, longer from height (average descent land_speed)."""
+        state = drone.get_state() if isinstance(drone, CrazyflieDrone) else None
+        if state is None or not np.isfinite(state.pos[2]):
+            return self.land_duration
+        return max(self.land_duration, (float(state.pos[2]) - LAND_HOVER_Z) / self.land_speed)
+
     def shutdown(self) -> None:
         drones = [self.own, self.opponent]
         fault = self._fault
@@ -1060,19 +1131,34 @@ class PursuitEvasionController:
                 except Exception:
                     logger.exception('[pe] emergency stop failed for %s', role)
                 drones = [x for x in drones if x is not d]
+        self._brake(drones)
         if fault is not None and fault.level == Level.HOLD:
             self._hold(drones, self.safety_cfg.hold_s)
-        # SAFETY_PLAN B1: start every landing first, then wait once. Landing the drones one after the other left
-        # the second one without setpoints for the whole first landing (> 2 s: the firmware cuts its motors).
-        landing = []
+        # SAFETY_PLAN B1: every drone at once. A firmware landing switches the motors off when its plan ends, wherever
+        # the drone is (planner.c: LANDING -> IDLE -> null setpoint); in CrazySim a pursuer still 0.97 m up then fell
+        # at 3.4 m/s. So: go_to (x, y, LAND_HOVER_Z), which keeps holding, wait until each drone is really there,
+        # then a short final landing from that height.
+        descending = []
         for d in drones:
             try:
-                if d.land_async(self.land_duration):
-                    landing.append(d)
+                state = d.get_state() if isinstance(d, CrazyflieDrone) else None
+                if state is not None and np.all(np.isfinite(state.pos)):
+                    duration = self._landing_duration(d)
+                    yaw = math.radians(_quat_to_rpy_deg(state.quat_wxyz)[2])
+                    if d.go_to_async(state.pos[0], state.pos[1], LAND_HOVER_Z, yaw, duration):
+                        descending.append((d, duration))
+                elif d.land_async(self.land_duration):         # no usable state: plain landing
+                    descending.append((d, self.land_duration))
             except Exception:
                 logger.exception('[pe] landing failed for %s', getattr(d, 'name', d))
-        if landing:
-            time.sleep(self.land_duration + 1.0)
+        if descending:
+            self._wait_at_hover([d for d, _ in descending], max(t for _, t in descending))
+            for d, _ in descending:
+                try:
+                    d.land_async(FINAL_LAND_S)
+                except Exception:
+                    logger.exception('[pe] final landing failed for %s', getattr(d, 'name', d))
+            time.sleep(FINAL_LAND_S + 0.5)
         for drone in (self.own, self.opponent):
             for action in ('disarm', 'disconnect'):
                 try:

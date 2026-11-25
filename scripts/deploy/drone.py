@@ -343,6 +343,15 @@ class CrazyflieDrone(Drone):
         self.cf.high_level_commander.land(0.1, duration)
         time.sleep(duration + 1.0)  # wait for landing to complete
 
+    def go_to_async(self, x: float, y: float, z: float, yaw_rad: float, duration: float) -> bool:
+        """Start a high-level go_to and return immediately. Unlike a landing, the firmware keeps holding the end point
+        afterwards (a finished landing switches the motors off, wherever the drone is)."""
+        if not self._require_connected('go_to') or not self._require_armed('go_to'):
+            return False
+        self._relax_setpoint_priority(wait_s=0.02)
+        self.cf.high_level_commander.go_to(float(x), float(y), float(z), float(yaw_rad), float(duration))
+        return True
+
     def land_async(self, duration: float = 3.0) -> bool:
         """Start a high-level landing and return immediately (SAFETY_PLAN B1: land several drones at once)."""
         if not self._require_connected('land') or not self._require_armed('land'):
@@ -402,6 +411,21 @@ class CrazyflieDrone(Drone):
                                yaw_deg: float = 0.0):
         self.cf.commander.send_position_setpoint(
             float(x), float(y), float(z), float(yaw_deg))
+
+    def send_velocity_world_setpoint(self, vx: float, vy: float, vz: float, yaw_rate_deg: float = 0.0):
+        """World-frame velocity setpoint (m/s) for the firmware's velocity controller.
+
+        Same packet as cflib's commander.send_velocity_world_setpoint, built here because cflib warns (Deprecation-
+        Warning) on every call when the firmware only has the legacy type: protocol <= 8 (CrazySim reports 7) takes
+        type 1 with the yaw rate negated, newer firmware type 8.
+        """
+        legacy = self.cf.platform.get_protocol_version() <= 8
+        pk = CRTPPacket()
+        pk.port = CRTPPort.COMMANDER_GENERIC
+        pk.channel = 0
+        pk.data = struct.pack('<Bffff', 1 if legacy else 8, float(vx), float(vy), float(vz),
+                              -float(yaw_rate_deg) if legacy else float(yaw_rate_deg))
+        self.cf.send_packet(pk)
 
     def send_hover_setpoint(self, z: float):
         self.cf.commander.send_hover_setpoint(0.0, 0.0, 0.0, float(z))
@@ -592,6 +616,9 @@ class ScriptedDrone(Drone):
 
     def land(self, duration: float = 3.0) -> None:
         logger.info('[%s] Scripted landing (no-op)', self.name)
+
+    def go_to_async(self, x, y, z, yaw_rad, duration) -> bool:
+        return False
 
     def land_async(self, duration: float = 3.0) -> bool:
         logger.info('[%s] Scripted landing (no-op)', self.name)

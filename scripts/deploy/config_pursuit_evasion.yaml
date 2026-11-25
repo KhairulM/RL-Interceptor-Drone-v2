@@ -30,14 +30,14 @@ opponent:
   mode: policy                 # policy | cf | scripted
   # mode: policy  -> artifact of the OPPOSING role (here the same campaign's
   # final evader, stage 25).
-  artifact_dir: artifacts/thesis_F8b_roncero_s0/evader
+  artifact_dir: artifacts/thesis_F14_rls_s200/evader_stage23
   # mode: policy only: hand the opponent drone to a second policy during the run (the thesis
   # switching evaders). The new policy keeps the drone's previous action. null = no switch.
   # F8 -> F10: artifact_dir = artifacts/thesis_F8_roncero_s0/evader and
   #   switch: {artifact_dir: artifacts/thesis_F10_nofix_s0/evader, after_s: 1.0}
   # (after_s: s after the chase starts; thesis 0.5, 1.0 or 1.5). Swap the two for F10 -> F8.
-  switch: {artifact_dir: artifacts/thesis_F10_nofix_s0/evader, after_s: 2.0}
-  # switch: null
+  # switch: {artifact_dir: artifacts/thesis_F10_nofix_s0/evader, after_s: 2.0}
+  switch: null
   # mode: cf  -> a real Crazyflie tracked by mocap but flown by something else.
   # mode: scripted  -> the opponent Crazyflie takes off and flies position setpoints:
   scripted:
@@ -77,6 +77,10 @@ flight:
   takeoff_height: 1.0          # m, both drones.
   takeoff_duration: 3.0        # s.
   land_duration: 3.0           # s.
+  land_speed: 0.5              # m/s average descent: landing time = max(land_duration, (z - 0.1) / land_speed).
+  brake_decel: 2.0             # m/s^2: moving drones are slowed to rest at this rate before a hold / landing.
+  firmware_thrust_base: 45000  # posCtlPid.thrustBase (PWM). CrazySim cf2x_L250 hovers at ~45000; null on real drones
+                               # keeps the firmware's 36000 (stock Crazyflie).
   control_dt: 0.0              # s; 0 = the policy's training period (metadata.ctbr.dt).
   # Low-pass time constant (s) on the commanded body rates; 0 = off. The firmware
   # rate loop is ~10x faster than the 50 Hz training loop and can turn aggressive
@@ -137,8 +141,8 @@ mocap:
 # Checked every control tick for both drones. Responses: HOLD (hover in place for hold_s, then land),
 # LAND (both drones land at the same time), EMERGENCY (motors off on the affected drone, the other lands).
 safety:
-  enabled: true
-  strict_preflight: false        # refuse to take off if mocap is not aligned / the estimator has not converged /
+  enabled: false
+  strict_preflight: true        # refuse to take off if mocap is not aligned / the estimator has not converged /
                                 # a drone starts outside the arena, not level or with a stale / non-finite state
   evader_geofence_margin: 0.3   # evader's hard fence = arena + margin (incl. ceiling) -> LAND
   pursuer_geofence_margin: 0.3  # pursuer's fence; null = none (training lets the pursuer leave the arena).

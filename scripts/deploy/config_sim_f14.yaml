@@ -31,6 +31,7 @@ flight:
   takeoff_height: 1.0
   takeoff_duration: 3.0
   land_duration: 3.0
+  firmware_thrust_base: 45000  # CrazySim cf2x_L250 hover thrust (firmware default 36000 sags / flips)
   control_dt: 0.0
   command_rate_lpf_tau: 0.03    # raise to 0.02-0.05 if the pursuer rolls / oscillates
 

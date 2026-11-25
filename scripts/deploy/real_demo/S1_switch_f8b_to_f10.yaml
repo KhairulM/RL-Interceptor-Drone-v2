@@ -29,6 +29,7 @@ flight:
   takeoff_height: 1.0
   takeoff_duration: 3.0
   land_duration: 3.0
+  firmware_thrust_base: null   # keep the firmware's value on the real drones (see config_pursuit_evasion.yaml)
   control_dt: 0.0
   command_rate_lpf_tau: 0.03   # s; smooths the body-rate commands (CrazySim 2026-11-24: the only captures)
 
