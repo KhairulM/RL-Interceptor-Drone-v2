@@ -1,13 +1,21 @@
 {
-  "config_path": "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/real_demo/A_amspbh_f8b.yaml",
+  "config_path": "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/real_demo/P_apf.yaml",
   "config": {
     "policy": {
       "artifact_dir": "artifacts/thesis_F14_rls_s200/pursuer"
     },
     "opponent": {
-      "mode": "policy",
-      "artifact_dir": "artifacts/thesis_F8b_roncero_s0/evader",
-      "switch": null
+      "mode": "scripted",
+      "scripted": {
+        "type": "apf",
+        "virtual": false,
+        "speed": 2.0,
+        "lookahead": 0.5,
+        "apf_influence": 3.0,
+        "apf_wall_margin": 1.0,
+        "apf_wall_gain": 2.0,
+        "apf_vortex_gain": 1.0
+      }
     },
     "arena": {
       "origin": [
@@ -19,7 +27,7 @@
     },
     "episode": {
       "stop_on_capture": true,
-      "capture_radius": 0.1,
+      "capture_radius": 0.11,
       "stop_on_evader_exit": true,
       "stop_on_timeout": true,
       "state_timeout": 0.5,
@@ -103,10 +111,9 @@
     }
   },
   "checkpoints": {
-    "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F14_rls_s200/pursuer": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt",
-    "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F8b_roncero_s0/evader": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage25.pt"
+    "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F14_rls_s200/pursuer": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt"
   },
-  "capture_radius": 0.1,
+  "capture_radius": 0.11,
   "control_dt": 0.02,
   "arena_origin": [
     0.0,
@@ -114,10 +121,10 @@
     0.0
   ],
   "pursuer": "thesis_F14_rls_s200-pursuer",
-  "evader": "thesis_F8b_roncero_s0-evader",
-  "start_wall_time": 1795607287.8586462,
-  "outcome": "safety_stop",
-  "outcome_detail": "HOLD: pursuer: mocap stale 0.21 s",
-  "rows": 77,
-  "end_wall_time": 1795607305.4582584
+  "evader": "scripted-apf",
+  "start_wall_time": 1795673269.5397058,
+  "outcome": "capture",
+  "outcome_detail": "0.109 m <= 0.11 m",
+  "rows": 175,
+  "end_wall_time": 1795673278.7270048
 }

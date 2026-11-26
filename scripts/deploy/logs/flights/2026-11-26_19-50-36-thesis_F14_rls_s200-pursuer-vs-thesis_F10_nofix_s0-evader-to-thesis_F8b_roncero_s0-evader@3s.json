@@ -1,33 +1,28 @@
 {
-  "config_path": "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/real_demo/P_apf.yaml",
+  "config_path": "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/real_demo/S2_switch_f10_to_f8b.yaml",
   "config": {
     "policy": {
       "artifact_dir": "artifacts/thesis_F14_rls_s200/pursuer"
     },
     "opponent": {
-      "mode": "scripted",
-      "scripted": {
-        "type": "apf",
-        "virtual": false,
-        "speed": 2.0,
-        "lookahead": 0.5,
-        "apf_influence": 3.0,
-        "apf_wall_margin": 1.0,
-        "apf_wall_gain": 2.0,
-        "apf_vortex_gain": 1.0
+      "mode": "policy",
+      "artifact_dir": "artifacts/thesis_F10_nofix_s0/evader",
+      "switch": {
+        "artifact_dir": "artifacts/thesis_F8b_roncero_s0/evader",
+        "after_s": 3.0
       }
     },
     "arena": {
       "origin": [
         0.0,
-        0.0,
+        1.0,
         0.0
       ],
       "scripted_margin": 0.3
     },
     "episode": {
       "stop_on_capture": true,
-      "capture_radius": 0.1,
+      "capture_radius": 0.11,
       "stop_on_evader_exit": true,
       "stop_on_timeout": true,
       "state_timeout": 0.5,
@@ -104,6 +99,8 @@
       "pursuer_geofence_margin": 0.1,
       "stop_lookahead_s": 0.3,
       "min_separation": 0.0,
+      "mocap_timeout": 1.0,
+      "mocap_land_after": 1.0,
       "inject": {
         "kind": "none",
         "at_s": 5.0
@@ -111,20 +108,22 @@
     }
   },
   "checkpoints": {
-    "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F14_rls_s200/pursuer": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt"
+    "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F14_rls_s200/pursuer": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt",
+    "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F10_nofix_s0/evader": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F10-nofix-s0/checkpoints/evader_stage11.pt",
+    "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F8b_roncero_s0/evader": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage25.pt"
   },
-  "capture_radius": 0.1,
+  "capture_radius": 0.11,
   "control_dt": 0.02,
   "arena_origin": [
     0.0,
-    0.0,
+    1.0,
     0.0
   ],
   "pursuer": "thesis_F14_rls_s200-pursuer",
-  "evader": "scripted-apf",
-  "start_wall_time": 1795587885.799913,
-  "outcome": "safety_stop",
-  "outcome_detail": "HOLD: pursuer: mocap stale 0.20 s",
-  "rows": 66,
-  "end_wall_time": 1795587901.134044
+  "evader": "thesis_F10_nofix_s0-evader-to-thesis_F8b_roncero_s0-evader@3s",
+  "start_wall_time": 1795690236.9976358,
+  "outcome": "evader_crash",
+  "outcome_detail": "EMERGENCY: evader: body rate 914 deg/s",
+  "rows": 201,
+  "end_wall_time": 1795690243.579338
 }

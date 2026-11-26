@@ -21,7 +21,7 @@ F8B = 'artifacts/thesis_F8b_roncero_s0/evader'              # AMSPBH (Roncero ru
 
 
 def policy(artifact, switch_to=None):
-    switch = f'{{artifact_dir: {switch_to}, after_s: 1.0}}' if switch_to else 'null'
+    switch = f'{{artifact_dir: {switch_to}, after_s: 3.0}}' if switch_to else 'null'
     return f"""opponent:
   mode: policy
   artifact_dir: {artifact}
@@ -44,8 +44,8 @@ APF = """opponent:
 
 CONDITIONS = [
     # id, file name, description, opponent block
-    ('S1', 'S1_switch_f8b_to_f10', 'switching evader: F8b s0 -> F10 after 1 s', policy(F8B, F10)),
-    ('S2', 'S2_switch_f10_to_f8b', 'switching evader: F10 -> F8b s0 after 1 s', policy(F10, F8B)),
+    ('S1', 'S1_switch_f8b_to_f10', 'switching evader: F8b s0 -> F10 after 3 s', policy(F8B, F10)),
+    ('S2', 'S2_switch_f10_to_f8b', 'switching evader: F10 -> F8b s0 after 3 s', policy(F10, F8B)),
     ('O25', 'O25_own_stage25', 'own campaign evader, stage 25 (final)', policy(F22_S25)),
     ('O23', 'O23_own_stage23', 'own campaign evader, stage 23', policy(F22_S23)),
     ('A', 'A_amspbh_f8b', 'AMSPBH evader: F8b seed 0, final (stage 25)', policy(F8B)),

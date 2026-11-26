@@ -1,13 +1,16 @@
 {
-  "config_path": "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/real_demo/O23_own_stage23.yaml",
+  "config_path": "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/real_demo/S1_switch_f8b_to_f10.yaml",
   "config": {
     "policy": {
       "artifact_dir": "artifacts/thesis_F14_rls_s200/pursuer"
     },
     "opponent": {
       "mode": "policy",
-      "artifact_dir": "artifacts/thesis_F14_rls_s200/evader_stage23",
-      "switch": null
+      "artifact_dir": "artifacts/thesis_F8b_roncero_s0/evader",
+      "switch": {
+        "artifact_dir": "artifacts/thesis_F10_nofix_s0/evader",
+        "after_s": 1.0
+      }
     },
     "arena": {
       "origin": [
@@ -19,7 +22,7 @@
     },
     "episode": {
       "stop_on_capture": true,
-      "capture_radius": 0.1,
+      "capture_radius": 0.11,
       "stop_on_evader_exit": true,
       "stop_on_timeout": true,
       "state_timeout": 0.5,
@@ -96,6 +99,7 @@
       "pursuer_geofence_margin": 0.1,
       "stop_lookahead_s": 0.3,
       "min_separation": 0.0,
+      "mocap_timeout": 1.0,
       "inject": {
         "kind": "none",
         "at_s": 5.0
@@ -104,9 +108,10 @@
   },
   "checkpoints": {
     "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F14_rls_s200/pursuer": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt",
-    "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F14_rls_s200/evader_stage23": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/evader_stage23.pt"
+    "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F8b_roncero_s0/evader": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F8b-roncero-s0/checkpoints/evader_stage25.pt",
+    "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F10_nofix_s0/evader": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F10-nofix-s0/checkpoints/evader_stage11.pt"
   },
-  "capture_radius": 0.1,
+  "capture_radius": 0.11,
   "control_dt": 0.02,
   "arena_origin": [
     0.0,
@@ -114,10 +119,10 @@
     0.0
   ],
   "pursuer": "thesis_F14_rls_s200-pursuer",
-  "evader": "thesis_F14_rls_s200-evader_stage23",
-  "start_wall_time": 1795607920.6956522,
+  "evader": "thesis_F8b_roncero_s0-evader-to-thesis_F10_nofix_s0-evader@1s",
+  "start_wall_time": 1795677124.3273654,
   "outcome": "pursuer_crash",
-  "outcome_detail": "EMERGENCY: pursuer: tilt 66 deg | EMERGENCY: pursuer: body rate 768 deg/s",
-  "rows": 17,
-  "end_wall_time": 1795607932.0606925
+  "outcome_detail": "EMERGENCY: pursuer: tilt 62 deg",
+  "rows": 38,
+  "end_wall_time": 1795677133.9234612
 }

@@ -92,4 +92,6 @@ safety:
   pursuer_geofence_margin: 0.1  # m, same limit: the pursuer climbs toward the ceiling in most CrazySim runs
   stop_lookahead_s: 0.3         # predicted position outside the fence -> HOLD
   min_separation: 0.0           # m; 0 = off, the capture stop at 0.10 m ends the run
+  mocap_timeout: 1.0            # s without an accepted mocap frame for a drone -> HOLD
+  mocap_land_after: 1.0         # s after the last accepted mocap frame for a drone -> LAND
   inject: {kind: none, at_s: 5.0}

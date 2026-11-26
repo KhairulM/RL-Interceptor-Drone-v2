@@ -1,21 +1,13 @@
 {
-  "config_path": "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/real_demo/P_apf.yaml",
+  "config_path": "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/real_demo/O23_own_stage23.yaml",
   "config": {
     "policy": {
       "artifact_dir": "artifacts/thesis_F14_rls_s200/pursuer"
     },
     "opponent": {
-      "mode": "scripted",
-      "scripted": {
-        "type": "apf",
-        "virtual": false,
-        "speed": 2.0,
-        "lookahead": 0.5,
-        "apf_influence": 3.0,
-        "apf_wall_margin": 1.0,
-        "apf_wall_gain": 2.0,
-        "apf_vortex_gain": 1.0
-      }
+      "mode": "policy",
+      "artifact_dir": "artifacts/thesis_F22_z2/evader_stage23",
+      "switch": null
     },
     "arena": {
       "origin": [
@@ -27,7 +19,7 @@
     },
     "episode": {
       "stop_on_capture": true,
-      "capture_radius": 0.1,
+      "capture_radius": 0.11,
       "stop_on_evader_exit": true,
       "stop_on_timeout": true,
       "state_timeout": 0.5,
@@ -111,9 +103,10 @@
     }
   },
   "checkpoints": {
-    "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F14_rls_s200/pursuer": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt"
+    "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F14_rls_s200/pursuer": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt",
+    "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F22_z2/evader_stage23": "../selfplay/outputs/thesis-F22-v2d-acc-rls-z2-s0/checkpoints/evader_stage23.pt"
   },
-  "capture_radius": 0.1,
+  "capture_radius": 0.11,
   "control_dt": 0.02,
   "arena_origin": [
     0.0,
@@ -121,10 +114,10 @@
     0.0
   ],
   "pursuer": "thesis_F14_rls_s200-pursuer",
-  "evader": "scripted-apf",
-  "start_wall_time": 1795606948.078876,
-  "outcome": "evader_crash",
-  "outcome_detail": "EMERGENCY: evader: body rate 1137 deg/s",
-  "rows": 164,
-  "end_wall_time": 1795606961.433527
+  "evader": "thesis_F22_z2-evader_stage23",
+  "start_wall_time": 1795673559.2186916,
+  "outcome": "safety_stop",
+  "outcome_detail": "HOLD: pursuer: mocap stale 0.20 s",
+  "rows": 267,
+  "end_wall_time": 1795673577.098849
 }

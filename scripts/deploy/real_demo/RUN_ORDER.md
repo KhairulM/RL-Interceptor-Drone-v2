@@ -6,24 +6,24 @@ Fly in this order. If a flight is invalid (e.g. `pursuer_oob`), note it and fly 
 
 | # | block | condition | config | done / outcome |
 |---|---|---|---|---|
-| 1 | 1 | S2: switching evader: F10 -> F8b s0 after 1 s | `real_demo/S2_switch_f10_to_f8b.yaml` | |
+| 1 | 1 | S2: switching evader: F10 -> F8b s0 after 3 s | `real_demo/S2_switch_f10_to_f8b.yaml` | |
 | 2 | 1 | P: scripted APF evader | `real_demo/P_apf.yaml` | |
 | 3 | 1 | A: AMSPBH evader: F8b seed 0, final (stage 25) | `real_demo/A_amspbh_f8b.yaml` | |
 | 4 | 1 | O23: own campaign evader, stage 23 | `real_demo/O23_own_stage23.yaml` | |
 | 5 | 1 | O25: own campaign evader, stage 25 (final) | `real_demo/O25_own_stage25.yaml` | |
-| 6 | 1 | S1: switching evader: F8b s0 -> F10 after 1 s | `real_demo/S1_switch_f8b_to_f10.yaml` | |
+| 6 | 1 | S1: switching evader: F8b s0 -> F10 after 3 s | `real_demo/S1_switch_f8b_to_f10.yaml` | |
 | 7 | 2 | O25: own campaign evader, stage 25 (final) | `real_demo/O25_own_stage25.yaml` | |
-| 8 | 2 | S2: switching evader: F10 -> F8b s0 after 1 s | `real_demo/S2_switch_f10_to_f8b.yaml` | |
+| 8 | 2 | S2: switching evader: F10 -> F8b s0 after 3 s | `real_demo/S2_switch_f10_to_f8b.yaml` | |
 | 9 | 2 | P: scripted APF evader | `real_demo/P_apf.yaml` | |
 | 10 | 2 | O23: own campaign evader, stage 23 | `real_demo/O23_own_stage23.yaml` | |
 | 11 | 2 | A: AMSPBH evader: F8b seed 0, final (stage 25) | `real_demo/A_amspbh_f8b.yaml` | |
-| 12 | 2 | S1: switching evader: F8b s0 -> F10 after 1 s | `real_demo/S1_switch_f8b_to_f10.yaml` | |
+| 12 | 2 | S1: switching evader: F8b s0 -> F10 after 3 s | `real_demo/S1_switch_f8b_to_f10.yaml` | |
 | 13 | 3 | A: AMSPBH evader: F8b seed 0, final (stage 25) | `real_demo/A_amspbh_f8b.yaml` | |
-| 14 | 3 | S2: switching evader: F10 -> F8b s0 after 1 s | `real_demo/S2_switch_f10_to_f8b.yaml` | |
+| 14 | 3 | S2: switching evader: F10 -> F8b s0 after 3 s | `real_demo/S2_switch_f10_to_f8b.yaml` | |
 | 15 | 3 | P: scripted APF evader | `real_demo/P_apf.yaml` | |
 | 16 | 3 | O23: own campaign evader, stage 23 | `real_demo/O23_own_stage23.yaml` | |
 | 17 | 3 | O25: own campaign evader, stage 25 (final) | `real_demo/O25_own_stage25.yaml` | |
-| 18 | 3 | S1: switching evader: F8b s0 -> F10 after 1 s | `real_demo/S1_switch_f8b_to_f10.yaml` | |
+| 18 | 3 | S1: switching evader: F8b s0 -> F10 after 3 s | `real_demo/S1_switch_f8b_to_f10.yaml` | |
 
 Replacements:
 

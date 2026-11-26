@@ -1,33 +1,25 @@
 {
-  "config_path": "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/real_demo/P_apf.yaml",
+  "config_path": "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/real_demo/O25_own_stage25.yaml",
   "config": {
     "policy": {
       "artifact_dir": "artifacts/thesis_F14_rls_s200/pursuer"
     },
     "opponent": {
-      "mode": "scripted",
-      "scripted": {
-        "type": "apf",
-        "virtual": false,
-        "speed": 2.0,
-        "lookahead": 0.5,
-        "apf_influence": 3.0,
-        "apf_wall_margin": 1.0,
-        "apf_wall_gain": 2.0,
-        "apf_vortex_gain": 1.0
-      }
+      "mode": "policy",
+      "artifact_dir": "artifacts/thesis_F22_z2/evader",
+      "switch": null
     },
     "arena": {
       "origin": [
         0.0,
-        0.0,
+        1.0,
         0.0
       ],
       "scripted_margin": 0.3
     },
     "episode": {
       "stop_on_capture": true,
-      "capture_radius": 0.1,
+      "capture_radius": 0.11,
       "stop_on_evader_exit": true,
       "stop_on_timeout": true,
       "state_timeout": 0.5,
@@ -104,6 +96,7 @@
       "pursuer_geofence_margin": 0.1,
       "stop_lookahead_s": 0.3,
       "min_separation": 0.0,
+      "mocap_timeout": 0.5,
       "inject": {
         "kind": "none",
         "at_s": 5.0
@@ -111,20 +104,21 @@
     }
   },
   "checkpoints": {
-    "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F14_rls_s200/pursuer": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt"
+    "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F14_rls_s200/pursuer": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F14-v2d-acc-rls-26-s200/checkpoints/pursuer_stage24.pt",
+    "/home/user/Khairul/RL-Interceptor-Drone-v2/scripts/deploy/artifacts/thesis_F22_z2/evader": "scripts/selfplay/outputs/thesis-F22-v2d-acc-rls-z2-s0/checkpoints/evader_stage25.pt"
   },
-  "capture_radius": 0.1,
+  "capture_radius": 0.11,
   "control_dt": 0.02,
   "arena_origin": [
     0.0,
-    0.0,
+    1.0,
     0.0
   ],
   "pursuer": "thesis_F14_rls_s200-pursuer",
-  "evader": "scripted-apf",
-  "start_wall_time": 1795587655.912679,
+  "evader": "thesis_F22_z2-evader",
+  "start_wall_time": 1795676178.865149,
   "outcome": "safety_stop",
-  "outcome_detail": "HOLD: pursuer: mocap stale 0.21 s",
-  "rows": 54,
-  "end_wall_time": 1795587668.8300836
+  "outcome_detail": "LAND: pursuer: mocap stale 0.52 s",
+  "rows": 211,
+  "end_wall_time": 1795676195.588571
 }
