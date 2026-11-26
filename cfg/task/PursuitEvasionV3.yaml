@@ -1,0 +1,20 @@
+defaults:
+  - PursuitEvasion
+  - _self_
+
+# Thesis v3: v2d's thesis rewards and plain-difference shaping, with arena
+# violations by either drone and the time limit treated as truncations.
+env:
+  max_episode_length: 750 # 15 s at 50 Hz (sim.dt=0.01 s, 2 substeps)
+
+arena:
+  z_max: 2.2
+
+shaping_gamma: null
+reward_bounds_weight: 1.0
+pursuer_bounds_penalty: true
+
+ablation:
+  truncate_failures: true
+  no_timeout: true
+  truncate_pursuer_oob: true

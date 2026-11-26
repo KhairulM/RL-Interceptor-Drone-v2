@@ -136,6 +136,7 @@ class PursuitEvasion(IsaacEnv):
         self.reward_terminal_weight = float(task_cfg.get(
             "reward_terminal_weight", task_cfg.get("reward_capture_weight", 100.0)))
         self.reward_bounds_weight = float(task_cfg.get("reward_bounds_weight", 1.0))
+        self.pursuer_bounds_penalty = bool(task_cfg.get("pursuer_bounds_penalty", False))
         # Pursuer-only floor penalty: the evader's floor term (same ramp over bounds_margin), no walls or ceiling.
         # 0 = off (default), so runs without it are unchanged.
         self.reward_floor_weight = float(task_cfg.get("reward_floor_weight", 0.0))
@@ -158,6 +159,7 @@ class PursuitEvasion(IsaacEnv):
         self.abl_no_timeout_evader = bool(abl.get("no_timeout_evader", False))   # thesis v2d: evader bonus only
         self.abl_closing_discount = bool(abl.get("closing_discount", False))
         self.abl_truncate_failures = bool(abl.get("truncate_failures", False))
+        self.abl_truncate_pursuer_oob = bool(abl.get("truncate_pursuer_oob", False))
         # Dense per-step distance penalty (pursuer only; matches Intercept's
         # _reward_distance_to_evader = reward_distance_weight * distance). With a
         # negative weight it penalizes being far from the evader. Disabled by
@@ -683,6 +685,15 @@ class PursuitEvasion(IsaacEnv):
             # exact per-episode sums (thesis F11 pilot): pursuer approach + precision, and the regularisation penalties
             "sum_shaping": UnboundedContinuous(torch.Size([1]), device=self.device),
             "sum_regularisation": UnboundedContinuous(torch.Size([1]), device=self.device),
+            "sum_reward_approach": UnboundedContinuous(torch.Size([1]), device=self.device),
+            "sum_reward_precision": UnboundedContinuous(torch.Size([1]), device=self.device),
+            "sum_reward_distance": UnboundedContinuous(torch.Size([1]), device=self.device),
+            "sum_reward_survival": UnboundedContinuous(torch.Size([1]), device=self.device),
+            "sum_reward_boundary": UnboundedContinuous(torch.Size([1]), device=self.device),
+            "sum_reward_body_rate": UnboundedContinuous(torch.Size([1]), device=self.device),
+            "sum_reward_action_smoothness": UnboundedContinuous(torch.Size([1]), device=self.device),
+            "sum_reward_cmd_rate": UnboundedContinuous(torch.Size([1]), device=self.device),
+            "sum_reward_terminal": UnboundedContinuous(torch.Size([1]), device=self.device),
             "episode_len": UnboundedContinuous(torch.Size([1]), device=self.device),
             "distance": UnboundedContinuous(torch.Size([1]), device=self.device),
             "min_distance": UnboundedContinuous(torch.Size([1]), device=self.device),
@@ -1347,14 +1358,19 @@ class PursuitEvasion(IsaacEnv):
             self.stats["reward_terminal"][:] = self._terminal_reward
             self.stats["timeout"][:] = torch.maximum(self.stats["timeout"], self._timeout.float())
             return self._finish_state(obs, state)
-        # Only the evader is confined to the arena; the pursuer may leave freely.
+        # Only the evader is confined to the arena by default; v3 also ends on pursuer OOB.
         evader_oob = self._agent_oob if self.role == EVADER else self._opp_oob
+        pursuer_oob = self._agent_oob if self.role == PURSUER else self._opp_oob
         self._terminated = (
             self._captured | self._agent_crash | self._opp_crash | evader_oob)
+        if self.abl_truncate_pursuer_oob:
+            self._terminated |= pursuer_oob
         self._timeout = self._truncated & ~self._terminated
         if self.role == PURSUER:
             win = self._captured                      # only an actual capture wins
             loss = self._agent_crash | self._timeout  # crashed, or ran out of time
+            if self.abl_truncate_pursuer_oob:
+                loss = loss | self._agent_oob
         else:
             win = self._timeout                       # survived the full episode
             loss = self._captured | self._agent_crash | self._agent_oob
@@ -1364,7 +1380,7 @@ class PursuitEvasion(IsaacEnv):
         self._terminal_reward = self.reward_terminal_weight * (
             self._win.float() - self._loss.float())
         if (self.abl_no_timeout or self.abl_closing_discount or self.abl_truncate_failures
-                or self.abl_no_timeout_evader):
+                or self.abl_no_timeout_evader or self.abl_truncate_pursuer_oob):
             pursuer = self.role == PURSUER
             pd, ed = (self.agent_drone, self.opp_drone) if pursuer else (self.opp_drone, self.agent_drone)
             v_close = roncero_reward.closing_speed(pd.pos[:, 0], pd.vel_w[:, 0, :3], ed.pos[:, 0], ed.vel_w[:, 0, :3])
@@ -1373,7 +1389,7 @@ class PursuitEvasion(IsaacEnv):
                 self._terminal_reward, self._terminated, self._truncated, self._timeout, self._captured, beta,
                 self.reward_terminal_weight, pursuer, self.abl_no_timeout, self.abl_closing_discount,
                 self.abl_truncate_failures,
-                self.abl_no_timeout_evader)
+                self.abl_no_timeout_evader, self.abl_truncate_pursuer_oob, pursuer_oob)
         self.stats["reward_terminal"][:] = self._terminal_reward
         self.stats["timeout"][:] = torch.maximum(
             self.stats["timeout"], self._timeout.float())
@@ -1436,11 +1452,14 @@ class PursuitEvasion(IsaacEnv):
         # Dense inward push so the boundary is learned before it is hit.
         if self.role == EVADER:
             bounds_pen = self.reward_bounds_weight * self._bounds_proximity(agent_pos)
+        elif self.pursuer_bounds_penalty:
+            bounds_pen = self.reward_bounds_weight * self._bounds_proximity(agent_pos)
         elif self.reward_floor_weight > 0:
             bounds_pen = self.reward_floor_weight * self._floor_proximity(agent_pos)
         else:
             bounds_pen = torch.zeros(self.num_envs, 1, device=self.device)
 
+        zero = torch.zeros_like(body_rate_pen)
         if self.reward_mode == "roncero":
             pursuer = self.role == PURSUER
             pd, ed = (self.agent_drone, self.opp_drone) if pursuer else (self.opp_drone, self.agent_drone)
@@ -1479,6 +1498,16 @@ class PursuitEvasion(IsaacEnv):
             reward_distance = self._reward_distance(distance)
         else:
             reward_distance = torch.zeros(self.num_envs, 1, device=self.device)
+
+        self.stats["sum_reward_approach"] += approach_shaping if self.role == PURSUER else zero
+        self.stats["sum_reward_precision"] += precision if self.role == PURSUER else zero
+        self.stats["sum_reward_distance"] += reward_distance
+        self.stats["sum_reward_survival"] += self.reward_step if self.role == EVADER else zero
+        self.stats["sum_reward_boundary"] -= bounds_pen
+        self.stats["sum_reward_body_rate"] -= body_rate_pen
+        self.stats["sum_reward_action_smoothness"] -= smoothness_pen
+        self.stats["sum_reward_cmd_rate"] -= cmd_rate_pen
+        self.stats["sum_reward_terminal"] += self._terminal_reward
 
         if self.role == PURSUER:
             approach = approach_shaping

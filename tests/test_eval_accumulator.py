@@ -57,6 +57,23 @@ class EvalAccumulatorTests(unittest.TestCase):
         self.assertAlmostEqual(means[1], 3.5)
         self.assertAlmostEqual(ep["feat_std"][0, 0].item(), 0.5, places=5)
 
+    def test_reward_component_sums_are_preserved_per_episode(self):
+        stats = _stats(1, episode_len=[2.0], capture=[1.0], sum_reward_approach=[3.0],
+                       sum_reward_terminal=[100.0])
+        acc = ea.EpisodeAccumulator(1, 1, "cpu")
+        acc.step(0, torch.tensor([True]), stats)
+        episodes = acc.episodes()
+        self.assertAlmostEqual(episodes["sum_reward_approach"].item(), 3.0)
+        self.assertAlmostEqual(episodes["sum_reward_terminal"].item(), 100.0)
+        result = ea.summarize_matchups(
+            {**episodes, "min_distance": torch.zeros(1), "motor_effort": torch.zeros(1),
+             "feat_mean": torch.zeros(1, NF), "feat_std": torch.zeros(1, NF)},
+            {"opp": torch.tensor([0])}, "pursuer", step_dt=0.02, max_episode_steps=100)["opp"]
+        self.assertEqual(result["reward_components"]["approach"], 3.0)
+        self.assertEqual(result["reward_components"]["terminal"], 100.0)
+        self.assertEqual(result["reward_components_by_capture"]["captured"]["approach"], 3.0)
+        self.assertEqual(result["outcome_counts"]["capture"], 1)
+
     def test_summarize_neutralisation_censoring_and_roles(self):
         episodes = {
             "env": torch.tensor([0, 0, 1, 1]),

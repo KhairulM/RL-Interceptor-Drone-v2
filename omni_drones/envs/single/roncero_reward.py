@@ -51,18 +51,26 @@ def rate_jerk(rate, prev):
 
 
 def ablate(terminal, terminated, truncated, timeout, captured, beta, w_terminal, pursuer,
-           no_timeout=False, closing_discount=False, truncate_failures=False, no_timeout_evader=False):
+           no_timeout=False, closing_discount=False, truncate_failures=False, no_timeout_evader=False,
+           truncate_pursuer_oob=False, pursuer_oob=None):
     """Thesis F9: one Roncero component at a time on top of the thesis rules. Inputs are the thesis outcome
     (terminal reward [N, 1], terminated / truncated / timeout / captured [N, 1] bool, beta [N, 1] from Eq. (10)).
     no_timeout: the timeout gives 0 to both roles (thesis: pursuer -W, evader +W).
     no_timeout_evader (thesis v2d, 2026-11-12): only the evader's timeout bonus becomes 0 (the pursuer keeps -W).
     closing_discount: the pursuer's capture reward is W * beta (thesis: W).
+    truncate_pursuer_oob: pursuer leaving the arena ends the episode as a truncation.
     truncate_failures: every terminal ending except capture (crash, evader leaving) becomes a truncation (value
     bootstrapped); its rewards are unchanged. Returns (terminal, terminated, truncated)."""
     if no_timeout or (no_timeout_evader and not pursuer):
         terminal = torch.where(timeout, torch.zeros_like(terminal), terminal)
     if closing_discount and pursuer:
         terminal = torch.where(captured, w_terminal * beta, terminal)
+    if truncate_pursuer_oob:
+        if pursuer_oob is None:
+            raise ValueError("pursuer_oob is required when truncate_pursuer_oob is enabled")
+        pursuer_oob = pursuer_oob & ~captured
+        truncated = truncated | pursuer_oob
+        terminated = terminated & ~pursuer_oob
     if truncate_failures:
         fail = terminated & ~captured
         truncated = truncated | fail

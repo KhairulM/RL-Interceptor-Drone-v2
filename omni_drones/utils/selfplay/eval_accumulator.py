@@ -32,6 +32,8 @@ BEHAVIOUR_FEATURES = (
 EPISODE_STATS = (
     "capture", "crash", "opp_crash", "out_of_bounds", "opp_out_of_bounds", "timeout",
     "episode_len", "min_distance", "motor_effort",
+    "sum_reward_approach", "sum_reward_precision", "sum_reward_distance", "sum_reward_survival", "sum_reward_boundary",
+    "sum_reward_body_rate", "sum_reward_action_smoothness", "sum_reward_cmd_rate", "sum_reward_terminal",
     "payoff_return_pursuer", "payoff_return_evader",     # thesis F16 (task.payoff_returns), copied when present
 )
 
@@ -170,7 +172,23 @@ def summarize_matchups(episodes: Dict[str, torch.Tensor], assignment: Dict[str, 
             "pursuer_crash_rate": float(flag["pursuer_crash"].float().mean()),
             "outcomes": {"capture": float(cap.float().mean()),
                          **{k: float(f.float().mean()) for k, f in flag.items()}},
+            "outcome_counts": {"capture": int(cap.sum().item()),
+                               **{k: int(f.sum().item()) for k, f in flag.items()}},
         }
+        reward_components = [key for key in EPISODE_STATS if key.startswith("sum_reward_") and key in episodes]
+        if reward_components:
+            record["reward_components"] = {
+                key.removeprefix("sum_reward_"): float(episodes[key][sel].mean())
+                for key in reward_components
+            }
+            record["reward_components_by_capture"] = {
+                label: {
+                    key.removeprefix("sum_reward_"): float(episodes[key][sel][group].mean())
+                    for key in reward_components
+                }
+                for label, group in (("captured", cap), ("not_captured", ~cap))
+                if bool(group.any())
+            }
         if "payoff_return_pursuer" in episodes:      # thesis F16: both roles' discounted Roncero returns
             rp, re = episodes["payoff_return_pursuer"][sel].double(), episodes["payoff_return_evader"][sel].double()
             record["payoff"] = {"n": n, "mean_pursuer": float(rp.mean()), "std_pursuer": float(rp.std(unbiased=False)),

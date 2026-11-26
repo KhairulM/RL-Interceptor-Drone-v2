@@ -133,15 +133,15 @@ def run_stage(args: List[str], log: str, retries: int = 2) -> int:
     return rc
 
 
-def common_overrides(role: str, num_envs: int, seed: int) -> List[str]:
-    return ["task=PursuitEvasion", f"task.role={role}", f"task.env.num_envs={num_envs}", "headless=true",
+def common_overrides(role: str, num_envs: int, seed: int, task_config: str = "PursuitEvasion") -> List[str]:
+    return [f"task={task_config}", f"task.role={role}", f"task.env.num_envs={num_envs}", "headless=true",
             f"seed={seed}", "wandb.mode=disabled"]
 
 
 def evaluate(out_json: str, opponents: List[dict], role: str = "pursuer", policy_ckpt: Optional[str] = None,
              heuristic_agent: Optional[str] = None, num_envs: int = 4096, seed: int = 0,
              cutoff: int = EVAL_CUTOFF, extra: Optional[List[str]] = None, save_episodes: bool = True,
-             switch: Optional[dict] = None) -> Optional[dict]:
+             switch: Optional[dict] = None, task_config: str = "PursuitEvasion") -> Optional[dict]:
     """Evaluate one agent (checkpoint or heuristic) against ``opponents`` (envs split uniformly).
 
     Returns None if the eval failed or another lane is running it (lock).
@@ -155,20 +155,20 @@ def evaluate(out_json: str, opponents: List[dict], role: str = "pursuer", policy
         return None
     try:
         return _evaluate(out_json, opponents, role, policy_ckpt, heuristic_agent, num_envs, seed, cutoff, extra,
-                         save_episodes, switch)
+                         save_episodes, switch, task_config)
     finally:
         if os.path.isfile(lock):
             os.remove(lock)
 
 
 def _evaluate(out_json, opponents, role, policy_ckpt, heuristic_agent, num_envs, seed, cutoff, extra, save_episodes,
-              switch):
+              switch, task_config):
     if os.path.isfile(out_json):
         with open(out_json) as f:
             return json.load(f)
     base = os.path.splitext(out_json)[0]
     spec = write_spec(base + "_opp.json", opponents, switch=switch)
-    args = common_overrides(role, num_envs, seed) + [
+    args = common_overrides(role, num_envs, seed, task_config) + [
         "mode=eval", f"opponent_spec_path={spec}", f"stage_out={out_json}", f"eval_cutoff_steps={cutoff}"]
     if save_episodes:
         args.append(f"eval_episodes_out={base}_episodes.pt")
@@ -229,7 +229,7 @@ def gae_pin(overrides: List[str]) -> List[str]:
 
 def train(ckpt: str, opponents: List[dict], frames: int, role: str = "pursuer", probs: Optional[Dict[str, float]] = None,
           init_policy: Optional[str] = None, num_envs: int = 4096, seed: int = 0,
-          extra: Optional[List[str]] = None) -> Optional[str]:
+          extra: Optional[List[str]] = None, task_config: str = "PursuitEvasion") -> Optional[str]:
     """Train ``role`` with PPO against a fixed opponent pool; returns the checkpoint path.
 
     Returns None if the run failed or another lane holds its lock (it is training it now).
@@ -241,18 +241,18 @@ def train(ckpt: str, opponents: List[dict], frames: int, role: str = "pursuer", 
         log_progress(f"[skip: run locked by another lane] {ckpt}")
         return None
     try:
-        return _train(ckpt, opponents, frames, role, probs, init_policy, num_envs, seed, extra)
+        return _train(ckpt, opponents, frames, role, probs, init_policy, num_envs, seed, extra, task_config)
     finally:
         if os.path.isfile(lock):
             os.remove(lock)
 
 
-def _train(ckpt, opponents, frames, role, probs, init_policy, num_envs, seed, extra):
+def _train(ckpt, opponents, frames, role, probs, init_policy, num_envs, seed, extra, task_config):
     if os.path.isfile(ckpt):
         return ckpt
     base = os.path.splitext(ckpt)[0]
     spec = write_spec(base + "_opp.json", opponents, probs)
-    args = common_overrides(role, num_envs, seed) + [
+    args = common_overrides(role, num_envs, seed, task_config) + [
         "mode=train", f"total_frames={frames}", f"opponent_spec_path={spec}", f"stage_ckpt={ckpt}",
         f"stage_out={base}_out.json"]
     if init_policy:

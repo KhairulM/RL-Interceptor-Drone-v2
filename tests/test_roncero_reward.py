@@ -97,6 +97,26 @@ class AblationTest(unittest.TestCase):
         self.assertEqual(te2.flatten().tolist(), [True, False, False, False])
         self.assertEqual(tr2.flatten().tolist(), [False, True, True, True])
 
+    def test_v3_pursuer_oob_is_a_truncation_with_failure_reward(self):
+        terminal = F(-100.0, 100.0, -100.0)
+        terminated = B(1, 1, 0)
+        truncated = B(0, 0, 1)
+        timeout = B(0, 0, 0)
+        captured = B(0, 1, 0)
+        pursuer_oob = B(1, 0, 0)
+        t2, te2, tr2 = rr.ablate(
+            terminal, terminated, truncated, timeout, captured, F(1, 1, 1), 100.0, True,
+            no_timeout=True, truncate_failures=True, truncate_pursuer_oob=True,
+            pursuer_oob=pursuer_oob)
+        self.assertEqual(t2.flatten().tolist(), [-100.0, 100.0, -100.0])
+        self.assertEqual(te2.flatten().tolist(), [False, True, False])
+        self.assertEqual(tr2.flatten().tolist(), [True, False, True])
+
+    def test_v3_pursuer_oob_requires_event_mask(self):
+        with self.assertRaisesRegex(ValueError, "pursuer_oob is required"):
+            rr.ablate(F(-100.0), B(1), B(0), B(0), B(0), F(1), 100.0, True,
+                      truncate_pursuer_oob=True)
+
 
 class GaeTruncationTest(unittest.TestCase):
 
