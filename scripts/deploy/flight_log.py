@@ -5,7 +5,8 @@ Rows stream to ``<stem>.csv.partial`` during the flight, so a crash of the contr
 writes ``<stem>.csv`` with the outcome filled into every row and removes the partial file.
 
 Frames and sources: positions are the drones' state estimates in the mocap world frame (arena centre = config
-arena.origin); velocities are the estimators' world-frame velocities (stateEstimate.v*).
+arena.origin); velocities are the estimators' world-frame velocities (stateEstimate.v*); attitudes are the estimators'
+roll, pitch, yaw in degrees (stateEstimate.q*, ZYX Euler angles, world frame), the attitude the policies see.
 """
 from __future__ import annotations
 
@@ -24,8 +25,10 @@ OUTCOMES = ('capture', 'evader_crash', 'evader_oob', 'pursuer_crash', 'pursuer_o
 COLUMNS = (
     'wall_time', 't', 'outcome',
     'pursuer_x', 'pursuer_y', 'pursuer_z', 'pursuer_vx', 'pursuer_vy', 'pursuer_vz', 'pursuer_speed',
+    'pursuer_roll', 'pursuer_pitch', 'pursuer_yaw',
     'approach_velocity', 'distance',
     'evader_x', 'evader_y', 'evader_z', 'evader_vx', 'evader_vy', 'evader_vz', 'evader_speed',
+    'evader_roll', 'evader_pitch', 'evader_yaw',
     'evader_policy',
 )
 
@@ -35,6 +38,15 @@ def approach_velocity(p_pursuer, v_pursuer, p_evader, v_evader) -> float:
     los = np.asarray(p_evader, float) - np.asarray(p_pursuer, float)
     u = los / max(float(np.linalg.norm(los)), 1e-6)
     return float(-np.dot(u, np.asarray(v_evader, float) - np.asarray(v_pursuer, float)))
+
+
+def euler_deg(quat_wxyz) -> 'tuple[float, float, float]':
+    """(roll, pitch, yaw) in degrees, ZYX convention, of a (w, x, y, z) quaternion."""
+    w, x, y, z = np.asarray(quat_wxyz, float)
+    roll = np.arctan2(2.0 * (w * x + y * z), 1.0 - 2.0 * (x * x + y * y))
+    pitch = np.arcsin(np.clip(2.0 * (w * y - z * x), -1.0, 1.0))
+    yaw = np.arctan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
+    return tuple(float(a) for a in np.degrees((roll, pitch, yaw)))
 
 
 def artifact_label(artifact_dir: str) -> str:
@@ -82,8 +94,10 @@ class FlightLog:
         self._writer.writerow([
             f'{wall_time:.4f}', f'{wall_time - self._start:.4f}', '',
             *(f'{x:.4f}' for x in pp), *(f'{x:.4f}' for x in pv), f'{np.linalg.norm(pv):.4f}',
+            *(f'{a:.2f}' for a in euler_deg(pursuer_state.quat_wxyz)),
             f'{approach_velocity(pp, pv, ep, ev):.4f}', f'{np.linalg.norm(ep - pp):.4f}',
             *(f'{x:.4f}' for x in ep), *(f'{x:.4f}' for x in ev), f'{np.linalg.norm(ev):.4f}',
+            *(f'{a:.2f}' for a in euler_deg(evader_state.quat_wxyz)),
             evader_policy,
         ])
         self._file.flush()

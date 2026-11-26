@@ -51,7 +51,7 @@ class SafetyConfig:
     # On hardware set it to the room the lab has beyond the arena walls and below the ceiling.
     pursuer_geofence_margin: Optional[float] = 0.3
     stop_lookahead_s: float = 0.3
-    min_altitude: float = 0.10
+    min_altitude: float = 0.10          # m above arena origin; below this, motors off on the affected drone
     max_descent_speed: float = 2.5      # m/s, checked below descent_check_alt
     descent_check_alt: float = 0.6
     max_tilt_deg: float = 60.0
@@ -162,7 +162,7 @@ class SafetyMonitor:
             # the floor and flips, the tilt rule stops the motors.
             v.raise_to(Level.HOLD, f'{role}: falling {state.lin_vel[2]:.1f} m/s at {local[2]:.2f} m')
         if local[2] < c.min_altitude:
-            v.raise_to(Level.LAND, f'{role}: below min altitude ({local[2]:.2f} m)')
+            v.raise_to(Level.EMERGENCY, f'{role}: below min altitude ({local[2]:.2f} m)', role)
 
     def check(self, states: Dict[str, object], now: float, action_finite: bool = True,
               mocap: Optional[Dict[str, dict]] = None) -> Verdict:

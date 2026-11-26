@@ -26,6 +26,14 @@ logger = logging.getLogger(__name__)
 CPPM_SETPOINT_TYPE = 3
 CPPM_RATE_RP_DPS = 720.0     # cppm.rateRoll / cppm.ratePitch, set in _setup_params (persistent params)
 CPPM_RATE_YAW_DPS = 400.0    # cppm.rateYaw
+# Pre-flight: largest allowed difference between the estimator's heading and the mocap heading after the reset.
+HEADING_TOLERANCE_DEG = 10.0
+
+
+def yaw_from_quat_xyzw(q) -> float:
+    """Heading (rad, about world z) of an (x, y, z, w) quaternion."""
+    x, y, z, w = q
+    return float(np.arctan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z)))
 
 
 def cppm_rate_setpoint(roll_rate: float, pitch_rate: float, yaw_rate: float, thrust_pwm: float) -> bytes:
@@ -218,6 +226,7 @@ class CrazyflieDrone(Drone):
             self.pose_publisher.register(drone_id=self.name)
 
         self.mocap_orientation_aligned = threading.Event()
+        self.mocap_pose: Optional[ic.MocapPose] = None     # latest accepted mocap frame (set by MocapReceiver)
 
     def _relax_setpoint_priority(self, wait_s: float = 0.1) -> None:
         """Hand control back to the high-level commander after low-level setpoints."""
@@ -290,11 +299,14 @@ class CrazyflieDrone(Drone):
             logger.warning('[%s] Mocap orientation not aligned. '
                            'Position estimate may be inaccurate.', self.name)
 
+        mocap_yaw = self._reset_estimator_to_mocap()
         converged = self._is_estimator_converged(timeout=10.0)
         if not converged:
             logger.warning('[%s] Kalman filter not converged. '
                            'Position estimate may be inaccurate.', self.name)
-        self.arm_status = {'mocap_aligned': bool(aligned), 'estimator_converged': bool(converged)}
+        heading_error = self._heading_error_deg(mocap_yaw)
+        self.arm_status = {'mocap_aligned': bool(aligned), 'estimator_converged': bool(converged),
+                           'heading_error_deg': heading_error}
 
         # The first setpoint must be a zero-thrust one to unlock the commander.
         self.cf.commander.send_setpoint(0.0, 0.0, 0.0, 0)
@@ -517,6 +529,36 @@ class CrazyflieDrone(Drone):
             data['gyro.y'],
             data['gyro.z'],
         )
+
+    def _reset_estimator_to_mocap(self) -> Optional[float]:
+        """Restart the Kalman filter at the latest mocap pose, heading included; returns that heading (rad).
+
+        Only the position is streamed to the estimator (MocapReceiver), so without this its heading starts at 0, i.e.
+        wherever the drone faced at power-on, and the policy flies in a rotated frame. None without a mocap frame.
+        """
+        pose = self.mocap_pose
+        if pose is None:
+            logger.warning('[%s] No mocap pose: estimator heading not set from mocap.', self.name)
+            return None
+        (x, y, z), yaw = pose.position, yaw_from_quat_xyzw(pose.quat_xyzw)
+        for name, value in (('initialX', x), ('initialY', y), ('initialZ', z), ('initialYaw', yaw)):
+            self.cf.param.set_value(f'kalman.{name}', float(value))
+        self.cf.param.set_value('kalman.resetEstimation', 1)
+        time.sleep(0.1)
+        self.cf.param.set_value('kalman.resetEstimation', 0)
+        logger.info('[%s] Estimator reset at the mocap pose (%.2f, %.2f, %.2f) m, heading %.1f deg.',
+                    self.name, x, y, z, np.degrees(yaw))
+        return yaw
+
+    def _heading_error_deg(self, mocap_yaw: Optional[float]) -> Optional[float]:
+        """|estimator heading - mocap heading| (deg) after the reset; None if either is missing."""
+        state = self.get_state()
+        if mocap_yaw is None or state is None:
+            return None
+        w, x, y, z = state.quat_wxyz
+        err = np.degrees(abs(np.angle(np.exp(1j * (yaw_from_quat_xyzw((x, y, z, w)) - mocap_yaw)))))
+        logger.info('[%s] Estimator heading is %.1f deg off the mocap heading.', self.name, err)
+        return float(err)
 
     def _is_estimator_converged(self, threshold=0.001, timeout=10.0) -> bool:
         """Wait for the Kalman filter to converge on a position estimate."""

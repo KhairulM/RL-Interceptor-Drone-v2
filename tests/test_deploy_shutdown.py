@@ -6,6 +6,7 @@ import types
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 
@@ -91,6 +92,10 @@ def controller(fault=None):
     c.brake_decel = 2.0
     c.land_settle_timeout = 0.2
     c.safety_cfg = SafetyConfig(hold_s=0.1)
+    c.cfg = SimpleNamespace(episode=pec_ctrl.EpisodeConfig())
+    c.arena_origin = np.zeros(3)
+    c.opponent_flies = True
+    c._outcome = None
     c.mocap_receiver = c.mocap_tf_publisher = None
     return c, log
 
@@ -122,6 +127,52 @@ class ShutdownTest(unittest.TestCase):
         self.assertIn("hold", kinds)
         self.assertLess(kinds.index("hold"), kinds.index("land"))
         self.assertEqual(sorted(n for k, n, _ in log if k == "land"), ["evader", "pursuer"])
+
+    def test_below_min_altitude_stops_only_affected_drones(self):
+        for roles in (("pursuer",), ("evader",), ("pursuer", "evader")):
+            with self.subTest(roles=roles):
+                c, log = controller()
+                for d in (c.own, c.opponent):
+                    if d.name in roles:
+                        d.get_state = lambda: SimpleNamespace(pos=np.array([0.0, 0.0, 0.12]),
+                                                              lin_vel=np.array([2.0, 0.0, -1.0]))
+                c.shutdown()
+                self.assertEqual([n for k, n, _ in log if k == "estop"], list(roles))
+                for role in roles:
+                    self.assertFalse(any(k in ("vel", "hold", "goto", "land") and n == role for k, n, _ in log))
+                self.assertEqual([n for k, n, _ in log if k == "land"],
+                                 [r for r in ("pursuer", "evader") if r not in roles])
+
+    def test_episode_floor_latches_both_roles_before_shutdown(self):
+        c, log = controller()
+        states = [SimpleNamespace(pos=np.array([0.0, 0.0, 0.12]), stamp=10.0) for _ in range(2)]
+        self.assertTrue(c._episode_over(*states, 10.0))
+        self.assertEqual((c._fault.level, c._fault.emergency_roles),
+                         (Level.EMERGENCY, ["pursuer", "evader"]))
+        c.shutdown()
+        self.assertEqual([n for k, n, _ in log if k == "estop"], ["pursuer", "evader"])
+        self.assertFalse(any(k in ("goto", "land", "vel", "hold") for k, _, _ in log))
+
+    def test_shutdown_floor_uses_safety_threshold_relative_to_arena(self):
+        c, log = controller()
+        c.cfg.episode.min_altitude = 0.05
+        c.safety_cfg.min_altitude = 0.2
+        c.arena_origin[2] = 1.0
+        c.own.get_state = lambda: SimpleNamespace(pos=np.array([0.0, 0.0, 1.12]))
+        c.opponent.get_state = lambda: SimpleNamespace(pos=np.array([0.0, 0.0, 1.5]),
+                                                      quat_wxyz=np.array([1.0, 0, 0, 0]), lin_vel=np.zeros(3))
+        c.shutdown()
+        self.assertEqual([n for k, n, _ in log if k == "estop"], ["pursuer"])
+        self.assertEqual([n for k, n, _ in log if k == "land"], ["evader"])
+
+    def test_episode_floor_ignores_virtual_opponent(self):
+        c, _ = controller()
+        c.opponent_flies = False
+        c.cfg.episode.stop_on_evader_exit = c.cfg.episode.stop_on_timeout = c.cfg.episode.stop_on_capture = False
+        own = SimpleNamespace(pos=np.array([0.0, 0.0, 1.0]), stamp=10.0)
+        opponent = SimpleNamespace(pos=np.array([1.0, 0.0, 0.05]), stamp=10.0)
+        self.assertFalse(c._episode_over(own, opponent, 10.0))
+        self.assertIsNone(c._fault)
 
 
 class LandingDurationTest(unittest.TestCase):
@@ -155,6 +206,44 @@ class BrakeTest(unittest.TestCase):
         self.assertNotIn(("vel", "evader"), kinds)                    # the evader was at rest: no braking
 
 class ShutdownLandingTest(unittest.TestCase):
+
+    def test_floor_is_checked_throughout_shutdown_after_capture(self):
+        for phase in ("vel", "hold", "goto", "land"):
+            for role in ("pursuer", "evader"):
+                with self.subTest(phase=phase, role=role):
+                    fault = Verdict() if phase == "hold" else None
+                    if fault is not None:
+                        fault.raise_to(Level.HOLD, "stale")
+                    c, log = controller(fault)
+                    c._outcome = "capture"
+                    clock = [10.0]
+                    low = [False]
+                    crossed_at = []
+                    drone = c.own if role == "pursuer" else c.opponent
+
+                    def state():
+                        return SimpleNamespace(pos=np.array([0.0, 0.0, 0.05 if low[0] else 1.0]),
+                                               quat_wxyz=np.array([1.0, 0, 0, 0]),
+                                               lin_vel=np.array([2.0 if phase == "vel" else 0.0, 0, 0]))
+
+                    def sleep(duration):
+                        clock[0] += duration
+                        if any(k == phase and n == role for k, n, _ in log):
+                            low[0] = True
+                            if not crossed_at:
+                                crossed_at.append(clock[0])
+
+                    drone.get_state = state
+                    with patch.object(pec_ctrl.time, "time", side_effect=lambda: clock[0]), \
+                            patch.object(pec_ctrl.time, "sleep", side_effect=sleep):
+                        c.shutdown()
+                    stops = [i for i, (k, n, _) in enumerate(log) if k == "estop" and n == role]
+                    self.assertEqual(len(stops), 1)
+                    self.assertLessEqual(log[stops[0]][2] - crossed_at[0], c.control_dt + 1e-9)
+                    self.assertFalse(any(k in ("vel", "hold", "goto", "land") and n == role
+                                         for k, n, _ in log[stops[0] + 1:]))
+                    self.assertEqual(c._outcome, "capture")
+                    self.assertFalse(any(k == "estop" and n != role for k, n, _ in log))
 
     def test_descends_with_go_to_then_lands_from_the_hover_point(self):
         # A finished firmware landing cuts the motors wherever the drone is (planner.c), so the long descent is a
@@ -206,6 +295,46 @@ class CppmSetpointTest(unittest.TestCase):
             self.assertAlmostEqual(y, -yaw, delta=0.5)
             self.assertAlmostEqual(t, thrust, delta=40.0)                 # full range: 65535 stays 65535
 
+
+
+class EstimatorHeadingTest(unittest.TestCase):
+    """arm() starts the Kalman filter at the mocap pose and heading (only the position is streamed afterwards)."""
+
+    def drone(self, mocap_yaw_deg, estimator_yaw_deg):
+        import drone
+        d = drone.CrazyflieDrone.__new__(drone.CrazyflieDrone)
+        d.name, self.params = "pursuer", []
+        d.cf = SimpleNamespace(param=SimpleNamespace(set_value=lambda k, v: self.params.append((k, v))))
+        h = np.radians(mocap_yaw_deg) / 2
+        d.mocap_pose = SimpleNamespace(position=(0.5, -1.0, 0.02), quat_xyzw=(0.0, 0.0, np.sin(h), np.cos(h)))
+        e = np.radians(estimator_yaw_deg) / 2
+        d.get_state = lambda: SimpleNamespace(quat_wxyz=np.array([np.cos(e), 0.0, 0.0, np.sin(e)]))
+        return d
+
+    def test_reset_sets_initial_pose_then_resets(self):
+        d = self.drone(120.0, 0.0)
+        yaw = d._reset_estimator_to_mocap()
+        self.assertAlmostEqual(np.degrees(yaw), 120.0)
+        names = [k for k, _ in self.params]
+        self.assertEqual(names, ["kalman.initialX", "kalman.initialY", "kalman.initialZ", "kalman.initialYaw",
+                                 "kalman.resetEstimation", "kalman.resetEstimation"])
+        self.assertAlmostEqual(dict(self.params[:4])["kalman.initialYaw"], np.radians(120.0))   # firmware: radians
+        self.assertEqual([v for k, v in self.params[4:]], [1, 0])
+
+    def test_heading_error_wraps(self):
+        self.assertAlmostEqual(self.drone(175.0, -175.0)._heading_error_deg(np.radians(175.0)), 10.0)
+        self.assertIsNone(self.drone(0.0, 0.0)._heading_error_deg(None))
+
+    def test_preflight_refuses_a_wrong_heading(self):
+        c, log = controller()
+        c.opponent_flies = False
+        c.mocap_config = SimpleNamespace(enabled=True)
+        c.safety_cfg = SafetyConfig(enabled=False, strict_preflight=True)
+        c.cfg = SimpleNamespace(flight=SimpleNamespace(takeoff_height=1.0, takeoff_duration=0.1))
+        c.own.arm = lambda: {"mocap_aligned": True, "estimator_converged": True, "heading_error_deg": 35.0}
+        with self.assertRaisesRegex(RuntimeError, "heading"):
+            c._arm_and_takeoff()
+        self.assertNotIn("takeoff", [k for k, _, _ in log])
 
 
 class VelocitySetpointTest(unittest.TestCase):

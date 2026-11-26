@@ -47,9 +47,9 @@ import torch
 
 import flight_log
 import pursuit_evasion_common as pec
-from drone import CrazyflieDrone, ScriptedDrone, DronePosePublisher
+from drone import CrazyflieDrone, ScriptedDrone, DronePosePublisher, HEADING_TOLERANCE_DEG
 from mocap import MocapReceiver, MocapTfPublisher
-from safety import Arena, Level, MocapGate, SafetyConfig, SafetyMonitor
+from safety import Arena, Level, MocapGate, SafetyConfig, SafetyMonitor, Verdict
 
 logger = logging.getLogger(__name__)
 
@@ -236,7 +236,7 @@ class EpisodeConfig:
     # Stop after metadata.max_episode_length control steps (evader win in training).
     stop_on_timeout: bool = True
     state_timeout: float = 0.5           # s; stop if a policy-relevant state is this stale
-    min_altitude: float = 0.15           # m; stop if a real drone is lower
+    min_altitude: float = 0.15           # m; motors off if a real drone is lower
 
 
 @dataclass
@@ -800,12 +800,18 @@ class PursuitEvasionController:
                 logger.warning('[pe] %s state timed out (%.2f s); stopping.', role, now - state.stamp)
                 self._set_outcome('state_timeout', f'{role} state stale {now - state.stamp:.2f} s')
                 return True
+        below_min_altitude = False
         for role, state, monitored in ((self.role, own_state, True),
                                        (self.opponent_role, opponent_state, real_opponent)):
             if monitored and state.pos[2] < ep.min_altitude:
-                logger.warning('[pe] %s below min altitude (%.2f m); stopping.', role, state.pos[2])
+                logger.warning('[pe] %s below min altitude (%.2f m); motors off.', role, state.pos[2])
+                if self._fault is None:
+                    self._fault = Verdict()
+                self._fault.raise_to(Level.EMERGENCY, f'{role}: below min altitude ({state.pos[2]:.2f} m)', role)
                 self._set_outcome(f'{role}_crash', f'{role} below min altitude ({state.pos[2]:.2f} m)')
-                return True
+                below_min_altitude = True
+        if below_min_altitude:
+            return True
         evader_state = own_state if self.role == 'evader' else opponent_state
         if ep.stop_on_evader_exit and self._outside_arena(evader_state.pos):
             logger.warning(
@@ -1031,6 +1037,11 @@ class PursuitEvasionController:
                 problems.append(f'{drone.name}: mocap orientation not aligned')
             if not status[key].get('estimator_converged', False):
                 problems.append(f'{drone.name}: estimator not converged')
+            if self.mocap_config.enabled and isinstance(drone, CrazyflieDrone):
+                err = status[key].get('heading_error_deg')
+                if err is None or err > HEADING_TOLERANCE_DEG:
+                    problems.append(f'{drone.name}: estimator heading not set from mocap'
+                                    + ('' if err is None else f' ({err:.0f} deg off)'))
         if self.safety_cfg.enabled:
             problems += self.safety.preflight(self._monitored_states(), time.time())
         if problems:
@@ -1081,6 +1092,35 @@ class PursuitEvasionController:
     def _inject_active(self, now: float) -> bool:
         return self._inject_kind != 'none' and now - self._motion_start_time >= float(self._inject.get('at_s', 5.0))
 
+    def _stop_low_drones(self, drones) -> None:
+        """Check live altitude and remove motor-stopped drones from the active shutdown list."""
+        for d in list(drones):
+            if not isinstance(d, CrazyflieDrone):
+                continue
+            state = d.get_state()
+            if state is None or not np.isfinite(state.pos[2]):
+                continue
+            if (state.pos[2] < self.cfg.episode.min_altitude
+                    or (self.safety_cfg.enabled
+                        and state.pos[2] - self.arena_origin[2] < self.safety_cfg.min_altitude)):
+                logger.warning('[pe] %s below min altitude (%.2f m) during shutdown; motors off.',
+                               d.name, state.pos[2])
+                try:
+                    d.emergency_stop()
+                except Exception:
+                    logger.exception('[pe] emergency stop failed for %s', d.name)
+                drones.remove(d)
+
+    def _wait_shutdown(self, drones, duration: float) -> None:
+        """Wait without suspending the floor checks."""
+        end = time.time() + duration
+        while drones:
+            self._stop_low_drones(drones)
+            remaining = end - time.time()
+            if not drones or remaining <= 0.0:
+                return
+            time.sleep(min(self.control_dt, remaining))
+
     def _hold(self, drones, duration: float) -> None:
         """Hold each real drone at its current position (and yaw) for ``duration`` seconds."""
         targets = []
@@ -1092,6 +1132,8 @@ class PursuitEvasionController:
             logger.warning('[pe] HOLD for %.1f s at the current positions.', duration)
         end = time.time() + duration
         while targets and time.time() < end:
+            self._stop_low_drones(drones)
+            targets = [t for t in targets if t[0] in drones]
             for d, p, yaw in targets:
                 try:
                     d.send_position_setpoint(p[0], p[1], p[2], yaw_deg=yaw)
@@ -1117,7 +1159,9 @@ class PursuitEvasionController:
                        ', '.join(f'{d.name} from {np.linalg.norm(v):.1f} m/s' for d, v, _ in plans),
                        max(p[2] for p in plans))
         start = time.time()
-        while (elapsed := time.time() - start) < max(p[2] for p in plans) + 0.2:
+        while plans and (elapsed := time.time() - start) < max(p[2] for p in plans) + 0.2:
+            self._stop_low_drones(drones)
+            plans = [p for p in plans if p[0] in drones]
             for d, v0, duration in plans:
                 v = v0 * max(0.0, 1.0 - elapsed / duration)
                 try:
@@ -1129,9 +1173,10 @@ class PursuitEvasionController:
     def _wait_at_hover(self, drones, planned_s: float) -> None:
         """Wait the planned descent time, then until every drone is within 0.1 m of LAND_HOVER_Z and slower than
         0.3 m/s, at most land_settle_timeout more seconds."""
-        time.sleep(planned_s)
+        self._wait_shutdown(drones, planned_s)
         deadline = time.time() + self.land_settle_timeout
         while time.time() < deadline:
+            self._stop_low_drones(drones)
             states = [d.get_state() for d in drones]
             if all(s is not None and abs(s.pos[2] - LAND_HOVER_Z) < 0.1 and np.linalg.norm(s.lin_vel) < 0.3
                    for s in states):
@@ -1150,14 +1195,16 @@ class PursuitEvasionController:
     def shutdown(self) -> None:
         drones = [self.own, self.opponent]
         fault = self._fault
-        if fault is not None and fault.level >= Level.EMERGENCY:
-            for role in fault.emergency_roles:
+        emergency_roles = list(fault.emergency_roles) if fault is not None and fault.level >= Level.EMERGENCY else []
+        if emergency_roles:
+            for role in emergency_roles:
                 d = self.own if role == self.role else self.opponent
                 try:
                     d.emergency_stop()
                 except Exception:
                     logger.exception('[pe] emergency stop failed for %s', role)
                 drones = [x for x in drones if x is not d]
+        self._stop_low_drones(drones)
         self._brake(drones)
         if fault is not None and fault.level == Level.HOLD:
             self._hold(drones, self.safety_cfg.hold_s)
@@ -1166,6 +1213,7 @@ class PursuitEvasionController:
         # at 3.4 m/s. So: go_to (x, y, LAND_HOVER_Z), which keeps holding, wait until each drone is really there,
         # then a short final landing from that height.
         descending = []
+        self._stop_low_drones(drones)
         for d in drones:
             try:
                 state = d.get_state() if isinstance(d, CrazyflieDrone) else None
@@ -1179,13 +1227,17 @@ class PursuitEvasionController:
             except Exception:
                 logger.exception('[pe] landing failed for %s', getattr(d, 'name', d))
         if descending:
-            self._wait_at_hover([d for d, _ in descending], max(t for _, t in descending))
+            drones[:] = [d for d, _ in descending]
+            self._wait_at_hover(drones, max(t for _, t in descending))
+            self._stop_low_drones(drones)
             for d, _ in descending:
+                if d not in drones:
+                    continue
                 try:
                     d.land_async(FINAL_LAND_S)
                 except Exception:
                     logger.exception('[pe] final landing failed for %s', getattr(d, 'name', d))
-            time.sleep(FINAL_LAND_S + 0.5)
+            self._wait_shutdown(drones, FINAL_LAND_S + 0.5)
         for drone in (self.own, self.opponent):
             for action in ('disarm', 'disconnect'):
                 try:

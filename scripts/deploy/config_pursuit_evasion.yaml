@@ -30,7 +30,7 @@ opponent:
   mode: scripted                 # policy | cf | scripted
   # mode: policy  -> artifact of the OPPOSING role (here the same campaign's
   # final evader, stage 25).
-  artifact_dir: artifacts/thesis_F14_rls_s200/evader_stage23
+  artifact_dir: artifacts/thesis_F22_z2/evader_stage23
   # mode: policy only: hand the opponent drone to a second policy during the run (the thesis
   # switching evaders). The new policy keeps the drone's previous action. null = no switch.
   # F8 -> F10: artifact_dir = artifacts/thesis_F8_roncero_s0/evader and
@@ -65,7 +65,7 @@ arena:
 # -- Episode ------------------------------------------------------------------
 episode:
   stop_on_capture: true        # Stop once the drones are within capture_radius.
-  capture_radius: 0.0          # m; 0 = the trained radius from the metadata.
+  capture_radius: 0.1          # m; 0 = the trained radius from the metadata.
   stop_on_evader_exit: true    # Stop if the EVADER leaves the arena (episode end in
                                # training); the pursuer may leave freely.
   stop_on_timeout: false       # Stop after the training episode length
@@ -149,7 +149,7 @@ safety:
   pursuer_geofence_margin: 0.3  # pursuer's fence; null = none (training lets the pursuer leave the arena).
                                 # Set to the room the lab has beyond the arena walls and below the ceiling.
   stop_lookahead_s: 0.3         # predicted position (p + v * t) outside the fence -> HOLD
-  min_altitude: 0.10            # -> LAND
+  min_altitude: 0.10            # -> EMERGENCY (motors off); also checked throughout shutdown
   max_descent_speed: 2.5        # m/s below descent_check_alt -> HOLD (brake; motors-off would hit harder)
   descent_check_alt: 0.6
   max_tilt_deg: 60.0            # -> EMERGENCY

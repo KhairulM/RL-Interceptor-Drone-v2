@@ -75,8 +75,18 @@ class MonitorTest(unittest.TestCase):
         self.assertEqual(free().check({"evader": st(pos=(2.2, 0, 1), vel=(2, 0, 0))}, 10.0).level, L.HOLD)
 
     def test_floor_and_fast_descent(self):
-        self.assertEqual(self.mon().check({"pursuer": st(pos=(0, 0, 0.05))}, 10.0).level, L.LAND)
+        self.assertEqual(self.mon().check({"pursuer": st(pos=(0, 0, 0.05))}, 10.0).level, L.EMERGENCY)
         self.assertEqual(self.mon().check({"pursuer": st(pos=(0, 0, 0.4), vel=(0, 0, -3))}, 10.0).level, L.HOLD)
+
+    def test_floor_emergency_targets_each_role_and_uses_arena_origin(self):
+        for role in ("pursuer", "evader"):
+            with self.subTest(role=role):
+                m = sf.SafetyMonitor(sf.SafetyConfig(), sf.Arena(np.array([0, 0, 1.0]), 2.0, 0.1, 3.0))
+                v = m.check({role: st(pos=(0, 0, 1.05))}, 10.0)
+                self.assertEqual((v.level, v.emergency_roles), (L.EMERGENCY, [role]))
+        v = self.mon().check({"pursuer": st(pos=(0, 0, 0.05)), "evader": st(pos=(1, 0, 0.05))}, 10.0)
+        self.assertEqual(v.emergency_roles, ["pursuer", "evader"])
+        self.assertEqual(self.mon().check({"pursuer": st(pos=(0, 0, 0.1))}, 10.0).level, L.OK)
 
     def test_separation_optional(self):
         s = {"pursuer": st(), "evader": st(pos=(0.15, 0, 1))}
@@ -86,7 +96,8 @@ class MonitorTest(unittest.TestCase):
     def test_latch_never_decreases(self):
         m = self.mon()
         m.check({"pursuer": st(pos=(0, 0, 0.05))}, 10.0)
-        self.assertEqual(m.check({"pursuer": st()}, 10.05).level, L.LAND)
+        v = m.check({"pursuer": st()}, 10.05)
+        self.assertEqual((v.level, v.emergency_roles), (L.EMERGENCY, ["pursuer"]))
 
     def test_preflight(self):
         m = self.mon()

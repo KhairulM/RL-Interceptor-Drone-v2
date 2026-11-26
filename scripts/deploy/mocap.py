@@ -182,6 +182,7 @@ class MocapReceiver:
                     and not drone.mocap_orientation_aligned.is_set():
                 drone.mocap_orientation_aligned.set()
 
+            drone.mocap_pose = pose                      # its heading seeds the estimator at arm()
             drone.send_mocap_pos(pose.position)
         except Exception:  # pragma: no cover - link may be tearing down
             return

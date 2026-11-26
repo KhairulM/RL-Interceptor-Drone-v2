@@ -104,7 +104,7 @@ configuration before running it.
 | `controller.control_dt` | `0.02` | Policy and evader-motion period in seconds. |
 | `controller.takeoff_height` | `1.0` | Takeoff height for both drones in metres. |
 | `pursuer.uri` / `evader.uri` | *(config)* | cflib radio or CrazySim UDP URI. |
-| `min_altitude` | `0.15` | Safety cutoff (mirrors the training "misbehave" floor). |
+| `episode.min_altitude` | `0.15` | Below this world-frame altitude, stop the affected real drone's motors without further braking or landing commands; the other drone lands normally. Checks continue every control tick throughout shutdown (including after capture, during braking, hold, descent and final landing). `safety.min_altitude` (default `0.10` m above the arena origin) also triggers motor stop when safety is enabled. Takeoff/preflight are unchanged. |
 | `state_timeout` | `0.5` | Stop the drone if pose is stale for this long (s). |
 | `logs.save` | `false` | Log both drones' states each control tick, plus the run's time to intercept and pursuer max speed, as CSVs under `<dir>/{trajectory_logs,time_to_intercept_logs,max_travel_speed_logs}/<name>_trial_<N>/` (`<name>` = `intercept` or the baseline method, `N` = next unused trial). |
 | `logs.dir` | `./logs` | Output folder (relative to the config). |

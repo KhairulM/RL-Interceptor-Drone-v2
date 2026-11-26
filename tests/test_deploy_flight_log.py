@@ -12,8 +12,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts/deploy"))
 import flight_log as fl  # noqa: E402
 
 
-def st(pos, vel):
-    return SimpleNamespace(pos=pos, lin_vel=vel)
+def st(pos, vel, quat_wxyz=(1.0, 0.0, 0.0, 0.0)):
+    return SimpleNamespace(pos=pos, lin_vel=vel, quat_wxyz=quat_wxyz)
 
 
 class FlightLogTest(unittest.TestCase):
@@ -22,6 +22,13 @@ class FlightLogTest(unittest.TestCase):
         self.assertAlmostEqual(fl.approach_velocity([0, 0, 1], [2, 0, 0], [1, 0, 1], [0, 0, 0]), 2.0)    # closing
         self.assertAlmostEqual(fl.approach_velocity([0, 0, 1], [0, 0, 0], [1, 0, 1], [1.5, 0, 0]), -1.5)  # opening
         self.assertAlmostEqual(fl.approach_velocity([0, 0, 1], [0, 3, 0], [1, 0, 1], [0, 0, 0]), 0.0)     # sideways
+
+    def test_euler_deg(self):
+        import numpy as np
+        c, s_ = np.cos(np.radians(15)), np.sin(np.radians(15))
+        np.testing.assert_allclose(fl.euler_deg((c, 0, 0, s_)), (0, 0, 30), atol=1e-9)     # yaw 30
+        np.testing.assert_allclose(fl.euler_deg((c, s_, 0, 0)), (30, 0, 0), atol=1e-9)     # roll 30
+        np.testing.assert_allclose(fl.euler_deg((c, 0, s_, 0)), (0, 30, 0), atol=1e-9)     # pitch 30
 
     def test_outcome_from_safety(self):
         cases = {"LAND: pursuer: outside the geofence at [2.4, 0, 1]": "pursuer_oob",
@@ -45,7 +52,7 @@ class FlightLogTest(unittest.TestCase):
     def test_streams_rows_then_fills_outcome_and_writes_sidecar(self):
         with tempfile.TemporaryDirectory() as d:
             log = fl.FlightLog(d, "P", "E", 1000.0, {"config": {"a": 1}})
-            log.row(1000.5, st([0, 0, 1], [1, 0, 0]), st([1, 0, 1], [0, 0, 0]), "E")
+            log.row(1000.5, st([0, 0, 1], [1, 0, 0], (0.7071068, 0, 0, 0.7071068)), st([1, 0, 1], [0, 0, 0]), "E")
             self.assertTrue(os.path.isfile(log.path + ".partial"))        # crash-safe while flying
             log.row(1000.52, st([0.02, 0, 1], [1, 0, 0]), st([1, 0, 1], [0, 0, 0]), "E2")
             path = log.finish("capture", "0.09 m")
@@ -58,6 +65,8 @@ class FlightLogTest(unittest.TestCase):
             self.assertAlmostEqual(float(rows[0]["t"]), 0.5)
             self.assertAlmostEqual(float(rows[0]["approach_velocity"]), 1.0)
             self.assertAlmostEqual(float(rows[0]["distance"]), 1.0)
+            self.assertAlmostEqual(float(rows[0]["pursuer_yaw"]), 90.0, places=2)
+            self.assertAlmostEqual(float(rows[0]["evader_roll"]), 0.0)
             meta = json.load(open(path[:-4] + ".json"))
             self.assertEqual((meta["outcome"], meta["rows"], meta["config"]), ("capture", 2, {"a": 1}))
 
