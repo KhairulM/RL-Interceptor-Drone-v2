@@ -14,12 +14,12 @@ opponent:
   switch: {artifact_dir: artifacts/thesis_F10_nofix_s0/evader, after_s: 1.0}
 
 arena:
-  origin: [0.0, 0.0, 0.0]      # Arena centre on the floor, in mocap world coordinates (check in Motive).
+  origin: [0.0, 1.0, 0.0]      # Arena centre on the floor, in mocap world coordinates (check in Motive).
   scripted_margin: 0.3
 
 episode:
   stop_on_capture: true
-  capture_radius: 0.10         # m, the trained radius (centre to centre; the propellers may touch)
+  capture_radius: 0.11         # m, the trained radius (centre to centre; the propellers may touch)
   stop_on_evader_exit: true
   stop_on_timeout: true        # end at the training episode length (30 s) = "timeout" outcome
   state_timeout: 0.5
@@ -42,7 +42,7 @@ logging:
 
 pursuer:
   name: pursuer
-  uri: radio://0/40/2M/E7E7E7E701
+  uri: radio://0/80/2M/E7E7E7E701
   cache_dir: ./cache-pursuer
   control_dt: 0.02
   log_period_ms: 20
@@ -53,7 +53,7 @@ pursuer:
 
 evader:
   name: evader
-  uri: radio://1/80/2M/E7E7E7E702
+  uri: radio://1/40/2M/E7E7E7E702
   cache_dir: ./cache-evader
   control_dt: 0.02
   log_period_ms: 20
@@ -70,8 +70,8 @@ mocap:
   command_port: 1510
   data_port: 1511
   body_to_flu_quat_xyzw: [0.0, 0.0, -0.7071067811865476, 0.7071067811865476]
-  pursuer_rigid_body_id: 31
-  evader_rigid_body_id: 32
+  pursuer_rigid_body_id: 32
+  evader_rigid_body_id: 33
   mocap_send_rate_hz: 60.0
   world_frame: world
   orientation_align_time: 2.0

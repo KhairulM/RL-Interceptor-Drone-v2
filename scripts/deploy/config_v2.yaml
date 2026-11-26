@@ -36,7 +36,7 @@ controller:
 # -- Pursuer drone config ----------------------------------------------------
 pursuer:
   name: pursuer
-  uri: radio://0/80/2M/E7E7E7E702      # Crazyflie URI of the pursuer.
+  uri: radio://0/80/2M/E7E7E7E701      # Crazyflie URI of the pursuer.
   # uri: radio://0/10/2M/E7E7E7E7E1
   # uri: udp://127.0.0.1:19850
   cache_dir: ./cache-pursuer                    # cflib read/write cache directory.
@@ -51,7 +51,7 @@ pursuer:
 # -- Evader drone config -----------------------------------------------------
 evader:
   name: evader
-  uri: radio://1/5/2M/E7E7E7E7E3    # Evader Crazyflie URI (when source == cf)
+  uri: radio://1/40/2M/E7E7E7E702    # Evader Crazyflie URI (when source == cf)
   # uri: udp://127.0.0.1:19851
   cache_dir: ./cache-evader                    # cflib read/write cache directory.
   control_dt: 0.02                 # 0 = use the policy's training dt.

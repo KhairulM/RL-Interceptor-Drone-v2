@@ -14,8 +14,8 @@ BASE = os.path.join(HERE, '..', 'config_real_f14.yaml')
 SEED = 20261125
 FLIGHTS_PER_CONDITION = 3
 
-F14_S25 = 'artifacts/thesis_F14_rls_s200/evader'            # own campaign, final evader (stage 25)
-F14_S23 = 'artifacts/thesis_F14_rls_s200/evader_stage23'    # own campaign, second-to-last evader
+F22_S25 = 'artifacts/thesis_F22_z2/evader'            # own campaign, final evader (stage 25)
+F22_S23 = 'artifacts/thesis_F22_z2/evader_stage23'    # own campaign, second-to-last evader
 F10 = 'artifacts/thesis_F10_nofix_s0/evader'                # F10 seed 0, final evader (stage 11)
 F8B = 'artifacts/thesis_F8b_roncero_s0/evader'              # AMSPBH (Roncero rules), F8b seed 0, final (stage 25)
 
@@ -46,8 +46,8 @@ CONDITIONS = [
     # id, file name, description, opponent block
     ('S1', 'S1_switch_f8b_to_f10', 'switching evader: F8b s0 -> F10 after 1 s', policy(F8B, F10)),
     ('S2', 'S2_switch_f10_to_f8b', 'switching evader: F10 -> F8b s0 after 1 s', policy(F10, F8B)),
-    ('O25', 'O25_own_stage25', 'own campaign evader, stage 25 (final)', policy(F14_S25)),
-    ('O23', 'O23_own_stage23', 'own campaign evader, stage 23', policy(F14_S23)),
+    ('O25', 'O25_own_stage25', 'own campaign evader, stage 25 (final)', policy(F22_S25)),
+    ('O23', 'O23_own_stage23', 'own campaign evader, stage 23', policy(F22_S23)),
     ('A', 'A_amspbh_f8b', 'AMSPBH evader: F8b seed 0, final (stage 25)', policy(F8B)),
     ('P', 'P_apf', 'scripted APF evader', APF),
 ]

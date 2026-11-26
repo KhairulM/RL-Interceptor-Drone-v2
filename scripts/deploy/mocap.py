@@ -162,7 +162,7 @@ class MocapReceiver:
                     return
                 self._last_send_stamp[rb_id] = now
 
-            # Send the first pose with orientation to align the EKF, then only position for the rest of the time.
+            # Stream position for orientation_align_time before reporting the drone as aligned.
             first_send_stamp = self._first_send_stamp.get(rb_id)
             if first_send_stamp is None:
                 self._first_send_stamp[rb_id] = now
@@ -177,13 +177,12 @@ class MocapReceiver:
                 return                                   # implausible frame: not forwarded to the estimator
 
         try:
-            if (now - first_send_stamp) < self._orientation_align_time:
-                drone.send_mocap_pose(pose)
-            else:
-                if not drone.mocap_orientation_aligned.is_set():
-                    drone.mocap_orientation_aligned.set()
+            # Position only, also during the align window: the mocap orientation is not sent to the estimator.
+            if (now - first_send_stamp) >= self._orientation_align_time \
+                    and not drone.mocap_orientation_aligned.is_set():
+                drone.mocap_orientation_aligned.set()
 
-                drone.send_mocap_pos(pose.position)
+            drone.send_mocap_pos(pose.position)
         except Exception:  # pragma: no cover - link may be tearing down
             return
 
