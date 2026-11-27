@@ -85,6 +85,8 @@ EXPERIMENTS = {
     "F22": "f22_z2_rls:run_f22",
     "F23": "f23_v3_rls:run_f23",
     "F23c": "f23_v3_rls:run_f23c",
+    "F24": "f24_v3_hedge:run_f24",
+    "F24c": "f24_v3_hedge:run_f24c",
     "F16": "f16_roncero_population:run_f16",
     "F16c": "f16_roncero_population:run_f16c",
 }
@@ -109,7 +111,7 @@ def main():
     mod, _, fn = EXPERIMENTS[args.exp].partition(":")
     getattr(importlib.import_module(mod), fn or "run")(args)
     log_progress(f"=== done {args.exp}")
-    if not args.smoke and args.exp not in {"F21", "F21c", "F23", "F23c"}:
+    if not args.smoke and args.exp not in {"F21", "F21c", "F23", "F23c", "F24", "F24c"}:
         # F21 and F23 preserve user-owned/uncommitted research changes.
         import subprocess
         subprocess.run([os.path.join(HERE, "git_sync.sh"), f"thesis: {args.exp} finished"], check=False)

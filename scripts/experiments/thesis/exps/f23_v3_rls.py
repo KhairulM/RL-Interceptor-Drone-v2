@@ -131,7 +131,8 @@ def _eval_pool(path, opponents, checkpoint, seed, capture_radius=0.10):
     batches = []
     for batch_index in range(0, len(opponents), 2):
         batch = opponents[batch_index:batch_index + 2]
-        batch_path = f"{os.path.splitext(path)[0]}_batch{batch_index // 2:02d}.json"
+        suffix = "_r015" if capture_radius != 0.10 else ""   # else the 0.15 m pass reuses the 0.10 m batch files
+        batch_path = f"{os.path.splitext(path)[0]}{suffix}_batch{batch_index // 2:02d}.json"
         result = _eval(batch_path, batch, checkpoint, seed, capture_radius=capture_radius, cutoff=750)
         for opponent, metrics in result["matchups"].items():
             if metrics["episodes"] < 2048:

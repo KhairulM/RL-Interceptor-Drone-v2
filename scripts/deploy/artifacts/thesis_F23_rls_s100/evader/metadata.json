@@ -1,0 +1,38 @@
+{
+  "adapter": null,
+  "algo": "ppo",
+  "arena_half_xy": 2.0,
+  "arena_z_max": 2.2,
+  "arena_z_min": 0.1,
+  "artifact_version": 2,
+  "capture_radius": 0.1,
+  "ctbr": {
+    "dt": 0.02,
+    "lpf_coef": 1.0,
+    "max_thrust_ratio": 1.0,
+    "min_thrust_ratio": 0.0,
+    "target_clip": 1.0
+  },
+  "max_episode_length": 750,
+  "notes": {
+    "action_transform": "pidrate",
+    "checkpoint": "/home/user/Projects/RLInterceptorDrone/scripts/selfplay/outputs/thesis-F23-v3-acc-rls-s100/checkpoints/evader_stage25.pt",
+    "drone_model": "Crazyflie",
+    "exported_by": "thesis_F23_rls_s100/export_noisaac.py; metadata adapted from F14",
+    "task": "PursuitEvasionV3",
+    "trained_against": "uniform self-play pool of thesis-F23-v3-acc-rls-s100"
+  },
+  "obs": {
+    "action_dim": 4,
+    "adapter_dim": 3,
+    "esn_dim": 6,
+    "obs_dim": 28,
+    "rot_repr": "matrix",
+    "use_adapter": false,
+    "use_esn": false,
+    "use_previous_action": true,
+    "use_rel_dist": true
+  },
+  "role": "evader",
+  "sim_dt": 0.01
+}

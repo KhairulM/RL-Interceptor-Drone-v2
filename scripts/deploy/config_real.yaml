@@ -23,7 +23,7 @@ arena:
 
 episode:
   stop_on_capture: true
-  capture_radius: 0.11         # m, the trained radius (centre to centre; the propellers may touch)
+  capture_radius: 0.125         # m, the crazyflie is trained with 0.1m but the mocap data can be delayed so we increased the capture radius here
   stop_on_evader_exit: true
   stop_on_timeout: true        # end at the training episode length (30 s) = "timeout" outcome
   state_timeout: 0.5

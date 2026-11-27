@@ -1,0 +1,7 @@
+defaults:
+  - PursuitEvasionV3
+  - _self_
+
+# Thesis F24: v3 with the boundary-proximity penalty margin narrowed from 0.5 m to 0.3 m
+# (both roles; the penalty now ramps from 0 at 0.3 m inside each wall/floor/ceiling to 1 at it).
+bounds_margin: 0.3

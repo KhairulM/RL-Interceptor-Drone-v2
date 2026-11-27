@@ -23,14 +23,14 @@ policy:
   # which drone section below is "self".
   # F14 Stage E RLS, seed 200, stage 24: learned evader-acceleration estimate +
   # online RLS (obs 31). See artifacts/thesis_F14_rls_s200/README.md.
-  artifact_dir: artifacts/thesis_F14_rls_s200/pursuer
+  artifact_dir: artifacts/thesis_F23_rls_s100/pursuer
 
 # -- Opponent -----------------------------------------------------------------
 opponent:
-  mode: scripted                 # policy | cf | scripted
+  mode: policy                 # policy | cf | scripted
   # mode: policy  -> artifact of the OPPOSING role (here the same campaign's
   # final evader, stage 25).
-  artifact_dir: artifacts/thesis_F22_z2/evader_stage23
+  artifact_dir: artifacts/thesis_F23_rls_s100/evader
   # mode: policy only: hand the opponent drone to a second policy during the run (the thesis
   # switching evaders). The new policy keeps the drone's previous action. null = no switch.
   # F8 -> F10: artifact_dir = artifacts/thesis_F8_roncero_s0/evader and
@@ -41,7 +41,7 @@ opponent:
   # mode: cf  -> a real Crazyflie tracked by mocap but flown by something else.
   # mode: scripted  -> the opponent Crazyflie takes off and flies position setpoints:
   scripted:
-    type: circular               # hover | linear | circular | pure_pursuit | flee | apf
+    type: apf               # hover | linear | circular | pure_pursuit | flee | apf
     virtual: false             # true: no opponent drone; the agent chases a virtual point.
     yaw_deg: 0.0               # Yaw of every setpoint (deg).
     anchor: [0.5, 0.0, 1.0]    # Start / hover point [x, y, z] (m, mocap world); flee holds this z.
@@ -65,7 +65,7 @@ arena:
 # -- Episode ------------------------------------------------------------------
 episode:
   stop_on_capture: true        # Stop once the drones are within capture_radius.
-  capture_radius: 0.1          # m; 0 = the trained radius from the metadata.
+  capture_radius: 0.125          # m; 0 = the trained radius from the metadata.
   stop_on_evader_exit: true    # Stop if the EVADER leaves the arena (episode end in
                                # training); the pursuer may leave freely.
   stop_on_timeout: false       # Stop after the training episode length
@@ -142,8 +142,8 @@ mocap:
 # Checked every control tick for both drones. Responses: HOLD (hover in place for hold_s, then land),
 # LAND (both drones land at the same time), EMERGENCY (motors off on the affected drone, the other lands).
 safety:
-  enabled: false
-  strict_preflight: true        # refuse to take off if mocap is not aligned / the estimator has not converged /
+  enabled: true
+  strict_preflight: false        # refuse to take off if mocap is not aligned / the estimator has not converged /
                                 # a drone starts outside the arena, not level or with a stale / non-finite state
   evader_geofence_margin: 0.3   # evader's hard fence = arena + margin (incl. ceiling) -> LAND
   pursuer_geofence_margin: 0.3  # pursuer's fence; null = none (training lets the pursuer leave the arena).
