@@ -6,7 +6,7 @@
 # Run with:  python pursuit_evasion_controller.py --config config_real_f14.yaml
 
 policy:
-  artifact_dir: artifacts/thesis_F14_rls_s200/pursuer   # estimator + RLS, obs 31
+  artifact_dir: artifacts/thesis_F23_rls_s100/pursuer   # estimator + RLS, obs 31
 
 opponent:
   mode: scripted
@@ -88,10 +88,10 @@ mocap:
 safety:
   enabled: true
   strict_preflight: true        # no take-off without mocap alignment, estimator convergence, both drones in the arena
-  evader_geofence_margin: 0.1   # m past the arena walls / ceiling; the lab has about 0.1-0.2 m
-  pursuer_geofence_margin: 0.1  # m, same limit: the pursuer climbs toward the ceiling in most CrazySim runs
+  evader_geofence_margin: 0.3   # m past the arena walls / ceiling; the lab has about 0.1-0.2 m
+  pursuer_geofence_margin: 0.3  # m, same limit: the pursuer climbs toward the ceiling in most CrazySim runs
   stop_lookahead_s: 0.3         # predicted position outside the fence -> HOLD
   min_separation: 0.0           # m; 0 = off, the capture stop at 0.10 m ends the run
-  mocap_timeout: 1.0            # s without an accepted mocap frame for a drone -> HOLD
-  mocap_land_after: 1.0         # s after the last accepted mocap frame for a drone -> LAND
+  mocap_timeout: 0.5            # s without an accepted mocap frame for a drone -> HOLD
+  mocap_land_after: 0.5         # s after the last accepted mocap frame for a drone -> LAND
   inject: {kind: none, at_s: 5.0}
